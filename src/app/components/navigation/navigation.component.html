@@ -1,0 +1,218 @@
+<div class="on-mobile shadow navigation-bar position-fixed w-100">
+  <nav class="navbar">
+    <button
+      class="navbar-toggler ms-3"
+      type="button"
+      data-bs-toggle="offcanvas"
+      data-bs-target="#offCanvasNavMenu"
+      aria-controls="offCanvasMenu"
+      aria-expanded="false"
+      aria-label="Toggle navigation"
+    >
+      <span class="navbar-toggler-icon"></span>
+    </button>
+  </nav>
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="offCanvasNavMenu" aria-labelledby="offCanvasNavMenuLabel">
+    <div class="offcanvas-header">
+      <button type="button" class="btn-close ms-auto" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body d-flex">
+      <img *ngIf="router != '/'" data-aos="fade-in" src="assets/logo_250.png" class="nav-logo-moblie" />
+      <!-- src="assets/SOTF_logo.png" -->
+      <div class="link-contaner-mobile">
+        <a
+          class="nav-item nav-link"
+          routerLink="/"
+          routerLinkActive="active"
+          data-bs-toggle="offcanvas"
+          data-bs-target="#offCanvasNavMenu"
+          [routerLinkActiveOptions]="{ exact: true }"
+        >
+          Home
+        </a>
+        <a
+          class="nav-item nav-link"
+          routerLink="/visitor-information"
+          routerLinkActive="active"
+          data-bs-toggle="offcanvas"
+          data-bs-target="#offCanvasNavMenu"
+          [routerLinkActiveOptions]="{ exact: true }"
+        >
+          Visitor Information
+          <br />
+          & Registration
+        </a>
+        <a
+          class="nav-item nav-link"
+          routerLink="/sponsors"
+          routerLinkActive="active"
+          data-bs-toggle="offcanvas"
+          data-bs-target="#offCanvasNavMenu"
+          [routerLinkActiveOptions]="{ exact: true }"
+        >
+          Sponsors
+        </a>
+        <a
+          class="nav-item nav-link"
+          routerLink="/vendors"
+          routerLinkActive="active"
+          data-bs-toggle="offcanvas"
+          data-bs-target="#offCanvasNavMenu"
+          [routerLinkActiveOptions]="{ exact: true }"
+        >
+          Vendors
+        </a>
+        <a
+          class="nav-item nav-link"
+          routerLink="/volunteers"
+          routerLinkActive="active"
+          data-bs-toggle="offcanvas"
+          data-bs-target="#offCanvasNavMenu"
+          [routerLinkActiveOptions]="{ exact: true }"
+        >
+          Volunteers
+        </a>
+        <a
+          class="nav-item nav-link"
+          routerLink="/media"
+          routerLinkActive="active"
+          data-bs-toggle="offcanvas"
+          data-bs-target="#offCanvasNavMenu"
+          [routerLinkActiveOptions]="{ exact: true }"
+        >
+          Media
+        </a>
+        <a
+          class="nav-item nav-link"
+          routerLink="/upcomingevents"
+          routerLinkActive="active"
+          data-bs-toggle="offcanvas"
+          data-bs-target="#offCanvasNavMenu"
+          [routerLinkActiveOptions]="{ exact: true }"
+        >
+          Upcoming Events
+        </a>
+        <a
+          class="nav-item nav-link"
+          routerLink="/about"
+          routerLinkActive="active"
+          data-bs-toggle="offcanvas"
+          data-bs-target="#offCanvasNavMenu"
+          [routerLinkActiveOptions]="{ exact: true }"
+        >
+          About
+        </a>
+        <!-- <div class="text-center" id="paypal-donate-button-container-2"></div> -->
+        <div class="social-links-container text-center mt-3">
+          <a href="https://www.instagram.com/ranchobernardo/" target="_blank">
+            <fa-icon class="social-link" [icon]="faInstagram"></fa-icon>
+          </a>
+          <a href="https://www.facebook.com/spiritofthefourth/" target="_blank">
+            <fa-icon class="social-link" [icon]="faFacebook"></fa-icon>
+          </a>
+        </div>
+        <a
+          class="nav-item nav-link privacy-policy"
+          routerLink="/privacy-policy"
+          routerLinkActive="active"
+          data-bs-toggle="offcanvas"
+          data-bs-target="#offCanvasNavMenu"
+          [routerLinkActiveOptions]="{ exact: true }"
+        >
+          Privacy Policy
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="on-mobile navbar-padding"></div>
+<div class="not-on-mobile navbar-container d-flex">
+  <img *ngIf="router != '/'" data-aos="fade-in" src="assets/logo_250.png" class="nav-logo" />
+  <!-- src="assets/SOTF_logo.png" -->
+  <div class="offcanvas-body link-contaner">
+    <a class="nav-item nav-link" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+      Home
+    </a>
+    <a
+      class="nav-item nav-link"
+      routerLink="/visitor-information"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: false }"
+    >
+      Visitor Information
+      <br />
+      & Registration
+    </a>
+    <a
+      class="nav-item nav-link"
+      routerLink="/sponsors"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      Sponsors
+    </a>
+    <a
+      class="nav-item nav-link"
+      routerLink="/vendors"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      Vendors
+    </a>
+    <a
+      class="nav-item nav-link"
+      routerLink="/volunteers"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      Volunteers
+    </a>
+    <a
+      class="nav-item nav-link"
+      routerLink="/media"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      Media
+    </a>
+    <a
+      class="nav-item nav-link"
+      routerLink="/upcomingevents"
+      routerLinkActive="active"
+      data-bs-toggle="offcanvas"
+      data-bs-target="#offCanvasNavMenu"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      Upcoming Events
+    </a>
+    <a
+      class="nav-item nav-link"
+      routerLink="/about"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      About
+    </a>
+
+    <div class="text-center" id="paypal-donate-button-container-1"></div>
+
+    <div class="social-links-container text-center mt-3">
+      <a href="https://www.instagram.com/ranchobernardo/" target="_blank">
+        <fa-icon class="social-link" [icon]="faInstagram"></fa-icon>
+      </a>
+      <a href="https://www.facebook.com/spiritofthefourth/" target="_blank">
+        <fa-icon class="social-link" [icon]="faFacebook"></fa-icon>
+      </a>
+    </div>
+
+    <a
+      class="nav-item nav-link privacy-policy"
+      routerLink="/privacy-policy"
+      routerLinkActive="active"
+      data-bs-toggle="offcanvas"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      Privacy Policy
+    </a>
+  </div>
+</div>

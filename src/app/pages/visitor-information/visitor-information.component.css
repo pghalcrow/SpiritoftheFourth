@@ -1,0 +1,36 @@
+
+
+
+
+.event-container{
+    position: relative;
+    width: 100%;
+    height: 200px;
+    overflow: hidden;
+}
+.event-image{
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: .5s;
+}
+.event-image:hover{
+    transform: scale(1.1);
+}
+
+.event-banner{
+    padding: 7px 0;
+    background-color: var(--yellow-color);
+    color: var(--dark-blue-color);
+    font-size: 1.05rem;
+    width: 100%;
+    text-align: center;
+    position: absolute;
+    bottom: 30px;
+
+}
+.map-image{
+    width: 95%;
+    height: auto;
+    object-fit: contain;
+}

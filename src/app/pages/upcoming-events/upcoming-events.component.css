@@ -1,0 +1,243 @@
+.flyer-img {
+  width: 80%;
+  max-width: 600px;
+  min-width: 350px;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+h1,
+h2 {
+  color: var(--dark-blue-color);
+}
+
+.text-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 74px;
+}
+
+.form-field input[type="checkbox"] {
+  transform: scale(1.4);
+  width: auto;
+  max-width: none;
+}
+
+form {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 30px;
+  color: var(--dark-blue-color);
+}
+
+form label {
+  /* display: block; */
+  margin-bottom: 5px;
+  font-weight: 600;
+}
+
+form input {
+  max-width: 400px;
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 14px;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.form-row label {
+  width: 120px;
+  margin-right: 10px;
+  font-weight: 600;
+  color: #333;
+}
+
+.form-row input {
+  flex: 1;
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.text-fields {
+  margin-top: 30px;
+}
+
+button {
+  margin: 3px;
+  border: 3px solid white;
+  width: 150px;
+  height: 60px;
+  color: var(--dark-blue-color);
+}
+
+.checkbox-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: auto;
+  max-width: none;
+}
+
+.add-ons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 16px;
+}
+
+.add-on-item {
+  font-size: 1.2rem;
+}
+
+.add-on-item label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.add-on-item input[type="checkbox"] {
+  transform: scale(1.4);
+  width: auto;
+  max-width: none;
+}
+
+.payment-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.payment-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 190px;
+  height: 66px;
+  font-size: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  margin: 0;
+}
+
+.paypal-btn {
+  background-color: #003087;
+  color: #ffffff;
+}
+
+.stripe-btn {
+  background-color: #635bff;
+  color: #ffffff;
+}
+
+.payment-btn:hover {
+  border: 3px solid #007bb4 !important;
+  color: #007bb4;
+}
+
+.sponsor-paypal-btn {
+  background-color: #ffffff;
+  color: #003087;
+  border: 1px solid #003087 !important;
+}
+
+.sponsor-stripe-btn {
+  background-color: #ffffff;
+  color: #635bff;
+  border: 1px solid #635bff !important;
+}
+
+.sponsor-paypal-btn:hover,
+.sponsor-stripe-btn:hover {
+  border: 3px solid #007bb4 !important;
+  color: #007bb4;
+}
+
+form input.ng-touched.ng-invalid {
+  border: 2px solid red;
+}
+
+#paypal-donate-button-container-2 {
+  min-height: 50px;
+}
+
+.text-center {
+  padding-top: 22px;
+}
+
+.sponsor-section {
+  background: var(--dark-blue-color);
+  color: white;
+  text-align: center;
+}
+
+.sponsor-section h3 {
+  color: white;
+}
+
+.sponsor-section p {
+  color: white;
+}
+
+.sponsor-section label {
+  color: white;
+}
+
+.error {
+  color: red;
+  font-size: 13px;
+  margin-bottom: 10px;
+  margin-left: 130px;
+  text-align: left;
+}
+
+@media (max-width: 768px) {
+  .payment-method-row label {
+    width: auto;
+    margin: 0 0 10px 0;
+    text-align: center;
+  }
+
+  .payment-method-row {
+    float: none;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+    align-items: unset;
+    flex-direction: column !important;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+}

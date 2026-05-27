@@ -1,0 +1,23 @@
+<div class="mt-5">
+    <h1 class="ms-3 text-center">A very special thanks to our sponsors!</h1>
+    <div class="container">
+        <div class="row ms-lg-5 me-lg-5 justify-content-center align-middle">
+            <div class="col-4 col-md-3 mt-2 d-flex text-center">
+               
+                <img src="assets/sponsor_logos/brenda_dave_rickey.png" class="sponsor-image">
+            
+            </div>
+        </div>
+
+        <div class="row ms-lg-5 me-lg-5 justify-content-center align-middle text-center">
+            <div *ngFor="let sponsor of sponsors" class="col-4 col-md-3 mt-2 d-flex text-center">
+                <a *ngIf="sponsor.url; else noUrl" class="mx-auto my-auto text-center" [href]="sponsor.url" target="_blank">
+                <img [src]="sponsor.image" class="sponsor-image text-center mx-auto">
+            </a>
+            <ng-template #noUrl>
+                <img [src]="sponsor.image" class="sponsor-image">
+            </ng-template>
+            </div>
+        </div>
+    </div>
+</div>

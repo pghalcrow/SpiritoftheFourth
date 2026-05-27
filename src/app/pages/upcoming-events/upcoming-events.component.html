@@ -1,0 +1,140 @@
+<div class="container gx-0">
+  <div class="row gx-0">
+    <h1 class="oswald-font text-center mt-3">Upcoming Event(s)</h1>
+    <hr style="width: 50%; margin: 0 auto" />
+    <div class="col-12 justify-center text-center">
+      <ng-template #fieldRenderer let-field let-fg="fg">
+        <div class="form-field" [formGroup]="fg">
+          <label *ngIf="field.type !== 'checkbox'" class="text-label">
+            {{ field.label }}
+            <input [type]="field.type" [formControlName]="field.name" />
+          </label>
+          <label *ngIf="field.type === 'checkbox'" class="checkbox-label">
+            <input type="checkbox" [formControlName]="field.name" />
+            {{ field.label }}
+          </label>
+        </div>
+      </ng-template>
+
+      <div *ngFor="let event of events; let i = index">
+        <h2>{{ event.title }}</h2>
+        <img [src]="event.flyerUrl" alt="{{ event.title }} flyer" class="flyer-img shadow mt-3" />
+
+        <form *ngIf="event.formGroup as fg" [formGroup]="fg" (ngSubmit)="onSubmit(event)">
+          <div *ngFor="let section of event.sections">
+            <!-- NORMAL FIELD SECTION -->
+            <ng-container *ngIf="section.type === 'fields'">
+              <div *ngFor="let fieldName of section.fields">
+                <ng-container *ngIf="event.fieldMap[fieldName] as field">
+                  <ng-container *ngIf="field.type !== 'group'">
+                    <ng-container
+                      *ngTemplateOutlet="fieldRenderer; context: { $implicit: field, fg: fg }"
+                    ></ng-container>
+                  </ng-container>
+                </ng-container>
+              </div>
+            </ng-container>
+
+            <!-- GROUP SECTION -->
+            <ng-container *ngIf="section.type === 'group'">
+              <ng-container *ngIf="event.fieldMap[section.field] as field">
+                <h3 *ngIf="getMembers(fg, field.name).length > 0">
+                  {{ field.label }}
+                </h3>
+
+                <p>{{ event.description }}</p>
+
+                <ng-container *ngIf="getMembers(fg, field.name).length > 0">
+                  <div [formArrayName]="field.name">
+                    <div
+                      *ngFor="let member of getMembers(fg, field.name).controls; let i = index"
+                      [formGroupName]="i"
+                      class="team-member"
+                    >
+                      <div *ngFor="let subField of field.fields" class="form-field">
+                        <label class="text-label">
+                          {{ subField.label }}
+                          <input [type]="subField.type" [formControlName]="subField.name" />
+                        </label>
+                      </div>
+
+                      <button type="button" (click)="removeMember(fg, field.name, i)">Remove</button>
+                    </div>
+                  </div>
+                </ng-container>
+
+                <button
+                  type="button"
+                  (click)="addMember(event, field)"
+                  [disabled]="getMembers(fg, field.name).length >= field.maxMembers"
+                >
+                  Add Participant
+                </button>
+              </ng-container>
+            </ng-container>
+          </div>
+
+          <div class="add-ons">
+            <div *ngFor="let addOn of event.pricing.addOns" class="add-on-item">
+              <label>
+                <input type="checkbox" [formControlName]="addOn.field" />
+                {{ addOn.field | titlecase }} (+${{ addOn.price }})
+              </label>
+            </div>
+          </div>
+
+          <h3>Total: ${{ calculateTotal(event) }}</h3>
+
+          <div class="payment-row">
+            <button type="submit" class="payment-btn paypal-btn" (click)="paymentMethod = 'paypal'">
+              <i class="fa-brands fa-paypal"></i> PayPal
+            </button>
+            <button type="submit" class="payment-btn stripe-btn" (click)="paymentMethod = 'stripe'">
+              <i class="fa-brands fa-stripe fa-2x"></i>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="text-center mt-4 sponsor-section">
+      <h3>Not participating in the tournament?</h3>
+      <p>Fill out this form to sponsor a tee sign.</p>
+      <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+
+      <form [formGroup]="sponsorForm" (ngSubmit)="submitSponsor()">
+        <div class="form-field">
+          <label class="text-label">
+            Name
+            <input type="text" formControlName="name" />
+          </label>
+        </div>
+
+        <div class="form-field">
+          <label class="text-label">
+            Email
+            <input type="email" formControlName="email" />
+          </label>
+        </div>
+
+        <div class="form-field">
+          <label class="text-label">
+            Phone
+            <input type="text" formControlName="phone" />
+          </label>
+        </div>
+
+        <h3>Total: $100</h3>
+
+        <div class="payment-row">
+          <button type="submit" class="payment-btn sponsor-paypal-btn" (click)="sponsorPaymentMethod = 'paypal'">
+            <i class="fa-brands fa-paypal"></i> PayPal
+          </button>
+          <button type="submit" class="payment-btn sponsor-stripe-btn" (click)="sponsorPaymentMethod = 'stripe'">
+            <i class="fa-brands fa-stripe fa-2x"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,162 @@
+<div class="container gx-0">
+  <div class="row gx-0">
+    <button (click)="logout()" class="logout-button">Logout</button>
+    <h1 class="oswald-font text-center mt-3">Upcoming Events - Admin Edit</h1>
+    <hr style="width: 50%; margin: 0 auto" />
+
+    <div class="col-12 justify-center text-center">
+      <div *ngFor="let cmsEvent of events; let i = index" class="event-editor">
+        <!-- Event Header -->
+        <h2>Event {{ i + 1 }}</h2>
+
+        <!-- Event Title -->
+        <label class="section-label">Title:</label>
+        <input
+          class="editable-title"
+          [(ngModel)]="cmsEvent.title"
+          (ngModelChange)="cmsEvent.type = toCamelCase($event)"
+        />
+
+        <!-- Flyer -->
+        <label class="section-label">Flyer Image:</label>
+        <img [src]="cmsEvent.flyerUrl" alt="{{ cmsEvent.title }} flyer" class="flyer-img shadow mt-3" />
+        <input type="file" (change)="onFileSelected($event, cmsEvent)" accept="image/*" />
+
+        <!-- Description -->
+        <label class="section-label">Description (For sign-up page):</label>
+        <textarea
+          class="editable-textarea"
+          [(ngModel)]="cmsEvent.description"
+          placeholder="Event Description"
+        ></textarea>
+
+        <!-- Event Meta -->
+        <fieldset>
+          <legend>Event Meta Data</legend>
+          <label>Date of Event:</label>
+          <input [(ngModel)]="cmsEvent.eventMeta.dateOfEvent" placeholder="Date" />
+          <br />
+          <br />
+
+          <label>Location:</label>
+          <input [(ngModel)]="cmsEvent.eventMeta.location" placeholder="Location" />
+          <br />
+          <br />
+
+          <label>Contact Email (Who will get the email confirmation & contact information given to sign-ups):</label>
+          <input [(ngModel)]="cmsEvent.eventMeta.contactEmail" placeholder="Contact Email" />
+          <br />
+          <br />
+
+          <label>End Blurb (Message for the sign-up in their email confirmation receipt):</label>
+          <textarea
+            [(ngModel)]="cmsEvent.eventMeta.endBlurb"
+            placeholder="End Blurb"
+            rows="4"
+            class="editable-textarea"
+          ></textarea>
+        </fieldset>
+
+        <!-- Form Fields -->
+        <fieldset>
+          <legend>Form Fields</legend>
+          <div cdkDropList (cdkDropListDropped)="dropField($event, cmsEvent.formFields)">
+            <div *ngFor="let field of cmsEvent.formFields; let k = index" cdkDrag class="form-field draggable-field">
+              <div class="drag-handle">☰ Drag</div>
+
+              <label>Label:</label>
+              <input [(ngModel)]="field.label" (ngModelChange)="onFieldLabelChange(field)" placeholder="Label" />
+
+              <label>Type:</label>
+              <select [(ngModel)]="field.type" (ngModelChange)="onFieldTypeChange(field)">
+                <option *ngFor="let type of fieldTypes" [value]="type">
+                  {{ type }}
+                </option>
+              </select>
+
+              <label>
+                Required:
+                <input type="checkbox" [(ngModel)]="field.required" />
+              </label>
+
+              <!-- Group Fields -->
+              <div *ngIf="field.type === 'group'" class="group-fields">
+                <h4>{{ field.label }} Subfields</h4>
+
+                <label>Max additional Members:</label>
+                <input type="number" [(ngModel)]="field.maxMembers" placeholder="Max Members" />
+
+                <div *ngFor="let subField of field.fields; let l = index">
+                  <label>Subfield Label:</label>
+                  <select [(ngModel)]="subField.label" (ngModelChange)="subField.name = toCamelCase(subField.label)">
+                    <option
+                      *ngFor="let mainField of cmsEvent.formFields"
+                      [value]="mainField.label"
+                      [disabled]="mainField === field"
+                    >
+                      {{ mainField.label }}
+                    </option>
+                  </select>
+
+                  <label>Subfield Type:</label>
+                  <select [(ngModel)]="subField.type">
+                    <option *ngFor="let type of subFieldTypes" [value]="type">
+                      {{ type }}
+                    </option>
+                  </select>
+
+                  <label>
+                    Required:
+                    <input type="checkbox" [(ngModel)]="subField.required" />
+                  </label>
+                </div>
+
+                <button (click)="addSubField(field)">Add Sub Field</button>
+              </div>
+
+              <button (click)="removeFormField(cmsEvent, k)">Remove Field</button>
+            </div>
+          </div>
+          <button (click)="addFormField(cmsEvent)">Add Form Field</button>
+        </fieldset>
+
+        <!-- Pricing -->
+        <fieldset>
+          <legend>Pricing</legend>
+          <label>Participant Field:</label>
+          <select [(ngModel)]="cmsEvent.pricing.basePlayerField">
+            <option value="N/A">N/A</option>
+            <ng-container *ngFor="let field of cmsEvent.formFields">
+              <option *ngIf="field.type === 'group'" [value]="field.name">
+                {{ field.label }}
+              </option>
+            </ng-container>
+          </select>
+
+          <label>
+            Include Primary Player:
+            <input type="checkbox" [(ngModel)]="cmsEvent.pricing.includePrimaryPlayer" />
+          </label>
+
+          <label>Price per Player:</label>
+          <input type="number" [(ngModel)]="cmsEvent.pricing.pricePerPlayer" placeholder="Price per Player" />
+
+          <div *ngFor="let addOn of cmsEvent.pricing.addOns; let j = index" class="add-on">
+            <label>Add-On Field:</label>
+            <input [(ngModel)]="addOn.field" placeholder="Add-On Field" />
+            <label>Price:</label>
+            <input type="number" [(ngModel)]="addOn.price" placeholder="Price" />
+            <button (click)="removeAddOn(cmsEvent, j)">Remove Add-On</button>
+          </div>
+          <button (click)="addAddOn(cmsEvent)">Add Add-On</button>
+        </fieldset>
+
+        <button (click)="deleteEvent(i)">🗑️ Delete Event</button>
+        <hr />
+      </div>
+
+      <button (click)="addEvent()">➕ Add New Event</button>
+      <button (click)="saveEvents()">💾 Save All Changes</button>
+    </div>
+  </div>
+</div>

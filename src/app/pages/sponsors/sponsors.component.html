@@ -1,0 +1,347 @@
+<div class="header-image-container">
+  <img src="assets/balloons_sky.jpg" />
+</div>
+
+<div class="container">
+  <div class="row text-center">
+    <div class="col-12">
+      <p class="mt-4">
+        We love and thank all of our generous sponsors and their continued support. The Spirit of the Fourth is a
+        509(a)(1) charitable foundation and the events we hold could not happen without the help of our community.
+      </p>
+      <p class="mt-4">
+        It takes over $85,000 to put on the 4th of July events throughout the day. Without event sponsors, donors and
+        partnerships, there would be no events.
+      </p>
+      <!-- <div class="link-div mt-4 shadow mb-5" data-bs-toggle="modal" data-bs-target="#sponsorshipModal">
+                    Become a Sponsor
+                </div> -->
+      <a href="/assets/Sponsorship_FORM.pdf" target="_blank">
+        <div class="link-div mt-4 shadow mb-5">Download PDF</div>
+      </a>
+
+      <p class="mt-3">
+        Are you an individual looking to join our Freedom Club? Learn more about how you can support the Spirit of the
+        Fourth and receive VIP perks.
+      </p>
+      <a class="link-btn" routerLink="/freedom-club">
+        <div class="link-div mt-4 shadow mb-5">Learn More</div>
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="sponsorshipModal" tabindex="-1" aria-labelledby="sponsorshipModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title text-center w-100 mt-3 modal-headline" id="sponsorshipModalLabel">
+          Spirit of the Fourth 2023 Sponsorship Form
+        </h1>
+        <button type="button" class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">X</button>
+      </div>
+      <div class="modal-body">
+        <!---Begin submission form-->
+        <form [formGroup]="sponsorForm" class="mt-4 mb-4" (ngSubmit)="onSubmit(sponsorForm)">
+          <div class="container">
+            <div class="row">
+              <div class="col-12">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    id="contactNameInput"
+                    formControlName="contactName"
+                    [class.alert-input]="
+                      sponsorForm.get('contactName')!.invalid &&
+                      (sponsorForm.get('contactName')!.dirty || sponsorForm.get('contactName')!.touched)
+                    "
+                    placeholder="Contact Name"
+                  />
+                  <label for="contactNameInput">Contact Name*</label>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    id="contactTitleInput"
+                    formControlName="contactTitle"
+                    [class.alert-input]="
+                      sponsorForm.get('contactTitle')!.invalid &&
+                      (sponsorForm.get('contactTitle')!.dirty || sponsorForm.get('contactTitle')!.touched)
+                    "
+                    placeholder="Title"
+                  />
+                  <label for="contactTitleInput">Title*</label>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    id="companyInput"
+                    formControlName="companyName"
+                    [class.alert-input]="
+                      sponsorForm.get('companyName')!.invalid &&
+                      (sponsorForm.get('companyName')!.dirty || sponsorForm.get('companyName')!.touched)
+                    "
+                    placeholder="Company Name"
+                  />
+                  <label for="emailInput">Company Name*</label>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="form-floating mb-3">
+                  <input
+                    type="email"
+                    class="form-control"
+                    id="emailInput"
+                    formControlName="email"
+                    [class.alert-input]="
+                      sponsorForm.get('email')!.invalid &&
+                      (sponsorForm.get('email')!.dirty || sponsorForm.get('email')!.touched)
+                    "
+                    placeholder="Email"
+                  />
+                  <label for="emailInput">Email*</label>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    id="websiteInput"
+                    formControlName="website"
+                    [class.alert-input]="
+                      sponsorForm.get('website')!.invalid &&
+                      (sponsorForm.get('website')!.dirty || sponsorForm.get('website')!.touched)
+                    "
+                    placeholder="Website"
+                  />
+                  <label for="websiteInput">Website URL*</label>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="form-floating mb-3">
+                  <input
+                    type="tel"
+                    class="form-control"
+                    id="phoneInput"
+                    formControlName="phone"
+                    appOnlyNumbers
+                    maxlength="12"
+                    size="12"
+                    [class.alert-input]="
+                      sponsorForm.get('phone')!.invalid &&
+                      (sponsorForm.get('phone')!.dirty || sponsorForm.get('phone')!.touched)
+                    "
+                    placeholder="Phone"
+                  />
+                  <label for="phoneInput">Phone Number*</label>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    id="streetAddressInput"
+                    [class.alert-input]="
+                      sponsorForm.get('streetAddress')!.invalid &&
+                      (sponsorForm.get('streetAddress')!.dirty || sponsorForm.get('streetAddress')!.touched)
+                    "
+                    formControlName="streetAddress"
+                    placeholder="Street"
+                  />
+
+                  <label for="streetAddressInput">Street Address*</label>
+                </div>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    id="cityInput"
+                    formControlName="city"
+                    [class.alert-input]="
+                      sponsorForm.get('city')!.invalid &&
+                      (sponsorForm.get('city')!.dirty || sponsorForm.get('city')!.touched)
+                    "
+                    placeholder="City"
+                  />
+                  <label for="cityInput">City*</label>
+                </div>
+              </div>
+
+              <div class="col-6 col-md-3">
+                <div class="form-floating mb-3">
+                  <select
+                    class="form-select"
+                    id="stateInput"
+                    formControlName="state"
+                    [class.alert-input]="
+                      sponsorForm.get('state')!.invalid &&
+                      (sponsorForm.get('state')!.dirty || sponsorForm.get('state')!.touched)
+                    "
+                  >
+                    <option *ngFor="let state of states" [value]="state">{{ state }}</option>
+                  </select>
+                  <label for="stateInput">State*</label>
+                </div>
+              </div>
+
+              <div class="col-6 col-md-3">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    id="zipcodeInput"
+                    formControlName="zipcode"
+                    appDigitsOnly
+                    maxlength="5"
+                    size="5"
+                    minLength="5"
+                    [class.alert-input]="
+                      sponsorForm.get('zipcode')!.invalid &&
+                      (sponsorForm.get('zipcode')!.dirty || sponsorForm.get('zipcode')!.touched)
+                    "
+                    placeholder="Zipcode"
+                  />
+                  <label for="zipcodeInput">Zipcode*</label>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="radio"
+                    name="sponsorshipLevel"
+                    id="sponsorshipLevelSpiritOfTheFourth"
+                    value="sotf"
+                    formControlName="sponsorshipLevel"
+                  />
+                  <label class="form-check-label" for="sponsorshipLevelSpiritOfTheFourth">
+                    <b>“Spirit of the Fourth Event Sponsor” $10,000:</b>
+                    Includes the following:
+                    <ul>
+                      <li>Your company name prominently placed on all advertising and publicity at all events</li>
+                      <li>Your sponsorship and company name announced at the Parade and Fireworks Show</li>
+                      <li>Your company name printed on parade volunteer/staff t-shirts</li>
+                      <li>
+                        Your company name displayed on a banner in the parade line-up with a corporate representative
+                        riding in a provided vehicle
+                      </li>
+                      <li>
+                        20 tickets to the VIP Reception, reserved parking and seats for 20 at the Parade and Fireworks
+                      </li>
+                      <li>Full page color ad in program and company name on cover of program</li>
+                    </ul>
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="radio"
+                    name="sponsorshipLevel"
+                    id="sponsorshipLevelStars"
+                    value="stars"
+                    formControlName="sponsorshipLevel"
+                  />
+                  <label class="form-check-label" for="sponsorshipLevelStars">
+                    <b>“Stars Sponsor” $5,000:</b>
+                    Includes the following:
+                    <ul>
+                      <li>Your company name prominently placed on all advertising and publicity at all events</li>
+                      <li>
+                        14 tickets to the VIP Reception, reserved parking and seats for 14 at the Parade and Fireworks
+                      </li>
+                      <li>Full-page color ad in program</li>
+                    </ul>
+                  </label>
+                </div>
+
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="radio"
+                    name="sponsorshipLevel"
+                    id="sponsorshipLevelStripes"
+                    value="stripes"
+                    formControlName="sponsorshipLevel"
+                  />
+                  <label class="form-check-label" for="sponsorshipLevelStripes">
+                    <b>“Stripes Sponsor” $3,000:</b>
+                    Includes the following:
+                    <ul>
+                      <li>Your company name prominently placed on all advertising and publicity at all events</li>
+                      <li>
+                        10 tickets to the VIP Reception, reserved parking and seats for 10 at the Parade and Fireworks
+                      </li>
+                      <li>Half-page color ad in program</li>
+                    </ul>
+                  </label>
+                </div>
+
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="radio"
+                    name="sponsorshipLevel"
+                    id="sponsorshipLevelLiberty"
+                    value="liberty"
+                    formControlName="sponsorshipLevel"
+                  />
+                  <label class="form-check-label" for="sponsorshipLevelLiberty">
+                    <b>“Liberty Sponsor” $2,000:</b>
+                    Includes the following:
+                    <ul>
+                      <li>Your company name prominently placed on all advertising and publicity at all events</li>
+                      <li>
+                        8 tickets to the VIP Reception, reserved parking and seats for 8 at the Parade and Fireworks
+                      </li>
+                      <li>Half-page color ad in program</li>
+                    </ul>
+                  </label>
+                </div>
+
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="radio"
+                    name="sponsorshipLevel"
+                    id="sponsorshipLevelPatriotic"
+                    value="patriotic"
+                    formControlName="sponsorshipLevel"
+                  />
+                  <label class="form-check-label" for="sponsorshipLevelPatriotic">
+                    <b>“Patriotic Sponsor” $1,000:</b>
+                    Includes the following:
+                    <ul>
+                      <li>Your company name prominently placed on all advertising and publicity at all events</li>
+                      <li>
+                        6 tickets to the VIP Reception, reserved parking and seats for 6 at the Parade and Fireworks
+                      </li>
+                      <li>Quarter-page color ad in program</li>
+                    </ul>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="text-center">
+            <button type="submit" [disabled]="isLoading || showSuccess" class="link-div">
+              <div [hidden]="isLoading == false" class="spinner-border spinner-border-sm" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              Send
+            </button>
+
+            <div [hidden]="showSuccess == false" class="success-message">Your message has been sent!</div>
+            <div [hidden]="showError == false" class="error-message">An error has occured. Please try again later.</div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

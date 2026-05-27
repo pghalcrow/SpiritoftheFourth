@@ -1,0 +1,159 @@
+<div class="header-image-container">
+  <img src="assets/volunteer_flag.png" />
+</div>
+<div class="container">
+  <div class="row">
+    <div class="col-12 text-center">
+      <h1 class="mt-4 text-center header-message-container">
+        Help us to make the Spirit of the Fourth Celebration a fantastic event!
+      </h1>
+      <p class="mt-4 oswald-font text-start">
+        The Spirit of the Fourth is an all-volunteer nonprofit organization that works year round to provide Rancho
+        Bernardo and the surrounding area with its annual Independence Day celebration. We Invite volunteers to serve on
+        the board in planning and coordinating the event, serve on committees and work day-of events. Whether you're
+        able to volunteer from home or onsite, year-round or one day, we would love to have you as part of our volunteer
+        team.
+      </p>
+      <p class="mt-4 oswald-font text-start">
+        Are you part of a group or organization that would be interested in getting involved? We would love to have you.
+        We work with all sorts of groups from church youth groups to Boy Scouts to The Rotary Club.
+      </p>
+      <div class="link-div shadow mt-3 mb-2" data-bs-toggle="modal" data-bs-target="#volunteerModal">
+        Reach Out to Volunteer
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="volunteerModal" tabindex="-1" aria-labelledby="volunteerModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title text-center w-100 mt-3 modal-headline" id="volunteerModalLabel">Volunteer Request</h1>
+        <button type="button" class="modal-close-btn" data-bs-dismiss="modal" aria-label="Close">X</button>
+      </div>
+      <div class="modal-body">
+        <!---Begin submission form-->
+        <form [formGroup]="volunteerForm" class="mt-4 mb-4" (ngSubmit)="onSubmit(volunteerForm)">
+          <div class="container">
+            <div class="row">
+              <div class="col-12">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    id="contactNameInput"
+                    formControlName="contactName"
+                    [class.alert-input]="
+                      volunteerForm.get('contactName')!.invalid &&
+                      (volunteerForm.get('contactName')!.dirty || volunteerForm.get('contactName')!.touched)
+                    "
+                    placeholder="Contact Name"
+                  />
+                  <label for="contactName">Contact Name*</label>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    id="organizationtNameInput"
+                    formControlName="organizationName"
+                    [class.alert-input]="
+                      volunteerForm.get('organizationName')!.invalid &&
+                      (volunteerForm.get('organizationName')!.dirty || volunteerForm.get('organizationName')!.touched)
+                    "
+                    placeholder="Contact Name"
+                  />
+                  <label for="organizationName">Organization Name (if applicable)</label>
+                </div>
+              </div>
+              <div class="col-12 col-md-6">
+                <div class="form-floating mb-3">
+                  <input
+                    type="email"
+                    class="form-control"
+                    id="emailInput"
+                    formControlName="email"
+                    [class.alert-input]="
+                      volunteerForm.get('email')!.invalid &&
+                      (volunteerForm.get('email')!.dirty || volunteerForm.get('email')!.touched)
+                    "
+                    placeholder="Email"
+                  />
+                  <label for="emailInput">Email*</label>
+                </div>
+              </div>
+              <div class="col-12 col-md-6">
+                <div class="form-floating mb-3">
+                  <input
+                    type="tel"
+                    class="form-control"
+                    id="phoneInput"
+                    formControlName="phone"
+                    appOnlyNumbers
+                    maxlength="12"
+                    size="12"
+                    [class.alert-input]="
+                      volunteerForm.get('phone')!.invalid &&
+                      (volunteerForm.get('phone')!.dirty || volunteerForm.get('phone')!.touched)
+                    "
+                    placeholder="Phone"
+                  />
+                  <label for="phoneInput">Phone Number*</label>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="form-floating mb-3">
+                  <select
+                    class="form-select"
+                    id="availabilityInput"
+                    formControlName="availability"
+                    [class.alert-input]="
+                      volunteerForm.get('availability')!.invalid &&
+                      (volunteerForm.get('availability')!.dirty || volunteerForm.get('availability')!.touched)
+                    "
+                  >
+                    <option value="" disabled>Select an option</option>
+                    <option value="Day (8AM-5PM)">Day (8AM-5PM)</option>
+                    <option value="Evening (5PM-10PM)">Evening (5PM-10PM)</option>
+                    <option value="Either">Either</option>
+                  </select>
+
+                  <label for="availabilityInput">Your Availability*</label>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="form-floating mb-3">
+                  <textarea
+                    class="form-control floating-textarea"
+                    id="messageInput"
+                    [class.alert-input]="
+                      volunteerForm.get('message')!.invalid &&
+                      (volunteerForm.get('message')!.dirty || volunteerForm.get('message')!.touched)
+                    "
+                    formControlName="message"
+                    placeholder="message"
+                  ></textarea>
+
+                  <label for="messageInput">Message*</label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="text-center">
+            <button type="submit" [disabled]="isLoading || showSuccess" class="link-div">
+              <div [hidden]="isLoading == false" class="spinner-border spinner-border-sm" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              Send
+            </button>
+
+            <div [hidden]="showSuccess == false" class="success-message">Your message has been sent!</div>
+            <div [hidden]="showError == false" class="error-message">An error has occured. Please try again later.</div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

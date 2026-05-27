@@ -1,0 +1,90 @@
+.logo-image {
+  max-width: 90%;
+  width: 1000px; /* 450px for the normal logo */
+  height: auto;
+  margin-top: -70px; /* remove for the normal logo */
+  margin-bottom: -100px; /* remove for the normal logo */
+}
+
+.headline {
+  color: var(--dark-blue-color);
+  font-size: 2rem;
+  text-align: center;
+  font-weight: bold;
+}
+
+.holding-flag-image {
+  width: 100%;
+  max-height: 400px;
+  object-fit: cover;
+  object-position: center;
+}
+
+.header-text {
+  font-size: 2rem;
+  color: var(--dark-blue-color);
+}
+
+.schedule-container {
+  max-width: 800px;
+  margin-left: 5px;
+  margin-right: 5px;
+  border: 2px solid var(--red-color);
+}
+.schedule-container h1 {
+  color: var(--dark-blue-color);
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.event-container {
+  padding: 15px;
+  text-align: start;
+  font-size: 1.3rem;
+}
+.event-location {
+  font-weight: bold;
+  color: var(--dark-blue-color);
+}
+.event-time {
+  color: var(--red-color);
+}
+.event-description {
+  color: var(--dark-blue-color);
+}
+.theme-container {
+  color: var(--red-color);
+}
+
+@media (max-width: 1199.98px) {
+}
+
+@media (max-width: 991.98px) {
+}
+
+@media (max-width: 767.98px) {
+  .on-mobile {
+    display: block;
+  }
+  .not-on-mobile {
+    display: none !important;
+  }
+  .headline {
+    font-size: 1.5rem;
+  }
+  .header-text {
+    font-size: 1.2rem;
+  }
+  .event-container {
+    font-size: 1rem;
+  }
+  .schedule-container h1 {
+    font-size: 1.2rem;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .event-container {
+    font-size: 1.1em;
+  }
+}

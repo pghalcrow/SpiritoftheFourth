@@ -1,0 +1,6 @@
+<div class="sign-in-container">
+  <h2>Admin Sign In</h2>
+  <input type="password" [(ngModel)]="password" placeholder="Enter password" />
+  <button (click)="login()">Sign In</button>
+  <p *ngIf="errorMessage" style="color: red">{{ errorMessage }}</p>
+</div>

@@ -1,0 +1,365 @@
+<div class="header-image-container">
+  <img src="assets/red_cars.jpg" />
+</div>
+<div class="breadcrumb-container shadow">
+  <a href="/visitor-information" routerLink="/visitor-information">
+    <div class="title-container breadcrumb-container-text d-inline-block">Spirit of the Fourth Events</div>
+  </a>
+  <div class="d-inline-block breadcrumb-container-text">
+    <span class="ms-2 me-2">></span>
+    Wheels of Freedom Motor Show
+  </div>
+</div>
+
+<div class="container">
+  <div class="row mt-5">
+    <div class="col-12 col-lg-10 mx-auto">
+      <p>
+        Highlighting classic and vintage cars, the Wheels of Freedom Motor Show epitomizes America's love of beautiful
+        cars and trucks. See cool cars, have a chance to interact with their owners and hear their stories. The motor
+        show opens at 9:00AM and is organized and hosted by the Poway Cruisers.
+      </p>
+    </div>
+    <div class="col-12 col-lg-10 mx-auto">
+      <p>
+        Do you have a classic car that you would like to show off? Fill out our entry form. Entries are limited to 130
+        cars so register today, entry fee is $25.00.
+      </p>
+    </div>
+
+    <div class="col-12 col-lg-10 mx-auto">
+      <p>
+        Highlights:
+        <br />
+        Award of Excellence Trophies
+        <br />
+        Best Decorated Car or Truck Trophy
+        <br />
+        Best of the Poway Cruisers Trophy (chosen by the entrants)
+        <br />
+        Best of Show Trophy
+      </p>
+    </div>
+
+    <div class="col-12 mx-auto text-center">
+      <div class="link-div mt-5 shadow" data-bs-toggle="modal" data-bs-target="#motorShowModal">Enter Motor Show</div>
+    </div>
+  </div>
+</div>
+
+<div class="container-fluid mt-5 gx-0">
+  <div class="row gx-0">
+    <div class="col-4">
+      <img src="assets/cars_parkinglot.jpg" class="car-show-image" />
+    </div>
+    <div class="col-4">
+      <img src="assets/car_2.jpg" class="car-show-image" />
+    </div>
+    <div class="col-4">
+      <img src="assets/car_3.jpg" class="car-show-image" />
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="motorShowModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-body p-0">
+        <!-- HEADER -->
+        <div class="car-modal-header position-relative">
+          <button type="button" class="modal-close-btn white" data-bs-dismiss="modal">X</button>
+
+          <div class="container-fluid gx-0">
+            <div class="row gx-0">
+              <div class="col-4"><img src="assets/car_2.jpg" class="car-modal-image" /></div>
+              <div class="col-4"><img src="assets/truck_1.jpg" class="car-modal-image" /></div>
+              <div class="col-4"><img src="assets/cars_parkinglot.jpg" class="car-modal-image" /></div>
+            </div>
+          </div>
+
+          <div class="car-modal-banner font-oswald">Wheels of Freedom Motor Show</div>
+        </div>
+
+        <!-- INFO -->
+        <div class="container mt-3">
+          <div class="car-modal-content">
+            The Wheels of Freedom Motor Show is from 9:00 AM to 2:00 PM (parking to start around 7:00 AM) Registration
+            is $25.00 but space is limited to 130 entries so you must be pre-registered.
+          </div>
+        </div>
+
+        <!-- 🔥 SINGLE FORM START -->
+        <form [formGroup]="motorShowForm" (ngSubmit)="onSubmit()" class="mt-4 mb-4">
+          <div class="container">
+            <!-- CONTACT -->
+            <div class="row">
+              <div class="col-12 col-md-6">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    formControlName="firstName"
+                    placeholder="First Name"
+                    [class.alert-input]="
+                      motorShowForm.get('firstName')?.invalid &&
+                      (motorShowForm.get('firstName')?.touched || motorShowForm.get('firstName')?.dirty)
+                    "
+                  />
+                  <label>First Name*</label>
+                </div>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    formControlName="lastName"
+                    placeholder="Last Name"
+                    [class.alert-input]="
+                      motorShowForm.get('lastName')?.invalid &&
+                      (motorShowForm.get('lastName')?.touched || motorShowForm.get('lastName')?.dirty)
+                    "
+                  />
+                  <label>Last Name*</label>
+                </div>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <div class="form-floating mb-3">
+                  <input
+                    type="email"
+                    class="form-control"
+                    formControlName="email"
+                    placeholder="Email"
+                    [class.alert-input]="
+                      motorShowForm.get('email')?.invalid &&
+                      (motorShowForm.get('email')?.touched || motorShowForm.get('email')?.dirty)
+                    "
+                  />
+                  <label>Email*</label>
+                </div>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <div class="form-floating mb-3">
+                  <input
+                    type="tel"
+                    class="form-control"
+                    formControlName="phone"
+                    (input)="formatPhone()"
+                    maxlength="12"
+                    placeholder="Phone"
+                    [class.alert-input]="motorShowForm.get('phone')?.touched && !motorShowForm.get('phone')?.value"
+                  />
+                  <label>Phone*</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- ADDRESS -->
+            <div class="row">
+              <div class="col-12">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    formControlName="streetAddress"
+                    placeholder="Street"
+                    [class.alert-input]="
+                      motorShowForm.get('streetAddress')?.invalid &&
+                      (motorShowForm.get('streetAddress')?.touched || motorShowForm.get('streetAddress')?.dirty)
+                    "
+                  />
+                  <label>Street Address*</label>
+                </div>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    formControlName="city"
+                    placeholder="City"
+                    [class.alert-input]="
+                      motorShowForm.get('city')?.invalid &&
+                      (motorShowForm.get('city')?.touched || motorShowForm.get('city')?.dirty)
+                    "
+                  />
+                  <label>City*</label>
+                </div>
+              </div>
+
+              <div class="col-6 col-md-3">
+                <div class="form-floating mb-3">
+                  <select
+                    class="form-select"
+                    formControlName="state"
+                    [class.alert-input]="
+                      motorShowForm.get('state')?.invalid &&
+                      (motorShowForm.get('state')?.touched || motorShowForm.get('state')?.dirty)
+                    "
+                  >
+                    <option *ngFor="let state of states" [value]="state">{{ state }}</option>
+                  </select>
+                  <label>State*</label>
+                </div>
+              </div>
+
+              <div class="col-6 col-md-3">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    formControlName="zipcode"
+                    maxlength="5"
+                    inputmode="numeric"
+                    (input)="digitsOnly('zipcode', 5)"
+                    placeholder="Zipcode"
+                    [class.alert-input]="
+                      motorShowForm.get('zipcode')?.invalid &&
+                      (motorShowForm.get('zipcode')?.touched || motorShowForm.get('zipcode')?.dirty)
+                    "
+                  />
+                  <label>Zipcode*</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- VEHICLE -->
+            <div class="row">
+              <div class="col-12 col-md-6">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    formControlName="year"
+                    maxlength="4"
+                    inputmode="numeric"
+                    (input)="digitsOnly('year', 4)"
+                    placeholder="Year"
+                    [class.alert-input]="
+                      motorShowForm.get('year')?.invalid &&
+                      (motorShowForm.get('year')?.touched || motorShowForm.get('year')?.dirty)
+                    "
+                  />
+                  <label>Year*</label>
+                </div>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    formControlName="make"
+                    placeholder="Make"
+                    [class.alert-input]="
+                      motorShowForm.get('make')?.invalid &&
+                      (motorShowForm.get('make')?.touched || motorShowForm.get('make')?.dirty)
+                    "
+                  />
+                  <label>Make*</label>
+                </div>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    formControlName="model"
+                    placeholder="Model"
+                    [class.alert-input]="
+                      motorShowForm.get('model')?.invalid &&
+                      (motorShowForm.get('model')?.touched || motorShowForm.get('model')?.dirty)
+                    "
+                  />
+                  <label>Model*</label>
+                </div>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <div class="form-floating mb-3">
+                  <input
+                    class="form-control"
+                    formControlName="color"
+                    placeholder="Color"
+                    [class.alert-input]="
+                      motorShowForm.get('color')?.invalid &&
+                      (motorShowForm.get('color')?.touched || motorShowForm.get('color')?.dirty)
+                    "
+                  />
+                  <label>Color*</label>
+                </div>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <div class="form-floating mb-3">
+                  <input class="form-control" formControlName="clubAffiliation" placeholder="Club" />
+                  <label>Club Affiliation</label>
+                </div>
+              </div>
+            </div>
+
+            <hr class="mt-4" />
+
+            <!-- CHECKBOX -->
+            <div class="form-check mb-3">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                formControlName="addShirtBundle"
+                (change)="updateCartTotal()"
+                id="addBundleCheck"
+              />
+              <label class="form-check-label" for="addBundleCheck">Add T-shirt & Plaque (+$35)</label>
+            </div>
+
+            <!-- 🔥 PURCHASE SECTION (UNCHANGED) -->
+            <div *ngIf="motorShowForm.get('addShirtBundle')?.value">
+              <hr class="mt-4" />
+              <h5 class="mb-3">T-Shirt & Plaque</h5>
+
+              <div class="row">
+                <div class="col-12 col-md-6">
+                  <div class="form-floating mb-3">
+                    <select class="form-select" formControlName="selectedShirt" (change)="updateCartTotal()">
+                      <option *ngFor="let shirtItem of tShirtSizes" [ngValue]="additionalShirtsItemsDict[shirtItem]">
+                        {{ shirtItem }}
+                      </option>
+                    </select>
+                    <label>T-Shirt Size (plaque included)</label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-12">
+                  <h6><u>Additionals</u></h6>
+
+                  <div class="d-flex mb-2" *ngFor="let shirt of shirtItems">
+                    <button type="button" class="btn-crementor" (click)="increment(shirt.size)">+</button>
+                    <div class="ms-2 me-2">{{ cartAdditionalShirtsCounterDict[shirt.size] }}</div>
+                    <button type="button" class="btn-crementor" (click)="decrement(shirt.size)">-</button>
+                    <div class="ms-2">${{ shirt.price }} - {{ shirt.description }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TOTAL -->
+            <hr />
+            <p>
+              <strong>Total: ${{ cartTotal }}.00</strong>
+            </p>
+
+            <!-- SUBMIT -->
+            <div class="payment-row mt-4">
+              <button type="submit" [disabled]="isLoading" class="payment-btn paypal-btn" (click)="paymentMethod = 'paypal'">
+                <i class="fa-brands fa-paypal"></i> PayPal
+              </button>
+              <button type="submit" [disabled]="isLoading" class="payment-btn stripe-btn" (click)="paymentMethod = 'stripe'">
+                <i class="fa-brands fa-stripe fa-2x"></i>
+              </button>
+            </div>
+          </div>
+        </form>
+        <!-- 🔥 SINGLE FORM END -->
+      </div>
+    </div>
+  </div>
+</div>

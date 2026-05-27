@@ -1,0 +1,12 @@
+<div class="single-file mx-auto">
+    <fa-icon class="file-icon" [icon]="faFileAlt"></fa-icon>
+    <div class="info">
+        <h4 class="name">
+            {{ file!.name }}
+        </h4>
+        <p class="size">
+            {{ formatBytes(file!.size) }}
+        </p>
+    </div>
+    <fa-icon class="delete file-icon my-auto" [icon]="faTrashAlt" (click)="deleteFile()"></fa-icon>
+</div>
