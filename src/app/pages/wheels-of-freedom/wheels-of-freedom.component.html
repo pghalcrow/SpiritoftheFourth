@@ -22,7 +22,7 @@
     </div>
     <div class="col-12 col-lg-10 mx-auto">
       <p>
-        Do you have a classic car that you would like to show off? Fill out our entry form. Entries are limited to 130
+        Do you have a classic car that you would like to show off? Fill out our entry form. Entries are limited to 140
         cars so register today, entry fee is $25.00.
       </p>
     </div>
@@ -61,6 +61,7 @@
   </div>
 </div>
 
+
 <div class="modal fade" id="motorShowModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -84,7 +85,7 @@
         <div class="container mt-3">
           <div class="car-modal-content">
             The Wheels of Freedom Motor Show is from 9:00 AM to 2:00 PM (parking to start around 7:00 AM) Registration
-            is $25.00 but space is limited to 130 entries so you must be pre-registered.
+            is $25.00 but space is limited to 140 entries so you must be pre-registered.
           </div>
         </div>
 
@@ -354,6 +355,16 @@
               </button>
               <button type="submit" [disabled]="isLoading" class="payment-btn stripe-btn" (click)="paymentMethod = 'stripe'">
                 <i class="fa-brands fa-stripe fa-2x"></i>
+              </button>
+            </div>
+
+            <p class="check-payment-note text-center mt-4 mb-2">
+              Payments via personal checks is acceptable. Payment must be received by June 15 at
+              The Spirit of the Fourth, P.O. Box 270736, San Diego, CA 92198
+            </p>
+            <div class="payment-row mb-2">
+              <button type="button" [disabled]="isLoading" class="payment-btn check-btn" (click)="onPayByCheck()">
+                Pay by Check
               </button>
             </div>
           </div>
