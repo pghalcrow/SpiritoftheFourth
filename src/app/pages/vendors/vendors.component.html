@@ -611,15 +611,16 @@
 
             <ng-container *ngIf="currentFee > 0; else freeSubmit">
               <div class="payment-row">
+                <button type="button" [disabled]="isLoading || stripeIsLoading" class="payment-btn card-btn" (click)="onVendorStripeClick()">
+                  <span *ngIf="stripeIsLoading" class="spinner-border spinner-border-sm" role="status"></span>
+                  <i *ngIf="!stripeIsLoading" class="fa-regular fa-credit-card"></i>
+                  {{ stripeIsLoading ? 'Starting card payment...' : 'Pay by Credit Card' }}
+                </button>
                 <button type="submit" [disabled]="isLoading" class="payment-btn paypal-btn" (click)="paymentMethod = 'paypal'">
                   <div [hidden]="isLoading == false || paymentMethod !== 'paypal'" class="spinner-border spinner-border-sm" role="status">
                     <span class="visually-hidden">Loading...</span>
                   </div>
                   <i class="fa-brands fa-paypal"></i> PayPal
-                </button>
-                <button type="button" [disabled]="isLoading || stripeIsLoading" class="payment-btn stripe-btn" (click)="onVendorStripeClick()">
-                  <span *ngIf="stripeIsLoading" class="spinner-border spinner-border-sm" role="status"></span>
-                  <i *ngIf="!stripeIsLoading" class="fa-brands fa-stripe fa-2x"></i>
                 </button>
               </div>
             </ng-container>

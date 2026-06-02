@@ -4,13 +4,13 @@ import { OrderService } from 'src/app/services/order.service';
 import { CmsService, Event as CmsEvent } from 'src/app/services/cms.service';
 import { Router, NavigationEnd } from '@angular/router';
 import { environment } from 'src/environments/environment';
+import { PaypalDonationService } from 'src/app/services/paypal-donation.service';
 
 interface UIEvent extends CmsEvent {
   formGroup: FormGroup;
   fieldMap: { [key: string]: any };
 }
 
-declare var PayPal: any;
 declare var Stripe: any;
 
 @Component({
@@ -34,7 +34,8 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
     private fb: FormBuilder,
     private orderService: OrderService,
     private router: Router,
-    private cmsService: CmsService
+    private cmsService: CmsService,
+    private paypalDonationService: PaypalDonationService
   ) {
 
     // refreshes page every time it is accessed
@@ -107,17 +108,7 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
   }
 
   ngAfterViewInit() {
-    const container = document.getElementById('paypal-donate-button-container-2');
-    if (container) {
-      PayPal.Donation.Button({
-        env: 'production',
-        hosted_button_id: 'ERLZZZF5H4NSN',
-        image: {
-          title: 'PayPal - The safer, easier way to pay online!',
-          alt: 'Donate with PayPal button'
-        }
-      }).render('#paypal-donate-button-container-2');
-    }
+    this.paypalDonationService.renderDonationButton('#paypal-donate-button-container-2');
   }
 
   getFlyerSrc(url: string): string {

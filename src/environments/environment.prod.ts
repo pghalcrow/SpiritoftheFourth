@@ -7,6 +7,10 @@ export const environment = {
   stripe: {
     pk: "pk_live_51N6ITZCtYBFkGDnFjqlCYuxO0JKLaoNHBmq1I56Hde6k4QbSMqDk15NtZf6gyzi9Wnwem6K0zLpxO3D8Ypab6Qks00de6HVbgz"
   },
+  paypal: {
+    donationEnv: "production",
+    donationHostedButtonId: "ERLZZZF5H4NSN"
+  },
   products: {
     motorShowShirtAndPlaque: {
       small: "https://www.paypal.com/ncp/payment/88CF6Y9GXDLDJ",

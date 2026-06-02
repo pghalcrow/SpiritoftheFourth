@@ -6,6 +6,10 @@ export const environment = {
   stripe: {
     pk: "pk_test_51N6ITZCtYBFkGDnFnqxO5njTXiRYsHAx8UQ4E9jxmIl392iDU6FLSu9wFpXQ09PvT9ACFjbBwtyfj2WjIxUgyTbZ006rnkZaql"
   },
+  paypal: {
+    donationEnv: "sandbox",
+    donationHostedButtonId: ""
+  },
   products: {
     motorShowShirtAndPlaque: {
       small: "https://buy.stripe.com/test_3csaIndB3c7G1k46oo",

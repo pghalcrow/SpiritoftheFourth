@@ -86,12 +86,13 @@
           <h3>Total: ${{ calculateTotal(event) }}</h3>
 
           <div class="payment-row">
+            <button type="button" [disabled]="stripeIsLoading" class="payment-btn card-btn" (click)="onStripeEvent(event, i)">
+              <span *ngIf="stripeIsLoading" class="spinner-border spinner-border-sm" role="status"></span>
+              <i *ngIf="!stripeIsLoading" class="fa-regular fa-credit-card"></i>
+              {{ stripeIsLoading ? 'Starting card payment...' : 'Pay by Credit Card' }}
+            </button>
             <button type="submit" class="payment-btn paypal-btn" (click)="paymentMethod = 'paypal'">
               <i class="fa-brands fa-paypal"></i> PayPal
-            </button>
-            <button type="button" [disabled]="stripeIsLoading" class="payment-btn stripe-btn" (click)="onStripeEvent(event, i)">
-              <span *ngIf="stripeIsLoading" class="spinner-border spinner-border-sm" role="status"></span>
-              <i *ngIf="!stripeIsLoading" class="fa-brands fa-stripe fa-2x"></i>
             </button>
           </div>
         </form>
@@ -136,12 +137,13 @@
         <h3>Total: $100</h3>
 
         <div class="payment-row">
+          <button type="button" [disabled]="stripeIsLoading" class="payment-btn sponsor-card-btn" (click)="onSponsorStripeClick()">
+            <span *ngIf="stripeIsLoading" class="spinner-border spinner-border-sm" role="status"></span>
+            <i *ngIf="!stripeIsLoading" class="fa-regular fa-credit-card"></i>
+            {{ stripeIsLoading ? 'Starting card payment...' : 'Pay by Credit Card' }}
+          </button>
           <button type="submit" class="payment-btn sponsor-paypal-btn" (click)="sponsorPaymentMethod = 'paypal'">
             <i class="fa-brands fa-paypal"></i> PayPal
-          </button>
-          <button type="button" [disabled]="stripeIsLoading" class="payment-btn sponsor-stripe-btn" (click)="onSponsorStripeClick()">
-            <span *ngIf="stripeIsLoading" class="spinner-border spinner-border-sm" role="status"></span>
-            <i *ngIf="!stripeIsLoading" class="fa-brands fa-stripe fa-2x"></i>
           </button>
         </div>
       </form>

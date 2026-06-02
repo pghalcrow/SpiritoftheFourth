@@ -1,7 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-
-declare var PayPal: any
-
+import { PaypalDonationService } from 'src/app/services/paypal-donation.service';
 
 @Component({
   selector: 'app-freedom-club',
@@ -9,29 +7,9 @@ declare var PayPal: any
   styleUrls: ['./freedom-club.component.css']
 })
 export class FreedomClubComponent implements OnInit {
-  
-  
+  constructor(private paypalDonationService: PaypalDonationService) {}
+
   ngOnInit() {
-    PayPal.Donation.Button({
-      onInit: function (data: any, actions: any) {
-        console.log('called')
-      },
-      env: 'production',
-      hosted_button_id: 'ERLZZZF5H4NSN',
-      image: {
-        title: 'PayPal - The safer, easier way to pay online!',
-        alt: 'Donate with PayPal button'
-      },
-      onComplete: function (params: any) {
-        // Your onComplete handler
-        console.log('called');
-      },
-    }).render('#paypal-donate-button-container-freedom-club');
-    
-
-
-  
+    this.paypalDonationService.renderDonationButton('#paypal-donate-button-container-freedom-club');
   }
-
-  
 }

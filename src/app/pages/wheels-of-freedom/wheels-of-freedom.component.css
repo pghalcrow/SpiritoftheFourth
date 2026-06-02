@@ -96,6 +96,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .payment-btn {
@@ -114,13 +115,22 @@
   background-color: #003087;
   color: #ffffff;
 }
-.stripe-btn {
-  background-color: #635bff;
+.card-btn {
+  background-color: #1f6f8b;
   color: #ffffff;
+  font-size: 1rem;
+  gap: 8px;
+  line-height: 1.15;
+  width: 220px;
 }
 .payment-btn:hover {
-  border: 3px solid #007bb4 !important;
-  color: #007bb4;
+  border: 3px solid #ffffff !important;
+  color: #ffffff;
+  filter: brightness(0.92);
+}
+.card-btn:hover,
+.paypal-btn:hover {
+  color: #ffffff;
 }
 .check-btn {
   background-color: #2e7d32;

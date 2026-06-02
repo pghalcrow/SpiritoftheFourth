@@ -7,8 +7,9 @@ import { MotorShowShirtItem } from 'src/app/models/motorShowShirtItem';
 import { faCartShopping } from '@fortawesome/free-solid-svg-icons'
 import { ActivatedRoute } from '@angular/router';
 import { OrderService } from 'src/app/services/order.service';
+import { PaypalDonationService } from 'src/app/services/paypal-donation.service';
+import { debounceTime, Subscription } from 'rxjs';
 
-declare var PayPal: any;
 declare var bootstrap: any;
 declare var Stripe: any;
 
@@ -33,6 +34,16 @@ export class WheelsOfFreedomComponent {
   showStripeCheckout: boolean = false;
   stripeCheckout: any = null;
   stripeIsLoading: boolean = false;
+  stripePreloadInFlight: boolean = false;
+  preloadedStripeClientSecret: string | null = null;
+  private preloadedStripePayloadKey: string | null = null;
+  private stripePreloadRequestKey: string | null = null;
+  private stripePreloadSubscription: Subscription | null = null;
+  private cartPreloadTimer: ReturnType<typeof setTimeout> | null = null;
+  private stripePreloadWaiters: Array<{
+    payloadKey: string;
+    callback: (clientSecret: string | null) => void;
+  }> = [];
 
   cartTotal: number = 0;
   customerInfo: any = {};
@@ -66,6 +77,7 @@ export class WheelsOfFreedomComponent {
     private fb: FormBuilder,
     private emailService: EmailService,
     private orderService: OrderService,
+    private paypalDonationService: PaypalDonationService,
     private route: ActivatedRoute
   ) {
 
@@ -154,6 +166,7 @@ export class WheelsOfFreedomComponent {
       (this.additionalShirtsItemsDict["XXXLarge"].price * this.cartAdditionalShirtsCounterDict["XXXLarge"]);
     
     this.cartTotal = baseFee + bundleFee + extras;
+    this.scheduleStripePreload();
   }
 
   increment(item: string) {
@@ -198,23 +211,13 @@ export class WheelsOfFreedomComponent {
       this.updateCartTotal();
     });
 
+    this.stripePreloadSubscription = this.motorShowForm.valueChanges
+      .pipe(debounceTime(700))
+      .subscribe(() => this.preloadStripeCheckoutIfReady());
+
     this.updateCartTotal();
 
-    // PayPal Donation (unchanged)
-    PayPal.Donation.Button({
-      onInit: function () {
-        console.log('called');
-      },
-      env: 'production',
-      hosted_button_id: 'ERLZZZF5H4NSN',
-      image: {
-        title: 'PayPal - The safer, easier way to pay online!',
-        alt: 'Donate with PayPal button'
-      },
-      onComplete: function () {
-        console.log('called');
-      },
-    }).render('#paypal-donate-button-motor-form');
+    this.paypalDonationService.renderDonationButton('#paypal-donate-button-motor-form');
   }
 
   // ORDER FLOW
@@ -281,11 +284,51 @@ export class WheelsOfFreedomComponent {
     this.motorShowForm.markAllAsTouched();
     if (!this.motorShowForm.valid) return;
 
+    const payload = this.buildStripePayload();
+    const payloadKey = this.getStripePayloadKey(payload);
+
+    if (this.preloadedStripeClientSecret && this.preloadedStripePayloadKey === payloadKey) {
+      this.mountStripeCheckout(this.preloadedStripeClientSecret);
+      return;
+    }
+
+    if (this.stripePreloadInFlight && this.stripePreloadRequestKey === payloadKey) {
+      this.stripeIsLoading = true;
+      this.stripePreloadWaiters.push({
+        payloadKey,
+        callback: (clientSecret) => {
+          if (clientSecret && this.getStripePayloadKey(this.buildStripePayload()) === payloadKey) {
+            this.mountStripeCheckout(clientSecret);
+            return;
+          }
+
+          this.createAndMountStripeCheckout(payload);
+        }
+      });
+      return;
+    }
+
+    this.stripeIsLoading = true;
+    this.createAndMountStripeCheckout(payload);
+  }
+
+  private createAndMountStripeCheckout(payload: any) {
+    this.orderService.createStripeEmbeddedSession(payload).subscribe({
+      next: async (response) => {
+        await this.mountStripeCheckout(response.client_secret);
+      },
+      error: () => {
+        this.stripeIsLoading = false;
+        alert('Error initiating payment. Please try again.');
+      }
+    });
+  }
+
+  buildStripePayload() {
     const form = this.motorShowForm.value;
     const selectedShirt = form.selectedShirt;
-    this.stripeIsLoading = true;
 
-    const payload = {
+    return {
       type: 'motorShowOrder',
       firstName: form.firstName,
       lastName: form.lastName,
@@ -311,24 +354,80 @@ export class WheelsOfFreedomComponent {
       additionalXXLarge: this.cartAdditionalShirtsCounterDict['XXLarge'],
       additionalXXXLarge: this.cartAdditionalShirtsCounterDict['XXXLarge'],
     };
+  }
+
+  preloadStripeCheckoutIfReady() {
+    if (!this.motorShowForm.valid || this.showStripeCheckout) return;
+
+    const payload = this.buildStripePayload();
+    const payloadKey = this.getStripePayloadKey(payload);
+
+    if (this.preloadedStripeClientSecret && this.preloadedStripePayloadKey === payloadKey) return;
+    if (this.stripePreloadInFlight && this.stripePreloadRequestKey === payloadKey) return;
+
+    this.preloadedStripeClientSecret = null;
+    this.preloadedStripePayloadKey = null;
+    this.stripePreloadInFlight = true;
+    this.stripePreloadRequestKey = payloadKey;
 
     this.orderService.createStripeEmbeddedSession(payload).subscribe({
-      next: async (response) => {
-        const clientSecret = response.client_secret;
-        const stripe = Stripe(environment.stripe.pk);
-        this.showStripeCheckout = true;
-        this.stripeIsLoading = false;
-        await new Promise(r => setTimeout(r, 50));
-        this.stripeCheckout = await stripe.initEmbeddedCheckout({
-          fetchClientSecret: () => Promise.resolve(clientSecret)
-        });
-        this.stripeCheckout.mount('#stripe-checkout-wof');
+      next: (response) => {
+        const latestPayloadKey = this.motorShowForm.valid
+          ? this.getStripePayloadKey(this.buildStripePayload())
+          : null;
+
+        if (latestPayloadKey === payloadKey) {
+          this.preloadedStripeClientSecret = response.client_secret;
+          this.preloadedStripePayloadKey = payloadKey;
+        }
+
+        this.resolveStripePreloadWaiters(
+          payloadKey,
+          latestPayloadKey === payloadKey ? response.client_secret : null
+        );
+        this.finishStripePreload(payloadKey);
       },
       error: () => {
-        this.stripeIsLoading = false;
-        alert('Error initiating payment. Please try again.');
+        this.resolveStripePreloadWaiters(payloadKey, null);
+        this.finishStripePreload(payloadKey);
       }
     });
+  }
+
+  private scheduleStripePreload() {
+    if (this.cartPreloadTimer) {
+      clearTimeout(this.cartPreloadTimer);
+    }
+
+    this.cartPreloadTimer = setTimeout(() => this.preloadStripeCheckoutIfReady(), 700);
+  }
+
+  private getStripePayloadKey(payload: any): string {
+    return JSON.stringify(payload);
+  }
+
+  private finishStripePreload(payloadKey: string) {
+    if (this.stripePreloadRequestKey === payloadKey) {
+      this.stripePreloadInFlight = false;
+      this.stripePreloadRequestKey = null;
+    }
+  }
+
+  private resolveStripePreloadWaiters(payloadKey: string, clientSecret: string | null) {
+    const matchingWaiters = this.stripePreloadWaiters.filter(waiter => waiter.payloadKey === payloadKey);
+    this.stripePreloadWaiters = this.stripePreloadWaiters.filter(waiter => waiter.payloadKey !== payloadKey);
+    matchingWaiters.forEach(waiter => waiter.callback(clientSecret));
+  }
+
+  private async mountStripeCheckout(clientSecret: string) {
+    const stripe = Stripe(environment.stripe.pk);
+    this.showStripeCheckout = true;
+    this.stripeIsLoading = false;
+    await new Promise(r => setTimeout(r, 50));
+    this.stripeCheckout = await stripe.initEmbeddedCheckout({
+      fetchClientSecret: () => Promise.resolve(clientSecret)
+    });
+    this.stripeCheckout.mount('#stripe-checkout-wof');
   }
 
   destroyStripeCheckout() {
@@ -337,6 +436,13 @@ export class WheelsOfFreedomComponent {
       this.stripeCheckout = null;
     }
     this.showStripeCheckout = false;
+  }
+
+  ngOnDestroy() {
+    this.stripePreloadSubscription?.unsubscribe();
+    if (this.cartPreloadTimer) {
+      clearTimeout(this.cartPreloadTimer);
+    }
   }
 
   // PAY BY CHECK
@@ -393,46 +499,166 @@ export class WheelsOfFreedomComponent {
     ).subscribe();
 
     const shirtBundleLine = form.addShirtBundle
-      ? `<p><strong>T-Shirt &amp; Plaque Bundle:</strong> ${form.selectedShirt?.size ?? ''}</p>`
-      : '';
-    const clubLine = form.clubAffiliation
-      ? `<p><strong>Club Affiliation:</strong> ${form.clubAffiliation}</p>`
-      : '';
+      ? form.selectedShirt?.size ?? ''
+      : 'No';
+    const clubLine = form.clubAffiliation || 'None';
+    const additionalItemsRows = this.shirtItems
+      .filter(shirt => this.cartAdditionalShirtsCounterDict[shirt.size] > 0)
+      .map(shirt => `
+        <tr>
+          <th>${shirt.description}</th>
+          <td>${this.cartAdditionalShirtsCounterDict[shirt.size]} x $${shirt.price}.00</td>
+        </tr>
+      `)
+      .join('');
 
     const printHtml = `<!DOCTYPE html>
 <html>
 <head>
   <title>Wheels of Freedom — Entry Form</title>
   <style>
-    body { font-family: Arial, sans-serif; color: #0A3161; padding: 48px; margin: 0; }
-    h2 { font-size: 1.5rem; margin-bottom: 4px; }
-    h4 { font-size: 1.1rem; margin: 4px 0 16px; }
-    h5 { margin: 16px 0 8px; }
-    p { margin: 4px 0; font-size: 1rem; }
-    hr { margin: 16px 0; border: none; border-top: 1px solid #ccc; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      color: #172b3a;
+      font-size: 12px;
+      line-height: 1.35;
+      margin: 0;
+      padding: 32px;
+      background: #ffffff;
+    }
+    .sheet {
+      max-width: 720px;
+      margin: 0 auto;
+      border: 1px solid #d8e1e8;
+      padding: 28px;
+    }
+    .header {
+      border-bottom: 3px solid #0A3161;
+      padding-bottom: 14px;
+      margin-bottom: 18px;
+    }
+    h1 {
+      color: #0A3161;
+      font-size: 22px;
+      line-height: 1.15;
+      margin: 0 0 4px;
+    }
+    .subtitle {
+      color: #4b5b67;
+      font-size: 13px;
+      margin: 0;
+    }
+    .payment-box {
+      background: #f3f8fb;
+      border: 1px solid #b8d1df;
+      border-left: 5px solid #0A3161;
+      padding: 14px 16px;
+      margin: 18px 0;
+    }
+    .payment-box h2 {
+      color: #0A3161;
+      font-size: 16px;
+      margin: 0 0 8px;
+    }
+    .payment-box p {
+      margin: 4px 0;
+    }
+    .section {
+      margin-top: 18px;
+    }
+    .section h3 {
+      color: #0A3161;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin: 0 0 8px;
+      border-bottom: 1px solid #d8e1e8;
+      padding-bottom: 5px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th,
+    td {
+      font-size: 12px;
+      padding: 6px 8px;
+      border-bottom: 1px solid #edf1f4;
+      vertical-align: top;
+      text-align: left;
+    }
+    th {
+      width: 34%;
+      color: #52616d;
+      font-weight: 700;
+    }
+    .total {
+      margin-top: 18px;
+      padding: 12px 16px;
+      background: #0A3161;
+      color: #ffffff;
+      font-size: 18px;
+      font-weight: 700;
+      text-align: right;
+    }
+    .footer-note {
+      margin-top: 14px;
+      color: #52616d;
+      font-size: 11px;
+    }
+    @media print {
+      body { padding: 0.35in; }
+      .sheet { border: none; padding: 0; max-width: none; }
+    }
   </style>
 </head>
 <body>
-  <h2>Wheels of Freedom Motor Show — Entry Form</h2>
-  <h4>Spirit of the Fourth &nbsp;|&nbsp; July 4th</h4>
-  <p><strong>Payment by Check</strong> — must be received by June 15</p>
-  <p>Mail check to: The Spirit of the Fourth, P.O. Box 270736, San Diego, CA 92198</p>
-  <hr/>
-  <h5>Contact Information</h5>
-  <p><strong>Name:</strong> ${form.firstName} ${form.lastName}</p>
-  <p><strong>Email:</strong> ${form.email}</p>
-  <p><strong>Phone:</strong> ${form.phone}</p>
-  <p><strong>Address:</strong> ${form.streetAddress}, ${form.city}, ${form.state} ${form.zipcode}</p>
-  <hr/>
-  <h5>Vehicle Information</h5>
-  <p><strong>Year:</strong> ${form.year}</p>
-  <p><strong>Make:</strong> ${form.make}</p>
-  <p><strong>Model:</strong> ${form.model}</p>
-  <p><strong>Color:</strong> ${form.color}</p>
-  ${clubLine}
-  <hr/>
-  ${shirtBundleLine}
-  <h4><strong>Total Due: $${this.cartTotal}.00</strong></h4>
+  <main class="sheet">
+    <header class="header">
+      <h1>Wheels of Freedom Motor Show Entry</h1>
+      <p class="subtitle">Spirit of the Fourth | July 4th | Pay by Check Confirmation</p>
+    </header>
+
+    <section class="payment-box">
+      <h2>Payment Instructions</h2>
+      <p><strong>Amount due:</strong> $${this.cartTotal}.00</p>
+      <p><strong>Payment deadline:</strong> Check must be received by June 15.</p>
+      <p><strong>Make check payable to:</strong> The Spirit of the Fourth</p>
+      <p><strong>Mail to:</strong> P.O. Box 270736, San Diego, CA 92198</p>
+    </section>
+
+    <section class="section">
+      <h3>Contact Information</h3>
+      <table>
+        <tr><th>Name</th><td>${form.firstName} ${form.lastName}</td></tr>
+        <tr><th>Email</th><td>${form.email}</td></tr>
+        <tr><th>Phone</th><td>${form.phone || 'Not provided'}</td></tr>
+        <tr><th>Address</th><td>${form.streetAddress}, ${form.city}, ${form.state} ${form.zipcode}</td></tr>
+      </table>
+    </section>
+
+    <section class="section">
+      <h3>Vehicle Information</h3>
+      <table>
+        <tr><th>Vehicle</th><td>${form.year} ${form.make} ${form.model}</td></tr>
+        <tr><th>Color</th><td>${form.color}</td></tr>
+        <tr><th>Club Affiliation</th><td>${clubLine}</td></tr>
+      </table>
+    </section>
+
+    <section class="section">
+      <h3>Registration Items</h3>
+      <table>
+        <tr><th>Entry Fee</th><td>$25.00</td></tr>
+        <tr><th>T-Shirt &amp; Plaque Bundle</th><td>${shirtBundleLine}</td></tr>
+        ${additionalItemsRows || '<tr><th>Additional Items</th><td>None</td></tr>'}
+      </table>
+    </section>
+
+    <div class="total">Total Due: $${this.cartTotal}.00</div>
+    <p class="footer-note">Please include this printed confirmation with your mailed check if possible.</p>
+  </main>
 </body>
 </html>`;
 

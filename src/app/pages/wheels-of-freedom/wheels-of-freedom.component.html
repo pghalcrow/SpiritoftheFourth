@@ -333,9 +333,9 @@
                   <h6><u>Additionals</u></h6>
 
                   <div class="d-flex mb-2" *ngFor="let shirt of shirtItems">
-                    <button type="button" class="btn-crementor" (click)="increment(shirt.size)">+</button>
-                    <div class="ms-2 me-2">{{ cartAdditionalShirtsCounterDict[shirt.size] }}</div>
                     <button type="button" class="btn-crementor" (click)="decrement(shirt.size)">-</button>
+                    <div class="ms-2 me-2">{{ cartAdditionalShirtsCounterDict[shirt.size] }}</div>
+                    <button type="button" class="btn-crementor" (click)="increment(shirt.size)">+</button>
                     <div class="ms-2">${{ shirt.price }} - {{ shirt.description }}</div>
                   </div>
                 </div>
@@ -350,12 +350,13 @@
 
             <!-- SUBMIT -->
             <div class="payment-row mt-4">
+              <button type="button" [disabled]="isLoading || stripeIsLoading" class="payment-btn card-btn" (click)="onStripeClick()">
+                <span *ngIf="stripeIsLoading" class="spinner-border spinner-border-sm" role="status"></span>
+                <i *ngIf="!stripeIsLoading" class="fa-regular fa-credit-card"></i>
+                {{ stripeIsLoading ? 'Starting card payment...' : 'Pay by Credit Card' }}
+              </button>
               <button type="submit" [disabled]="isLoading" class="payment-btn paypal-btn" (click)="paymentMethod = 'paypal'">
                 <i class="fa-brands fa-paypal"></i> PayPal
-              </button>
-              <button type="button" [disabled]="isLoading || stripeIsLoading" class="payment-btn stripe-btn" (click)="onStripeClick()">
-                <span *ngIf="stripeIsLoading" class="spinner-border spinner-border-sm" role="status"></span>
-                <i *ngIf="!stripeIsLoading" class="fa-brands fa-stripe fa-2x"></i>
               </button>
             </div>
 
