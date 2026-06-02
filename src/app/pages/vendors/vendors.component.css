@@ -141,3 +141,33 @@
 .paypal-btn:hover {
   color: #ffffff;
 }
+.card-security-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 620px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 8px 12px;
+  border: 1px solid #d8e1e8;
+  border-radius: 6px;
+  background-color: #f7fafc;
+  color: #4b5b67;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  text-align: left;
+}
+.card-security-note strong {
+  color: var(--dark-blue-color);
+}
+.card-security-note p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.25;
+}
+.card-security-note-icon {
+  color: #16805d;
+  flex: 0 0 auto;
+  font-size: 0.86rem;
+  margin-top: 2px;
+}
