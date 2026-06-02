@@ -1,6 +1,20 @@
-<div class="sign-in-container">
-  <h2>Admin Sign In</h2>
-  <input type="password" [(ngModel)]="password" placeholder="Enter password" />
-  <button (click)="login()">Sign In</button>
-  <p *ngIf="errorMessage" style="color: red">{{ errorMessage }}</p>
-</div>
+<main class="admin-login-shell">
+  <form class="admin-login-card" (ngSubmit)="login()">
+    <p class="login-eyebrow">CMS Access</p>
+    <h2>Admin Sign In</h2>
+
+    <label class="password-field">
+      <span>Password</span>
+      <input
+        type="password"
+        name="adminPassword"
+        [(ngModel)]="password"
+        placeholder="Enter password"
+        autocomplete="current-password"
+      />
+    </label>
+
+    <button type="submit" class="login-button">Sign In</button>
+    <p *ngIf="errorMessage" class="login-error">{{ errorMessage }}</p>
+  </form>
+</main>

@@ -1,7 +1,7 @@
 export const environment = {
   production: false,
   email: {
-    url: "https://hpocmu4d7tyabnwak3eofvrav40mkkpr.lambda-url.us-west-2.on.aws/",
+    url: "https://mxi47tjpgj2zrq2d2pp6z33ypu0dgqth.lambda-url.us-west-2.on.aws/",
   },
   stripe: {
     pk: "pk_test_51N6ITZCtYBFkGDnFnqxO5njTXiRYsHAx8UQ4E9jxmIl392iDU6FLSu9wFpXQ09PvT9ACFjbBwtyfj2WjIxUgyTbZ006rnkZaql"
@@ -17,7 +17,7 @@ export const environment = {
     }
   },
   order: {
-    url: "https://thhezemtlm7jnvllelcy765x7y0pzfzg.lambda-url.us-west-2.on.aws" // "http://localhost:3000/hello" 
+    url: "https://pufrilcp7fyemgxwhwa5wifg5m0pvdca.lambda-url.us-west-2.on.aws" // "http://localhost:3000/hello" 
   },
   forms: {
     carShow: {
@@ -54,7 +54,8 @@ export const environment = {
     },
   },
   cms: {
-    baseUrl: "https://pld6ie63oxozbkbotx3i2geo6i0trwks.lambda-url.us-west-2.on.aws",
+    baseUrl: "https://wsbgpjo6qvwrss4fswedoqbqd40bfhny.lambda-url.us-west-2.on.aws",
+    assetBaseUrl: "http://sotf-site-470065668628-us-west-2.s3-website-us-west-2.amazonaws.com",
     routes: {
       events: "/events",
       login: "/admin/login",

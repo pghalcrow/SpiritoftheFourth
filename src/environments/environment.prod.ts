@@ -1,7 +1,7 @@
 export const environment = {
   production: true,
   email: {
-    url: "https://jybzxjzk2qq2y7pll4fh7pt3la0avfmx.lambda-url.us-west-2.on.aws/",
+    url: "https://z2l2bnbbsh2i2oa37bhgvooyhe0wbegl.lambda-url.us-west-2.on.aws/",
     fromEmail: "adm.spiritofthefourth@gmail.com"
   },
   stripe: {
@@ -18,7 +18,7 @@ export const environment = {
     }
   },
   order: {
-    url: "https://rfgriyoxfaajhtdneqk7dbxuay0vdiir.lambda-url.us-west-2.on.aws"
+    url: "https://gnvdtq24qvk7gmzz3qq64aufei0piqrx.lambda-url.us-west-2.on.aws"
   },
   forms: {
     carShow: {
@@ -55,7 +55,8 @@ export const environment = {
     },
   },
   cms: {
-    baseUrl: "https://yrm44mdntiug7uyzuf7tfsbsuy0poiai.lambda-url.us-west-2.on.aws",
+    baseUrl: "https://fb6ob2hp7em6vh2tpmr5iuy4am0jrqpd.lambda-url.us-west-2.on.aws",
+    assetBaseUrl: "",
     routes: {
       events: "/events",
       login: "/admin/login",

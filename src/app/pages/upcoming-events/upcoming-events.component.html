@@ -18,7 +18,7 @@
 
       <div *ngFor="let event of events; let i = index">
         <h2>{{ event.title }}</h2>
-        <img [src]="event.flyerUrl" alt="{{ event.title }} flyer" class="flyer-img shadow mt-3" />
+        <img [src]="getFlyerSrc(event.flyerUrl)" alt="{{ event.title }} flyer" class="flyer-img shadow mt-3" />
 
         <form *ngIf="event.formGroup as fg" [formGroup]="fg" (ngSubmit)="onSubmit(event)">
           <div *ngFor="let section of event.sections">

@@ -115,6 +115,10 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
     }
   }
 
+  getFlyerSrc(url: string): string {
+    return this.cmsService.resolveAssetUrl(url);
+  }
+
   // TS helper to get teamMembers as FormArray
   getMembers(fg: FormGroup, fieldName: string): FormArray {
     return fg.get(fieldName) as FormArray;

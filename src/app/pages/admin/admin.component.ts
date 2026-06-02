@@ -5,6 +5,17 @@ import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { Observable, forkJoin } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
+type AdminModalVariant = 'success' | 'danger' | 'warning';
+
+interface AdminModal {
+  title: string;
+  message: string;
+  variant: AdminModalVariant;
+  confirmText: string;
+  cancelText?: string;
+  onConfirm?: () => void;
+}
+
 @Component({
   selector: 'app-admin',
   templateUrl: './admin.component.html',
@@ -12,12 +23,35 @@ import { tap } from 'rxjs/operators';
 })
 export class AdminComponent implements OnInit {
   events: CmsEvent[] = [];
+  activeEventIndex = 0;
   selectedFile?: File;
+  modal?: AdminModal;
 
   constructor(private cmsService: CmsService, private router: Router) {}
 
   ngOnInit() {
-    this.cmsService.getEvents().subscribe(res => this.events = res.events);
+    this.cmsService.getEvents().subscribe(res => {
+      this.events = res.events || [];
+      this.activeEventIndex = this.events.length ? 0 : 0;
+    });
+  }
+
+  get activeEvent(): CmsEvent | undefined {
+    return this.events[this.activeEventIndex];
+  }
+
+  selectEvent(index: number) {
+    if (index >= 0 && index < this.events.length) {
+      this.activeEventIndex = index;
+    }
+  }
+
+  getEventTabLabel(event: CmsEvent, index: number): string {
+    return event.title?.trim() || `New Event ${index + 1}`;
+  }
+
+  getFlyerSrc(url: string): string {
+    return this.cmsService.resolveAssetUrl(url);
   }
 
   logout() {
@@ -63,7 +97,10 @@ export class AdminComponent implements OnInit {
     if (uploadObservables.length) {
       forkJoin(uploadObservables).subscribe({
         next: () => this.finalizeSave(),
-        error: err => console.error('Image upload failed', err)
+        error: err => {
+          console.error('Image upload failed', err);
+          this.showModal('Image upload failed', 'Please try saving again.', 'danger');
+        }
       });
     } else {
       this.finalizeSave();
@@ -85,16 +122,26 @@ export class AdminComponent implements OnInit {
       sections: this.buildSections(event)
     }));
 
-    this.cmsService.updateEvents(updatedEvents).subscribe(res => {
-      if (res.success) alert('Events saved!');
+    this.cmsService.updateEvents(updatedEvents).subscribe({
+      next: res => {
+        if (res.success) {
+          this.showModal('Events saved', 'Your event changes have been saved.', 'success');
+        }
+      },
+      error: err => {
+        console.error('Events save failed', err);
+        this.showModal('Save failed', 'Please try saving again.', 'danger');
+      }
     });
   }
 
   // Update onFileSelected to store the file in the event
   onFileSelected(event: any, cmsEvent: CmsEvent) {
     const file: File = event.target.files[0];
+    if (!file) return;
+
     if (!file.type.startsWith("image/")) {
-      alert("Only images are allowed!");
+      this.showModal('Invalid image', 'Only images are allowed!', 'warning');
       return;
     }
     cmsEvent.selectedFile = file;
@@ -123,6 +170,7 @@ export class AdminComponent implements OnInit {
     };
 
     this.events.push(newEvent);
+    this.activeEventIndex = this.events.length - 1;
   }
 
   editEvent(index: number) {
@@ -132,9 +180,38 @@ export class AdminComponent implements OnInit {
   }
 
   deleteEvent(index: number) {
-    if (confirm('Are you sure you want to delete this event?')) {
+    this.showModal(
+      'Delete event',
+      'Are you sure you want to delete this event?',
+      'danger',
+      'Delete Event',
+      'Cancel',
+      () => {
       this.events.splice(index, 1);
-    }
+      this.activeEventIndex = Math.min(this.activeEventIndex, Math.max(this.events.length - 1, 0));
+      }
+    );
+  }
+
+  showModal(
+    title: string,
+    message: string,
+    variant: AdminModalVariant,
+    confirmText = 'OK',
+    cancelText?: string,
+    onConfirm?: () => void
+  ) {
+    this.modal = { title, message, variant, confirmText, cancelText, onConfirm };
+  }
+
+  closeModal() {
+    this.modal = undefined;
+  }
+
+  confirmModal() {
+    const onConfirm = this.modal?.onConfirm;
+    this.closeModal();
+    onConfirm?.();
   }
 
   addAddOn(event: CmsEvent) {

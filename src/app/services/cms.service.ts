@@ -91,6 +91,19 @@ export class CmsService {
     });
   }
 
+  resolveAssetUrl(url: string): string {
+    if (!url || /^(https?:|data:|blob:|\/)/.test(url)) {
+      return url;
+    }
+
+    const assetBaseUrl = (environment.cms as any).assetBaseUrl;
+    if (assetBaseUrl && url.startsWith('assets/')) {
+      return `${assetBaseUrl.replace(/\/$/, '')}/${url}`;
+    }
+
+    return url;
+  }
+
   /** Login as admin */
   login(password: string): Observable<AdminLoginResponse> {
     return this.http.post<AdminLoginResponse>(`${this.baseUrl}${this.routes.login}`, { password });

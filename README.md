@@ -34,8 +34,7 @@ should look similar to  https://fiestadelsol.net/
 
 Assets:  https://drive.google.com/drive/folders/1ZG1V9ahRT0tIICeSALJF2D3TnlVPrtwg?usp=sharing
 
-aws url:  http://spiritofthefourth.org.s3-website-us-west-2.amazonaws.com/
+aws url:  http://sotf-site-470065668628-us-west-2.s3-website-us-west-2.amazonaws.com/
 
 ## Notes
-
 

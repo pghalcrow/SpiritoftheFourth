@@ -1,94 +1,186 @@
-<div class="container gx-0">
-  <div class="row gx-0">
-    <button (click)="logout()" class="logout-button">Logout</button>
-    <h1 class="oswald-font text-center mt-3">Upcoming Events - Admin Edit</h1>
-    <hr style="width: 50%; margin: 0 auto" />
+<main class="admin-shell">
+  <header class="admin-toolbar">
+    <div>
+      <p class="eyebrow">CMS Editor</p>
+      <h1>Upcoming Events</h1>
+    </div>
 
-    <div class="col-12 justify-center text-center">
-      <div *ngFor="let cmsEvent of events; let i = index" class="event-editor">
-        <!-- Event Header -->
-        <h2>Event {{ i + 1 }}</h2>
+    <div class="toolbar-actions">
+      <button type="button" class="action-button secondary" (click)="addEvent()">Add Event</button>
+      <button type="button" class="action-button primary" (click)="saveEvents()">Save Changes</button>
+      <button type="button" class="action-button ghost" (click)="logout()">Logout</button>
+    </div>
+  </header>
 
-        <!-- Event Title -->
-        <label class="section-label">Title:</label>
-        <input
-          class="editable-title"
-          [(ngModel)]="cmsEvent.title"
-          (ngModelChange)="cmsEvent.type = toCamelCase($event)"
-        />
+  <nav *ngIf="events.length" class="event-tabs" aria-label="Events">
+    <button
+      *ngFor="let cmsEvent of events; let i = index"
+      type="button"
+      class="event-tab"
+      [class.active]="i === activeEventIndex"
+      (click)="selectEvent(i)"
+    >
+      <span class="event-tab-index">Event {{ i + 1 }}</span>
+      <span>{{ getEventTabLabel(cmsEvent, i) }}</span>
+    </button>
+  </nav>
 
-        <!-- Flyer -->
-        <label class="section-label">Flyer Image:</label>
-        <img [src]="cmsEvent.flyerUrl" alt="{{ cmsEvent.title }} flyer" class="flyer-img shadow mt-3" />
-        <input type="file" (change)="onFileSelected($event, cmsEvent)" accept="image/*" />
+  <section class="admin-workspace" *ngIf="activeEvent as cmsEvent">
+    <article class="event-card">
+      <div class="event-card-header">
+        <div>
+          <span class="event-index">Event {{ activeEventIndex + 1 }}</span>
+          <h2>{{ cmsEvent.title || 'Untitled Event' }}</h2>
+        </div>
 
-        <!-- Description -->
-        <label class="section-label">Description (For sign-up page):</label>
-        <textarea
-          class="editable-textarea"
-          [(ngModel)]="cmsEvent.description"
-          placeholder="Event Description"
-        ></textarea>
+        <button type="button" class="action-button danger" (click)="deleteEvent(activeEventIndex)">Delete Event</button>
+      </div>
 
-        <!-- Event Meta -->
-        <fieldset>
-          <legend>Event Meta Data</legend>
-          <label>Date of Event:</label>
-          <input [(ngModel)]="cmsEvent.eventMeta.dateOfEvent" placeholder="Date" />
-          <br />
-          <br />
+      <section class="editor-section">
+        <div class="section-heading">
+          <h3>Event Details</h3>
+          <p>Core information shown on the public sign-up page.</p>
+        </div>
 
-          <label>Location:</label>
-          <input [(ngModel)]="cmsEvent.eventMeta.location" placeholder="Location" />
-          <br />
-          <br />
+        <div class="control-grid two-column">
+          <label class="control-group span-full">
+            <span>Title</span>
+            <input
+              class="admin-input title-input"
+              [(ngModel)]="cmsEvent.title"
+              (ngModelChange)="cmsEvent.type = toCamelCase($event)"
+              placeholder="Event title"
+            />
+          </label>
 
-          <label>Contact Email (Who will get the email confirmation & contact information given to sign-ups):</label>
-          <input [(ngModel)]="cmsEvent.eventMeta.contactEmail" placeholder="Contact Email" />
-          <br />
-          <br />
+          <div class="control-group span-full">
+            <span>Flyer Image</span>
+            <div class="upload-panel">
+              <img
+                *ngIf="cmsEvent.flyerUrl"
+                [src]="getFlyerSrc(cmsEvent.flyerUrl)"
+                alt="{{ cmsEvent.title }} flyer"
+                class="flyer-img"
+              />
+              <label class="file-picker">
+                <span>Choose Image</span>
+                <input type="file" (change)="onFileSelected($event, cmsEvent)" accept="image/*" />
+              </label>
+            </div>
+          </div>
 
-          <label>End Blurb (Message for the sign-up in their email confirmation receipt):</label>
-          <textarea
-            [(ngModel)]="cmsEvent.eventMeta.endBlurb"
-            placeholder="End Blurb"
-            rows="4"
-            class="editable-textarea"
-          ></textarea>
-        </fieldset>
+          <label class="control-group span-full">
+            <span>Description</span>
+            <textarea
+              class="admin-textarea"
+              [(ngModel)]="cmsEvent.description"
+              placeholder="Event description"
+              rows="4"
+            ></textarea>
+          </label>
+        </div>
+      </section>
 
-        <!-- Form Fields -->
-        <fieldset>
-          <legend>Form Fields</legend>
-          <div cdkDropList (cdkDropListDropped)="dropField($event, cmsEvent.formFields)">
-            <div *ngFor="let field of cmsEvent.formFields; let k = index" cdkDrag class="form-field draggable-field">
-              <div class="drag-handle">☰ Drag</div>
+      <section class="editor-section">
+        <div class="section-heading">
+          <h3>Event Meta Data</h3>
+          <p>Details used in receipts, confirmations, and contact information.</p>
+        </div>
 
-              <label>Label:</label>
-              <input [(ngModel)]="field.label" (ngModelChange)="onFieldLabelChange(field)" placeholder="Label" />
+        <div class="control-grid two-column">
+          <label class="control-group">
+            <span>Date of Event</span>
+            <input class="admin-input" [(ngModel)]="cmsEvent.eventMeta.dateOfEvent" placeholder="Date" />
+          </label>
 
-              <label>Type:</label>
-              <select [(ngModel)]="field.type" (ngModelChange)="onFieldTypeChange(field)">
-                <option *ngFor="let type of fieldTypes" [value]="type">
-                  {{ type }}
-                </option>
-              </select>
+          <label class="control-group">
+            <span>Location</span>
+            <input class="admin-input" [(ngModel)]="cmsEvent.eventMeta.location" placeholder="Location" />
+          </label>
 
-              <label>
-                Required:
-                <input type="checkbox" [(ngModel)]="field.required" />
+          <label class="control-group span-full">
+            <span>Contact Email</span>
+            <input
+              class="admin-input"
+              [(ngModel)]="cmsEvent.eventMeta.contactEmail"
+              placeholder="Contact email"
+            />
+          </label>
+
+          <label class="control-group span-full">
+            <span>End Blurb</span>
+            <textarea
+              class="admin-textarea"
+              [(ngModel)]="cmsEvent.eventMeta.endBlurb"
+              placeholder="Email confirmation message"
+              rows="4"
+            ></textarea>
+          </label>
+        </div>
+      </section>
+
+      <section class="editor-section">
+        <div class="section-heading with-action">
+          <div>
+            <h3>Form Fields</h3>
+            <p>Drag fields to set their order on the public form.</p>
+          </div>
+          <button type="button" class="action-button secondary" (click)="addFormField(cmsEvent)">Add Field</button>
+        </div>
+
+        <div cdkDropList (cdkDropListDropped)="dropField($event, cmsEvent.formFields)" class="field-list">
+          <div *ngFor="let field of cmsEvent.formFields; let k = index" cdkDrag class="field-card">
+            <div class="field-card-header">
+              <button type="button" class="drag-handle" cdkDragHandle>Drag</button>
+              <strong>{{ field.label || 'New Field' }}</strong>
+              <button type="button" class="action-button text-danger" (click)="removeFormField(cmsEvent, k)">
+                Remove
+              </button>
+            </div>
+
+            <div class="control-grid field-grid">
+              <label class="control-group">
+                <span>Label</span>
+                <input
+                  class="admin-input"
+                  [(ngModel)]="field.label"
+                  (ngModelChange)="onFieldLabelChange(field)"
+                  placeholder="Label"
+                />
               </label>
 
-              <!-- Group Fields -->
-              <div *ngIf="field.type === 'group'" class="group-fields">
-                <h4>{{ field.label }} Subfields</h4>
+              <label class="control-group">
+                <span>Type</span>
+                <select class="admin-select" [(ngModel)]="field.type" (ngModelChange)="onFieldTypeChange(field)">
+                  <option *ngFor="let type of fieldTypes" [value]="type">{{ type }}</option>
+                </select>
+              </label>
 
-                <label>Max additional Members:</label>
-                <input type="number" [(ngModel)]="field.maxMembers" placeholder="Max Members" />
+              <label class="toggle-control">
+                <input type="checkbox" [(ngModel)]="field.required" />
+                <span class="toggle-track"></span>
+                <span>Required</span>
+              </label>
+            </div>
 
-                <div *ngFor="let subField of field.fields; let l = index">
-                  <label>Subfield Label:</label>
-                  <select [(ngModel)]="subField.label" (ngModelChange)="subField.name = toCamelCase(subField.label)">
+            <div *ngIf="field.type === 'group'" class="nested-panel">
+              <div class="section-heading compact">
+                <h4>{{ field.label || 'Group' }} Subfields</h4>
+              </div>
+
+              <label class="control-group compact-control">
+                <span>Max Additional Members</span>
+                <input class="admin-input" type="number" [(ngModel)]="field.maxMembers" placeholder="Max members" />
+              </label>
+
+              <div *ngFor="let subField of field.fields; let l = index" class="subfield-row">
+                <label class="control-group">
+                  <span>Subfield Label</span>
+                  <select
+                    class="admin-select"
+                    [(ngModel)]="subField.label"
+                    (ngModelChange)="subField.name = toCamelCase(subField.label)"
+                  >
                     <option
                       *ngFor="let mainField of cmsEvent.formFields"
                       [value]="mainField.label"
@@ -97,66 +189,124 @@
                       {{ mainField.label }}
                     </option>
                   </select>
+                </label>
 
-                  <label>Subfield Type:</label>
-                  <select [(ngModel)]="subField.type">
-                    <option *ngFor="let type of subFieldTypes" [value]="type">
-                      {{ type }}
-                    </option>
+                <label class="control-group">
+                  <span>Subfield Type</span>
+                  <select class="admin-select" [(ngModel)]="subField.type">
+                    <option *ngFor="let type of subFieldTypes" [value]="type">{{ type }}</option>
                   </select>
+                </label>
 
-                  <label>
-                    Required:
-                    <input type="checkbox" [(ngModel)]="subField.required" />
-                  </label>
-                </div>
-
-                <button (click)="addSubField(field)">Add Sub Field</button>
+                <label class="toggle-control">
+                  <input type="checkbox" [(ngModel)]="subField.required" />
+                  <span class="toggle-track"></span>
+                  <span>Required</span>
+                </label>
               </div>
 
-              <button (click)="removeFormField(cmsEvent, k)">Remove Field</button>
+              <button type="button" class="action-button secondary" (click)="addSubField(field)">Add Subfield</button>
             </div>
           </div>
-          <button (click)="addFormField(cmsEvent)">Add Form Field</button>
-        </fieldset>
+        </div>
+      </section>
 
-        <!-- Pricing -->
-        <fieldset>
-          <legend>Pricing</legend>
-          <label>Participant Field:</label>
-          <select [(ngModel)]="cmsEvent.pricing.basePlayerField">
-            <option value="N/A">N/A</option>
-            <ng-container *ngFor="let field of cmsEvent.formFields">
-              <option *ngIf="field.type === 'group'" [value]="field.name">
-                {{ field.label }}
-              </option>
-            </ng-container>
-          </select>
+      <section class="editor-section">
+        <div class="section-heading with-action">
+          <div>
+            <h3>Pricing</h3>
+            <p>Participant pricing and optional add-ons.</p>
+          </div>
+          <button type="button" class="action-button secondary" (click)="addAddOn(cmsEvent)">Add Add-On</button>
+        </div>
 
-          <label>
-            Include Primary Player:
-            <input type="checkbox" [(ngModel)]="cmsEvent.pricing.includePrimaryPlayer" />
+        <div class="control-grid pricing-grid">
+          <label class="control-group">
+            <span>Participant Field</span>
+            <select class="admin-select" [(ngModel)]="cmsEvent.pricing.basePlayerField">
+              <option value="N/A">N/A</option>
+              <ng-container *ngFor="let field of cmsEvent.formFields">
+                <option *ngIf="field.type === 'group'" [value]="field.name">{{ field.label }}</option>
+              </ng-container>
+            </select>
           </label>
 
-          <label>Price per Player:</label>
-          <input type="number" [(ngModel)]="cmsEvent.pricing.pricePerPlayer" placeholder="Price per Player" />
+          <label class="control-group">
+            <span>Price per Player</span>
+            <input
+              class="admin-input"
+              type="number"
+              [(ngModel)]="cmsEvent.pricing.pricePerPlayer"
+              placeholder="Price per player"
+            />
+          </label>
 
-          <div *ngFor="let addOn of cmsEvent.pricing.addOns; let j = index" class="add-on">
-            <label>Add-On Field:</label>
-            <input [(ngModel)]="addOn.field" placeholder="Add-On Field" />
-            <label>Price:</label>
-            <input type="number" [(ngModel)]="addOn.price" placeholder="Price" />
-            <button (click)="removeAddOn(cmsEvent, j)">Remove Add-On</button>
+          <label class="toggle-control pricing-toggle">
+            <input type="checkbox" [(ngModel)]="cmsEvent.pricing.includePrimaryPlayer" />
+            <span class="toggle-track"></span>
+            <span>Include Primary Player</span>
+          </label>
+        </div>
+
+        <div class="add-on-list">
+          <div *ngFor="let addOn of cmsEvent.pricing.addOns; let j = index" class="add-on-row">
+            <label class="control-group">
+              <span>Add-On Field</span>
+              <input class="admin-input" [(ngModel)]="addOn.field" placeholder="Add-on field" />
+            </label>
+
+            <label class="control-group price-control">
+              <span>Price</span>
+              <input class="admin-input" type="number" [(ngModel)]="addOn.price" placeholder="Price" />
+            </label>
+
+            <button type="button" class="action-button text-danger" (click)="removeAddOn(cmsEvent, j)">
+              Remove
+            </button>
           </div>
-          <button (click)="addAddOn(cmsEvent)">Add Add-On</button>
-        </fieldset>
+        </div>
+      </section>
+    </article>
+  </section>
 
-        <button (click)="deleteEvent(i)">🗑️ Delete Event</button>
-        <hr />
+  <section *ngIf="!events.length" class="empty-events">
+    <h2>No Events Yet</h2>
+    <p>Add an event to start editing.</p>
+    <button type="button" class="action-button primary" (click)="addEvent()">Add Event</button>
+  </section>
+
+  <div *ngIf="modal" class="admin-modal-backdrop" role="presentation">
+    <section
+      class="admin-modal"
+      [class.success]="modal.variant === 'success'"
+      [class.warning]="modal.variant === 'warning'"
+      [class.danger]="modal.variant === 'danger'"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-labelledby]="'admin-modal-title'"
+    >
+      <h2 id="admin-modal-title">{{ modal.title }}</h2>
+      <p>{{ modal.message }}</p>
+
+      <div class="modal-actions">
+        <button
+          *ngIf="modal.cancelText"
+          type="button"
+          class="action-button secondary"
+          (click)="closeModal()"
+        >
+          {{ modal.cancelText }}
+        </button>
+        <button
+          type="button"
+          class="action-button"
+          [class.primary]="modal.variant !== 'danger'"
+          [class.danger]="modal.variant === 'danger'"
+          (click)="confirmModal()"
+        >
+          {{ modal.confirmText }}
+        </button>
       </div>
-
-      <button (click)="addEvent()">➕ Add New Event</button>
-      <button (click)="saveEvents()">💾 Save All Changes</button>
-    </div>
+    </section>
   </div>
-</div>
+</main>
