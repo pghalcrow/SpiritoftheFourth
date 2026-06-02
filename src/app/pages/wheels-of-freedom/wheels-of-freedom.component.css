@@ -122,3 +122,15 @@
   border: 3px solid #007bb4 !important;
   color: #007bb4;
 }
+.check-btn {
+  background-color: #2e7d32;
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+.check-payment-note {
+  font-size: 0.95rem;
+  color: var(--dark-blue-color);
+  max-width: 480px;
+  margin: 0 auto;
+}

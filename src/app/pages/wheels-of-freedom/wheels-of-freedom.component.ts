@@ -286,6 +286,113 @@ export class WheelsOfFreedomComponent {
     }
   }
 
+  // PAY BY CHECK
+
+  onPayByCheck() {
+    this.motorShowForm.markAllAsTouched();
+    if (!this.motorShowForm.valid) return;
+
+    const form = this.motorShowForm.value;
+    this.printData = { ...form, total: this.cartTotal };
+
+    const shirtLine = form.addShirtBundle
+      ? `Yes — ${form.selectedShirt?.size ?? ''}`
+      : 'No';
+
+    const adminBody =
+      `New Motor Show Entry — Pay by Check\n\n` +
+      `Name: ${form.firstName} ${form.lastName}\n` +
+      `Email: ${form.email}\n` +
+      `Phone: ${form.phone}\n` +
+      `Address: ${form.streetAddress}, ${form.city}, ${form.state} ${form.zipcode}\n\n` +
+      `Vehicle: ${form.year} ${form.make} ${form.model} (${form.color})\n` +
+      `Club Affiliation: ${form.clubAffiliation || 'N/A'}\n` +
+      `T-Shirt & Plaque Bundle: ${shirtLine}\n` +
+      `Total: $${this.cartTotal}.00\n\n` +
+      `Customer will mail check to: The Spirit of the Fourth, P.O. Box 270736, San Diego, CA 92198 by June 15.`;
+
+    this.emailService.sendEmail(
+      environment.forms.carShow.toEamil,
+      adminBody,
+      'New Motor Show Entry — Check Payment',
+      form.email,
+      `${form.firstName} ${form.lastName}`,
+      form.phone
+    ).subscribe();
+
+    const receiptBody =
+      `Thank you for registering for the Wheels of Freedom Motor Show!\n\n` +
+      `Your entry has been received. Please mail your check for $${this.cartTotal}.00 ` +
+      `by June 15 to:\n\n` +
+      `  The Spirit of the Fourth\n  P.O. Box 270736\n  San Diego, CA 92198\n\n` +
+      `Entry Details:\n` +
+      `  Name: ${form.firstName} ${form.lastName}\n` +
+      `  Vehicle: ${form.year} ${form.make} ${form.model} (${form.color})\n` +
+      `  T-Shirt & Plaque Bundle: ${shirtLine}\n` +
+      `  Total Due: $${this.cartTotal}.00`;
+
+    this.emailService.sendEmail(
+      form.email,
+      receiptBody,
+      'Wheels of Freedom Motor Show — Entry Confirmation',
+      environment.forms.carShow.toEamil,
+      'Spirit of the Fourth',
+      ''
+    ).subscribe();
+
+    const shirtBundleLine = form.addShirtBundle
+      ? `<p><strong>T-Shirt &amp; Plaque Bundle:</strong> ${form.selectedShirt?.size ?? ''}</p>`
+      : '';
+    const clubLine = form.clubAffiliation
+      ? `<p><strong>Club Affiliation:</strong> ${form.clubAffiliation}</p>`
+      : '';
+
+    const printHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Wheels of Freedom — Entry Form</title>
+  <style>
+    body { font-family: Arial, sans-serif; color: #0A3161; padding: 48px; margin: 0; }
+    h2 { font-size: 1.5rem; margin-bottom: 4px; }
+    h4 { font-size: 1.1rem; margin: 4px 0 16px; }
+    h5 { margin: 16px 0 8px; }
+    p { margin: 4px 0; font-size: 1rem; }
+    hr { margin: 16px 0; border: none; border-top: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <h2>Wheels of Freedom Motor Show — Entry Form</h2>
+  <h4>Spirit of the Fourth &nbsp;|&nbsp; July 4th</h4>
+  <p><strong>Payment by Check</strong> — must be received by June 15</p>
+  <p>Mail check to: The Spirit of the Fourth, P.O. Box 270736, San Diego, CA 92198</p>
+  <hr/>
+  <h5>Contact Information</h5>
+  <p><strong>Name:</strong> ${form.firstName} ${form.lastName}</p>
+  <p><strong>Email:</strong> ${form.email}</p>
+  <p><strong>Phone:</strong> ${form.phone}</p>
+  <p><strong>Address:</strong> ${form.streetAddress}, ${form.city}, ${form.state} ${form.zipcode}</p>
+  <hr/>
+  <h5>Vehicle Information</h5>
+  <p><strong>Year:</strong> ${form.year}</p>
+  <p><strong>Make:</strong> ${form.make}</p>
+  <p><strong>Model:</strong> ${form.model}</p>
+  <p><strong>Color:</strong> ${form.color}</p>
+  ${clubLine}
+  <hr/>
+  ${shirtBundleLine}
+  <h4><strong>Total Due: $${this.cartTotal}.00</strong></h4>
+</body>
+</html>`;
+
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (printWindow) {
+      printWindow.document.write(printHtml);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
+    }
+  }
+
   // FORM SUBMIT
 
   onSubmit() {
