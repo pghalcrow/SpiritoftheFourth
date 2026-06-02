@@ -10,6 +10,7 @@ import { OrderService } from 'src/app/services/order.service';
 
 declare var PayPal: any;
 declare var bootstrap: any;
+declare var Stripe: any;
 
 @Component({
   selector: 'app-wheels-of-freedom',
@@ -29,6 +30,9 @@ export class WheelsOfFreedomComponent {
   showSuccess: boolean = false;
   showError: boolean = false;
   paymentMethod: string = 'paypal';
+  showStripeCheckout: boolean = false;
+  stripeCheckout: any = null;
+  stripeIsLoading: boolean = false;
 
   cartTotal: number = 0;
   customerInfo: any = {};
@@ -176,6 +180,7 @@ export class WheelsOfFreedomComponent {
       this.isLoading = false;
       this.showSuccess = false;
       this.showError = false;
+      this.destroyStripeCheckout();
 
       this.motorShowForm.reset();
       this.motorShowForm.enable();
@@ -249,41 +254,89 @@ export class WheelsOfFreedomComponent {
       additionalXXXLarge: this.cartAdditionalShirtsCounterDict["XXXLarge"],
     };
 
-    if (this.paymentMethod === 'stripe') {
-      this.orderService.createStripeOrder(basePayload).subscribe({
-        next: response => {
-          this.isLoading = false;
-          if (response?.session_url) {
-            window.location.href = response.session_url;
+    this.orderService.submitOrder({ ...basePayload, action: 'createOrder' }).subscribe({
+      next: result => {
+        this.isLoading = false;
+        const links = result['links'];
+        links.forEach((link: any) => {
+          if (link['rel'] === 'payer-action') {
+            document.location.href = link['href'];
           }
-        },
-        error: error => {
-          console.log(error);
-          this.isLoading = false;
-          alert("an error has occurred. please contact support.");
-        }
-      });
-    } else {
-      this.orderService.submitOrder({ ...basePayload, action: 'createOrder' }).subscribe({
-        next: result => {
-          this.isLoading = false;
-          const links = result['links'];
-          links.forEach((link: any) => {
-            if (link['rel'] === 'payer-action') {
-              document.location.href = link['href'];
-            }
-          });
-          const modalEl = document.getElementById('motorShowModal');
-          const modal = bootstrap?.Modal.getInstance(modalEl);
-          modal?.hide();
-        },
-        error: error => {
-          console.log(error);
-          this.isLoading = false;
-          alert("an error has occurred. please contact support.");
-        }
-      });
+        });
+        const modalEl = document.getElementById('motorShowModal');
+        const modal = bootstrap?.Modal.getInstance(modalEl);
+        modal?.hide();
+      },
+      error: error => {
+        console.log(error);
+        this.isLoading = false;
+        alert("an error has occurred. please contact support.");
+      }
+    });
+  }
+
+  // STRIPE EMBEDDED CHECKOUT
+
+  onStripeClick() {
+    this.motorShowForm.markAllAsTouched();
+    if (!this.motorShowForm.valid) return;
+
+    const form = this.motorShowForm.value;
+    const selectedShirt = form.selectedShirt;
+    this.stripeIsLoading = true;
+
+    const payload = {
+      type: 'motorShowOrder',
+      firstName: form.firstName,
+      lastName: form.lastName,
+      email: form.email,
+      phone: form.phone,
+      streetAddress: form.streetAddress,
+      city: form.city,
+      state: form.state,
+      zipcode: form.zipcode,
+      year: form.year,
+      make: form.make,
+      model: form.model,
+      color: form.color,
+      clubAffiliation: form.clubAffiliation,
+      comboSize: selectedShirt ? selectedShirt.size : null,
+      total: this.cartTotal,
+      grandTotal: this.cartTotal,
+      additionalPlaques: this.cartAdditionalShirtsCounterDict['Plaque'],
+      additionalSmall: this.cartAdditionalShirtsCounterDict['Small'],
+      additionalMedium: this.cartAdditionalShirtsCounterDict['Medium'],
+      additionalLarge: this.cartAdditionalShirtsCounterDict['Large'],
+      additionalXLarge: this.cartAdditionalShirtsCounterDict['XLarge'],
+      additionalXXLarge: this.cartAdditionalShirtsCounterDict['XXLarge'],
+      additionalXXXLarge: this.cartAdditionalShirtsCounterDict['XXXLarge'],
+    };
+
+    this.orderService.createStripeEmbeddedSession(payload).subscribe({
+      next: async (response) => {
+        const clientSecret = response.client_secret;
+        const stripe = Stripe(environment.stripe.pk);
+        this.showStripeCheckout = true;
+        this.stripeIsLoading = false;
+        await new Promise(r => setTimeout(r, 50));
+        this.stripeCheckout = await stripe.initEmbeddedCheckout({
+          fetchClientSecret: () => Promise.resolve(clientSecret)
+        });
+        this.stripeCheckout.mount('#stripe-checkout-wof');
+      },
+      error: () => {
+        this.stripeIsLoading = false;
+        alert('Error initiating payment. Please try again.');
+      }
+    });
+  }
+
+  destroyStripeCheckout() {
+    if (this.stripeCheckout) {
+      this.stripeCheckout.destroy();
+      this.stripeCheckout = null;
     }
+    this.showStripeCheckout = false;
   }
 
   // PAY BY CHECK
@@ -293,7 +346,6 @@ export class WheelsOfFreedomComponent {
     if (!this.motorShowForm.valid) return;
 
     const form = this.motorShowForm.value;
-    this.printData = { ...form, total: this.cartTotal };
 
     const shirtLine = form.addShirtBundle
       ? `Yes — ${form.selectedShirt?.size ?? ''}`

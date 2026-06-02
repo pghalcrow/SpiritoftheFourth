@@ -1,4 +1,5 @@
 import { Component, ElementRef, ViewChild } from '@angular/core';
+declare var Stripe: any;
 import { AbstractControl, FormBuilder, FormControl, FormGroup, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { EmailService } from 'src/app/services/email.service';
 import { FileServerService } from 'src/app/services/file-server.service';
@@ -39,6 +40,9 @@ export class VendorsComponent {
   hasTouchedFileDrop: boolean = false
   shouldDisable: boolean = false
   paymentMethod: string = 'paypal'
+  showStripeCheckout: boolean = false
+  stripeCheckout: any = null
+  stripeIsLoading: boolean = false
 
   currentYear: number = 0
 
@@ -100,6 +104,7 @@ export class VendorsComponent {
       this.isLoading = false
       this.showSuccess = false
       this.showError = false
+      this.destroyStripeCheckout()
       this.vendorApplicationForm.reset()
       this.vendorApplicationForm.enable()
       this.vendorApplicationForm.patchValue({ 'vendorStatus': 'New Vendor', 'vendorType': 'Non-Profit' })
@@ -195,43 +200,95 @@ export class VendorsComponent {
       paymentMethod: fee > 0 ? this.paymentMethod : 'none'
     };
 
-    if (fee > 0 && this.paymentMethod === 'stripe') {
-      this.orderService.createStripeOrder(basePayload).subscribe({
-        next: response => {
-          if (response?.session_url) {
-            window.location.href = response.session_url;
-          }
-        },
-        error: error => {
-          console.log(error);
-          this.isLoading = false;
-          this.showError = true;
-          this.vendorApplicationForm.enable();
+    this.orderService.createEventPayPalOrder({ ...basePayload, action: 'createOrder' }).subscribe({
+      next: result => {
+        const links = result?.['links'] ?? [];
+        const payerAction = links.find((link: any) => link['rel'] === 'payer-action');
+
+        if (payerAction) {
+          document.location.href = payerAction['href'];
+          return;
         }
+
+        this.isLoading = false;
+        this.showSuccess = true;
+        this.showError = false;
+      },
+      error: error => {
+        console.log(error);
+        this.isLoading = false;
+        this.showError = true;
+        this.vendorApplicationForm.enable();
+      }
+    });
+  }
+
+  onVendorStripeClick() {
+    this.vendorApplicationForm.markAllAsTouched();
+    if (!this.vendorApplicationForm.valid || this.totalFilesSize > this.maxFileSize) return;
+
+    this.isLoading = true;
+    this.vendorApplicationForm.disable();
+
+    const formData = this.vendorApplicationForm.getRawValue();
+    const fee = this.currentFee;
+    const toAddress = environment.forms.vendorApplicationForm.toEamil;
+    const subject = environment.forms.vendorApplicationForm.subject;
+    const replyTo = formData.email;
+    const name = formData.contactName;
+    const phone = formData.phone;
+    const body = EmailUtlity.createVendorApplicationHTMLBody(this.vendorApplicationForm);
+
+    const basePayload = {
+      ...formData,
+      toContact: toAddress,
+      subject,
+      replyTo,
+      name,
+      phone,
+      body,
+      grandTotal: fee,
+      type: 'vendorApplication',
+      paymentMethod: 'stripe'
+    };
+
+    const launchCheckout = (attachments: string) => {
+      const payload = { ...basePayload, attachments };
+      this.orderService.createStripeEmbeddedSession(payload).subscribe({
+        next: async (response) => {
+          const clientSecret = response.client_secret;
+          const stripe = Stripe(environment.stripe.pk);
+          this.showStripeCheckout = true;
+          this.isLoading = false;
+          await new Promise(r => setTimeout(r, 50));
+          this.stripeCheckout = await stripe.initEmbeddedCheckout({
+            fetchClientSecret: () => Promise.resolve(clientSecret)
+          });
+          this.stripeCheckout.mount('#stripe-checkout-vendor');
+        },
+        error: () => {
+          this.isLoading = false;
+          this.vendorApplicationForm.enable();
+          alert('Error initiating payment. Please try again.');
+        }
+      });
+    };
+
+    if (this.files.length > 0) {
+      this.uploadService.postFiles(this.files).subscribe(folder => {
+        folder.subscribe((folder: string) => launchCheckout(folder));
       });
     } else {
-      this.orderService.createEventPayPalOrder({ ...basePayload, action: 'createOrder' }).subscribe({
-        next: result => {
-          const links = result?.['links'] ?? [];
-          const payerAction = links.find((link: any) => link['rel'] === 'payer-action');
-
-          if (payerAction) {
-            document.location.href = payerAction['href'];
-            return;
-          }
-
-          this.isLoading = false;
-          this.showSuccess = true;
-          this.showError = false;
-        },
-        error: error => {
-          console.log(error);
-          this.isLoading = false;
-          this.showError = true;
-          this.vendorApplicationForm.enable();
-        }
-      });
+      launchCheckout('');
     }
+  }
+
+  destroyStripeCheckout() {
+    if (this.stripeCheckout) {
+      this.stripeCheckout.destroy();
+      this.stripeCheckout = null;
+    }
+    this.showStripeCheckout = false;
   }
 
   sendMail(payload: any) {

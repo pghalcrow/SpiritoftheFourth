@@ -45,6 +45,14 @@ export class OrderService {
     );
   }
 
+  createStripeEmbeddedSession(payload: any): Observable<any> {
+    return this.httpClient.post<any>(
+      environment.order.url,
+      { ...payload, action: 'createStripeEmbeddedSession' },
+      { headers: new HttpHeaders({ 'Content-Type': 'application/json' }) }
+    );
+  }
+
   createEventPayPalOrder(payload: any): Observable<any> {
     return this.httpClient.post<any>(
       environment.order.url,

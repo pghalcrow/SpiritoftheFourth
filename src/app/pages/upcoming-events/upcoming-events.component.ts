@@ -3,13 +3,15 @@ import { FormBuilder, FormGroup, Validators, FormArray } from '@angular/forms';
 import { OrderService } from 'src/app/services/order.service';
 import { CmsService, Event as CmsEvent } from 'src/app/services/cms.service';
 import { Router, NavigationEnd } from '@angular/router';
+import { environment } from 'src/environments/environment';
 
 interface UIEvent extends CmsEvent {
   formGroup: FormGroup;
   fieldMap: { [key: string]: any };
 }
 
-declare var PayPal: any
+declare var PayPal: any;
+declare var Stripe: any;
 
 @Component({
   selector: 'app-upcoming-events',
@@ -21,8 +23,11 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
   hasReloaded: boolean = false;
   paymentMethod: string = '';
   events: UIEvent[] = [];
-  // sections: any[] = [];
   sponsorForm!: FormGroup;
+  stripeCheckoutEventIndex: number | null = null;
+  showSponsorStripeCheckout: boolean = false;
+  stripeCheckout: any = null;
+  stripeIsLoading: boolean = false;
 
 
   constructor(
@@ -244,20 +249,7 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
 
   console.log('Submitting form data:', formData);
 
-  if (this.paymentMethod === 'stripe') {
-    this.orderService.createStripeOrder(formData).subscribe({
-      next: (response) => {
-        console.log('Stripe session created:', response);
-        if (response?.session_url) {
-          window.location.href = response.session_url;
-        }
-      },
-      error: (err) => {
-        console.error('Error creating Stripe session:', err);
-        alert('There was an error submitting your payment. Please try again.');
-      }
-    });
-  } else if (this.paymentMethod === 'paypal') {
+  if (this.paymentMethod === 'paypal') {
     this.orderService.createEventPayPalOrder(formData).subscribe({
       next: (result) => {
         console.log('PayPal order created:', result);
@@ -293,19 +285,7 @@ submitSponsor() {
     grandTotal: 100
   };
 
-  if (this.sponsorPaymentMethod === 'stripe') {
-    this.orderService.createStripeOrder(baseData).subscribe({
-      next: (response) => {
-        if (response?.session_url) {
-          window.location.href = response.session_url;
-        }
-      },
-      error: (err) => {
-        console.error('Error creating Stripe session:', err);
-        alert('Payment failed. Try again.');
-      }
-    });
-  } else {
+  if (this.sponsorPaymentMethod === 'paypal') {
     this.orderService.createEventPayPalOrder({ ...baseData, action: 'createOrder', paymentMethod: 'paypal' }).subscribe({
       next: (result) => {
         const links = result['links'];
@@ -320,6 +300,103 @@ submitSponsor() {
         alert('Payment failed. Try again.');
       }
     });
+  }
+}
+
+onStripeEvent(eventData: UIEvent, index: number) {
+  const form = eventData.formGroup;
+  const grandTotal = this.calculateTotal(eventData);
+  const pricing = eventData.pricing;
+  const addOns = this.collectAddOns(form, pricing);
+  const groupArray = form.get(pricing.basePlayerField)?.value || [];
+  let players = groupArray.length;
+  if (pricing.includePrimaryPlayer) players += 1;
+
+  if (!form.valid) {
+    form.markAllAsTouched();
+    alert('Please fill out all required fields before submitting.');
+    return;
+  }
+
+  const payload = {
+    type: eventData.type,
+    ...form.value,
+    eventTitle: eventData.title,
+    addOns,
+    players,
+    pricing,
+    teamMembers: groupArray,
+    grandTotal
+  };
+
+  this.stripeIsLoading = true;
+  this.orderService.createStripeEmbeddedSession(payload).subscribe({
+    next: async (response) => {
+      const clientSecret = response.client_secret;
+      const stripe = Stripe(environment.stripe.pk);
+      this.stripeCheckoutEventIndex = index;
+      this.stripeIsLoading = false;
+      await new Promise(r => setTimeout(r, 50));
+      this.stripeCheckout = await stripe.initEmbeddedCheckout({
+        fetchClientSecret: () => Promise.resolve(clientSecret)
+      });
+      this.stripeCheckout.mount(`#stripe-checkout-event-${index}`);
+    },
+    error: () => {
+      this.stripeIsLoading = false;
+      alert('Error initiating payment. Please try again.');
+    }
+  });
+}
+
+onSponsorStripeClick() {
+  if (!this.sponsorForm.valid) {
+    this.sponsorForm.markAllAsTouched();
+    alert('Please fill out all fields.');
+    return;
+  }
+
+  const payload = {
+    type: 'sponsor',
+    ...this.sponsorForm.value,
+    eventTitle: 'T Sign Hole Sponsorship',
+    grandTotal: 100
+  };
+
+  this.stripeIsLoading = true;
+  this.orderService.createStripeEmbeddedSession(payload).subscribe({
+    next: async (response) => {
+      const clientSecret = response.client_secret;
+      const stripe = Stripe(environment.stripe.pk);
+      this.showSponsorStripeCheckout = true;
+      this.stripeIsLoading = false;
+      await new Promise(r => setTimeout(r, 50));
+      this.stripeCheckout = await stripe.initEmbeddedCheckout({
+        fetchClientSecret: () => Promise.resolve(clientSecret)
+      });
+      this.stripeCheckout.mount('#stripe-checkout-sponsor');
+    },
+    error: () => {
+      this.stripeIsLoading = false;
+      alert('Error initiating payment. Please try again.');
+    }
+  });
+}
+
+cancelEventStripe() {
+  this.destroyStripeCheckout();
+  this.stripeCheckoutEventIndex = null;
+}
+
+cancelSponsorStripe() {
+  this.destroyStripeCheckout();
+  this.showSponsorStripeCheckout = false;
+}
+
+destroyStripeCheckout() {
+  if (this.stripeCheckout) {
+    this.stripeCheckout.destroy();
+    this.stripeCheckout = null;
   }
 }
 }

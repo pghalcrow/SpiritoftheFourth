@@ -82,7 +82,7 @@
         </div>
 
         <!-- INFO -->
-        <div class="container mt-3">
+        <div class="container mt-3" [hidden]="showStripeCheckout">
           <div class="car-modal-content">
             The Wheels of Freedom Motor Show is from 9:00 AM to 2:00 PM (parking to start around 7:00 AM) Registration
             is $25.00 but space is limited to 140 entries so you must be pre-registered.
@@ -90,7 +90,7 @@
         </div>
 
         <!-- 🔥 SINGLE FORM START -->
-        <form [formGroup]="motorShowForm" (ngSubmit)="onSubmit()" class="mt-4 mb-4">
+        <form [formGroup]="motorShowForm" (ngSubmit)="onSubmit()" class="mt-4 mb-4" [hidden]="showStripeCheckout">
           <div class="container">
             <!-- CONTACT -->
             <div class="row">
@@ -353,8 +353,9 @@
               <button type="submit" [disabled]="isLoading" class="payment-btn paypal-btn" (click)="paymentMethod = 'paypal'">
                 <i class="fa-brands fa-paypal"></i> PayPal
               </button>
-              <button type="submit" [disabled]="isLoading" class="payment-btn stripe-btn" (click)="paymentMethod = 'stripe'">
-                <i class="fa-brands fa-stripe fa-2x"></i>
+              <button type="button" [disabled]="isLoading || stripeIsLoading" class="payment-btn stripe-btn" (click)="onStripeClick()">
+                <span *ngIf="stripeIsLoading" class="spinner-border spinner-border-sm" role="status"></span>
+                <i *ngIf="!stripeIsLoading" class="fa-brands fa-stripe fa-2x"></i>
               </button>
             </div>
 
@@ -370,6 +371,17 @@
           </div>
         </form>
         <!-- 🔥 SINGLE FORM END -->
+
+        <!-- STRIPE EMBEDDED CHECKOUT -->
+        <div [hidden]="!showStripeCheckout" class="container my-3">
+          <div id="stripe-checkout-wof"></div>
+          <div class="text-center mt-3 mb-3">
+            <button type="button" class="btn btn-outline-secondary" (click)="destroyStripeCheckout()">
+              ← Back to form
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>

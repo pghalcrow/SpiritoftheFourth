@@ -617,11 +617,9 @@
                   </div>
                   <i class="fa-brands fa-paypal"></i> PayPal
                 </button>
-                <button type="submit" [disabled]="isLoading" class="payment-btn stripe-btn" (click)="paymentMethod = 'stripe'">
-                  <div [hidden]="isLoading == false || paymentMethod !== 'stripe'" class="spinner-border spinner-border-sm" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                  </div>
-                  <i class="fa-brands fa-stripe fa-2x"></i>
+                <button type="button" [disabled]="isLoading || stripeIsLoading" class="payment-btn stripe-btn" (click)="onVendorStripeClick()">
+                  <span *ngIf="stripeIsLoading" class="spinner-border spinner-border-sm" role="status"></span>
+                  <i *ngIf="!stripeIsLoading" class="fa-brands fa-stripe fa-2x"></i>
                 </button>
               </div>
             </ng-container>
@@ -639,6 +637,15 @@
             <div [hidden]="showError == false" class="error-message">An error has occured. Please try again later.</div>
           </div>
         </form>
+
+        <!-- STRIPE EMBEDDED CHECKOUT -->
+        <div [hidden]="!showStripeCheckout" class="p-3">
+          <div id="stripe-checkout-vendor"></div>
+          <div class="text-center mt-3 mb-2">
+            <button type="button" class="btn btn-outline-secondary" (click)="destroyStripeCheckout()">← Back to form</button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
