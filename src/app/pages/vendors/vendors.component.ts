@@ -57,6 +57,7 @@ export class VendorsComponent {
   }
 
   @ViewChild("fileDropRef", { static: false }) fileDropEl!: ElementRef;
+  @ViewChild("stripeCheckoutSection", { static: false }) stripeCheckoutSection?: ElementRef;
 
   constructor(
     private fb: FormBuilder,
@@ -225,9 +226,13 @@ export class VendorsComponent {
 
   onVendorStripeClick() {
     this.vendorApplicationForm.markAllAsTouched();
-    if (!this.vendorApplicationForm.valid || this.totalFilesSize > this.maxFileSize) return;
+    if (!this.vendorApplicationForm.valid || this.totalFilesSize > this.maxFileSize) {
+      this.scrollFirstVendorProblemIntoView();
+      return;
+    }
 
-    this.isLoading = true;
+    this.paymentMethod = 'stripe';
+    this.stripeIsLoading = true;
     this.vendorApplicationForm.disable();
 
     const formData = this.vendorApplicationForm.getRawValue();
@@ -256,18 +261,26 @@ export class VendorsComponent {
       const payload = { ...basePayload, attachments };
       this.orderService.createStripeEmbeddedSession(payload).subscribe({
         next: async (response) => {
-          const clientSecret = response.client_secret;
-          const stripe = Stripe(environment.stripe.pk);
-          this.showStripeCheckout = true;
-          this.isLoading = false;
-          await new Promise(r => setTimeout(r, 50));
-          this.stripeCheckout = await stripe.initEmbeddedCheckout({
-            fetchClientSecret: () => Promise.resolve(clientSecret)
-          });
-          this.stripeCheckout.mount('#stripe-checkout-vendor');
+          try {
+            const clientSecret = response.client_secret;
+            const stripe = Stripe(environment.stripe.pk);
+            this.showStripeCheckout = true;
+            await new Promise(r => setTimeout(r, 50));
+            this.stripeCheckout = await stripe.initEmbeddedCheckout({
+              fetchClientSecret: () => Promise.resolve(clientSecret)
+            });
+            this.stripeCheckout.mount('#stripe-checkout-vendor');
+            this.stripeIsLoading = false;
+            this.scrollStripeCheckoutIntoView();
+          } catch (error) {
+            console.log(error);
+            this.stripeIsLoading = false;
+            this.vendorApplicationForm.enable();
+            alert('Error initiating payment. Please try again.');
+          }
         },
         error: () => {
-          this.isLoading = false;
+          this.stripeIsLoading = false;
           this.vendorApplicationForm.enable();
           alert('Error initiating payment. Please try again.');
         }
@@ -289,6 +302,25 @@ export class VendorsComponent {
       this.stripeCheckout = null;
     }
     this.showStripeCheckout = false;
+  }
+
+  private scrollStripeCheckoutIntoView() {
+    this.stripeCheckoutSection?.nativeElement.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    });
+  }
+
+  private scrollFirstVendorProblemIntoView() {
+    const invalidControl = document.querySelector(
+      '#vendorApplicationModal .alert-input, #vendorApplicationModal .ng-invalid:not(form)'
+    ) as HTMLElement | null;
+
+    invalidControl?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center'
+    });
+    invalidControl?.focus();
   }
 
   sendMail(payload: any) {

@@ -647,7 +647,7 @@
         </form>
 
         <!-- STRIPE EMBEDDED CHECKOUT -->
-        <div [hidden]="!showStripeCheckout" class="p-3">
+        <div [hidden]="!showStripeCheckout" class="p-3" #stripeCheckoutSection>
           <div id="stripe-checkout-vendor"></div>
           <div class="text-center mt-3 mb-2">
             <button type="button" class="btn btn-outline-secondary" (click)="destroyStripeCheckout()">← Back to form</button>
