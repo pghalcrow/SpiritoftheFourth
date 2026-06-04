@@ -43,3 +43,6 @@ testem.log
 Thumbs.db
 
 .vscode/settings.json
+
+# Local AWS export/deployment artifacts contain credentials, logs, ZIPs, and vendored dependencies.
+/aws-export/
