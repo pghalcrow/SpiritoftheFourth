@@ -43,6 +43,34 @@ export interface AdminLoginResponse {
   token?: string;
 }
 
+export interface AdminSubmission {
+  submissionId: string;
+  submissionTitle: string;
+  submittedAt?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  paymentStatus?: string;
+  paymentProvider?: string;
+  amount?: number;
+  currency?: string;
+  source?: string;
+  status: string;
+  assignedTo: string;
+  notes: string;
+  rawData?: any;
+}
+
+export interface AdminSubmissionListResponse {
+  items: AdminSubmission[];
+}
+
+export interface AdminSubmissionUpdate {
+  status: string;
+  assignedTo: string;
+  notes: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -66,6 +94,23 @@ export class CmsService {
         Authorization: `Bearer ${token}` 
         } 
       }
+    );
+  }
+
+  getSubmissions(): Observable<AdminSubmissionListResponse> {
+    const token = sessionStorage.getItem('adminToken');
+    return this.http.get<AdminSubmissionListResponse>(
+      `${this.baseUrl}${this.routes.submissions}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  }
+
+  updateSubmissionAdminFields(submissionId: string, update: AdminSubmissionUpdate): Observable<AdminSubmission> {
+    const token = sessionStorage.getItem('adminToken');
+    return this.http.patch<AdminSubmission>(
+      `${this.baseUrl}${this.routes.submissions}/${submissionId}`,
+      update,
+      { headers: { Authorization: `Bearer ${token}` } }
     );
   }
 

@@ -65,6 +65,7 @@ export const environment = {
       events: "/events",
       login: "/admin/login",
       adminEvents: "/admin/events",
+      submissions: "/admin/submissions",
       upload: "/admin/upload"
     }
   }
