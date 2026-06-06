@@ -6,27 +6,47 @@
     </div>
 
     <div class="toolbar-actions">
-      <button type="button" class="action-button secondary" (click)="addEvent()">Add Event</button>
-      <button type="button" class="action-button primary" (click)="saveEvents()">Save Changes</button>
+      <div class="section-switcher" aria-label="Admin section">
+        <button
+          type="button"
+          class="section-button"
+          [class.active]="adminSection === 'events'"
+          (click)="selectAdminSection('events')"
+        >
+          Events
+        </button>
+        <button
+          type="button"
+          class="section-button"
+          [class.active]="adminSection === 'submissions'"
+          data-testid="admin-section-submissions"
+          (click)="selectAdminSection('submissions')"
+        >
+          Submissions
+        </button>
+      </div>
+      <button *ngIf="adminSection === 'events'" type="button" class="action-button secondary" (click)="addEvent()">Add Event</button>
+      <button *ngIf="adminSection === 'events'" type="button" class="action-button primary" (click)="saveEvents()">Save Changes</button>
       <button type="button" class="action-button ghost" (click)="logout()">Logout</button>
     </div>
   </header>
 
-  <nav *ngIf="events.length" class="event-tabs" aria-label="Events">
-    <button
-      *ngFor="let cmsEvent of events; let i = index"
-      type="button"
-      class="event-tab"
-      [class.active]="i === activeEventIndex"
-      (click)="selectEvent(i)"
-    >
-      <span class="event-tab-index">Event {{ i + 1 }}</span>
-      <span>{{ getEventTabLabel(cmsEvent, i) }}</span>
-    </button>
-  </nav>
+  <ng-container *ngIf="adminSection === 'events'">
+    <nav *ngIf="events.length" class="event-tabs" aria-label="Events">
+      <button
+        *ngFor="let cmsEvent of events; let i = index"
+        type="button"
+        class="event-tab"
+        [class.active]="i === activeEventIndex"
+        (click)="selectEvent(i)"
+      >
+        <span class="event-tab-index">Event {{ i + 1 }}</span>
+        <span>{{ getEventTabLabel(cmsEvent, i) }}</span>
+      </button>
+    </nav>
 
-  <section class="admin-workspace" *ngIf="activeEvent as cmsEvent">
-    <article class="event-card">
+    <section class="admin-workspace" *ngIf="activeEvent as cmsEvent">
+      <article class="event-card">
       <div class="event-card-header">
         <div>
           <span class="event-index">Event {{ activeEventIndex + 1 }}</span>
@@ -266,14 +286,93 @@
           </div>
         </div>
       </section>
-    </article>
+      </article>
+    </section>
+
+    <section *ngIf="!events.length" class="empty-events">
+      <h2>No Events Yet</h2>
+      <p>Add an event to start editing.</p>
+      <button type="button" class="action-button primary" (click)="addEvent()">Add Event</button>
+    </section>
+  </ng-container>
+
+  <section *ngIf="adminSection === 'submissions'" class="submissions-workspace">
+    <div class="submissions-tools">
+      <label class="control-group submissions-search">
+        <span>Search</span>
+        <input class="admin-input" [(ngModel)]="submissionSearch" placeholder="Search submissions" />
+      </label>
+      <button type="button" class="action-button secondary" (click)="loadSubmissions()">Refresh</button>
+    </div>
+
+    <div class="submissions-table-wrap">
+      <table class="submissions-table">
+        <thead>
+          <tr>
+            <th>Submission</th>
+            <th>Date</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Payment</th>
+            <th>Status</th>
+            <th>Assigned To</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let submission of filteredSubmissions"
+            [attr.data-testid]="'submission-row-' + submission.submissionId"
+            (click)="selectSubmission(submission)"
+          >
+            <td>{{ submission.submissionTitle }}</td>
+            <td>{{ submission.submittedAt }}</td>
+            <td>{{ submission.name }}</td>
+            <td>{{ submission.email }}</td>
+            <td>{{ submission.phone }}</td>
+            <td>{{ submission.paymentStatus }}</td>
+            <td>{{ submission.status }}</td>
+            <td>{{ submission.assignedTo }}</td>
+            <td>{{ submission.notes }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
-  <section *ngIf="!events.length" class="empty-events">
-    <h2>No Events Yet</h2>
-    <p>Add an event to start editing.</p>
-    <button type="button" class="action-button primary" (click)="addEvent()">Add Event</button>
-  </section>
+  <aside *ngIf="selectedSubmission" class="submission-detail-panel">
+    <div class="submission-detail-header">
+      <div>
+        <span class="event-index">Submission</span>
+        <h2>{{ selectedSubmission.submissionTitle }}</h2>
+      </div>
+      <button type="button" class="action-button ghost" (click)="selectedSubmission = undefined">Close</button>
+    </div>
+
+    <div class="submission-contact">
+      <p>{{ selectedSubmission.name }}</p>
+      <p>{{ selectedSubmission.email }}</p>
+      <p>{{ selectedSubmission.phone }}</p>
+    </div>
+
+    <label class="control-group">
+      <span>Status</span>
+      <select class="admin-select" [(ngModel)]="selectedSubmission.status">
+        <option *ngFor="let status of submissionStatuses" [value]="status">{{ status }}</option>
+      </select>
+    </label>
+    <label class="control-group">
+      <span>Assigned To</span>
+      <input class="admin-input" [(ngModel)]="selectedSubmission.assignedTo" />
+    </label>
+    <label class="control-group">
+      <span>Notes</span>
+      <textarea class="admin-textarea" [(ngModel)]="selectedSubmission.notes" rows="5"></textarea>
+    </label>
+    <pre class="submission-raw">{{ selectedSubmission.rawData | json }}</pre>
+    <button type="button" class="action-button primary" (click)="saveSelectedSubmission()">Save Submission</button>
+  </aside>
 
   <div *ngIf="modal" class="admin-modal-backdrop" role="presentation">
     <section

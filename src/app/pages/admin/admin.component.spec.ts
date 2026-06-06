@@ -12,7 +12,14 @@ describe('AdminComponent', () => {
   let cmsService: jasmine.SpyObj<CmsService>;
 
   beforeEach(async () => {
-    cmsService = jasmine.createSpyObj<CmsService>('CmsService', ['getEvents', 'updateEvents', 'uploadImage', 'resolveAssetUrl']);
+    cmsService = jasmine.createSpyObj<CmsService>('CmsService', [
+      'getEvents',
+      'updateEvents',
+      'uploadImage',
+      'resolveAssetUrl',
+      'getSubmissions',
+      'updateSubmissionAdminFields',
+    ]);
     cmsService.getEvents.and.returnValue(of({
       events: [{
         title: 'Golf Fundraiser',
@@ -44,6 +51,8 @@ describe('AdminComponent', () => {
     cmsService.updateEvents.and.returnValue(of({ success: true }));
     cmsService.uploadImage.and.returnValue(of({ success: true, url: 'assets/new-flyer.png' }));
     cmsService.resolveAssetUrl.and.callFake((url: string) => url);
+    cmsService.getSubmissions.and.returnValue(of({ items: [] }));
+    cmsService.updateSubmissionAdminFields.and.returnValue(of({} as any));
 
     await TestBed.configureTestingModule({
       declarations: [AdminComponent],
@@ -159,5 +168,76 @@ describe('AdminComponent', () => {
 
     expect(component.events.length).toBe(0);
     expect(nativeElement.querySelector('.admin-modal')).toBeFalsy();
+  });
+
+  it('switches to submissions and renders spreadsheet rows', () => {
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 's1',
+        submissionTitle: 'Volunteer Request',
+        submittedAt: '2026-06-05T10:00:00-07:00',
+        name: 'Pat Halcrow',
+        email: 'pat@example.com',
+        phone: '555-1212',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { message: 'Available morning' },
+      }]
+    }));
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const button = nativeElement.querySelector('[data-testid="admin-section-submissions"]') as HTMLButtonElement;
+    button.click();
+    fixture.detectChanges();
+
+    expect(cmsService.getSubmissions).toHaveBeenCalled();
+    expect(nativeElement.querySelector('.submissions-table')?.textContent).toContain('Volunteer Request');
+    expect(nativeElement.querySelector('.submissions-table')?.textContent).toContain('Pat Halcrow');
+  });
+
+  it('opens a submission detail panel and saves admin fields', () => {
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 's1',
+        submissionTitle: 'Volunteer Request',
+        submittedAt: '2026-06-05T10:00:00-07:00',
+        name: 'Pat Halcrow',
+        email: 'pat@example.com',
+        phone: '555-1212',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { message: 'Available morning' },
+      }]
+    }));
+    cmsService.updateSubmissionAdminFields.and.returnValue(of({
+      submissionId: 's1',
+      submissionTitle: 'Volunteer Request',
+      status: 'Complete',
+      assignedTo: 'Patrick',
+      notes: 'Verified',
+    } as any));
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-submissions"]')!.click();
+    fixture.detectChanges();
+    nativeElement.querySelector<HTMLTableRowElement>('[data-testid="submission-row-s1"]')!.click();
+    fixture.detectChanges();
+
+    component.selectedSubmission!.status = 'Complete';
+    component.selectedSubmission!.assignedTo = 'Patrick';
+    component.selectedSubmission!.notes = 'Verified';
+    component.saveSelectedSubmission();
+
+    expect(cmsService.updateSubmissionAdminFields).toHaveBeenCalledWith('s1', {
+      status: 'Complete',
+      assignedTo: 'Patrick',
+      notes: 'Verified',
+    });
   });
 });

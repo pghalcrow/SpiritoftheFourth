@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { CmsService, CmsEvent } from 'src/app/services/cms.service';
+import { CmsService, CmsEvent, AdminSubmission } from 'src/app/services/cms.service';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { Observable, forkJoin } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -26,6 +26,11 @@ export class AdminComponent implements OnInit {
   activeEventIndex = 0;
   selectedFile?: File;
   modal?: AdminModal;
+  adminSection: 'events' | 'submissions' = 'events';
+  submissions: AdminSubmission[] = [];
+  selectedSubmission?: AdminSubmission;
+  submissionSearch = '';
+  submissionStatuses = ['New', 'In Review', 'Follow Up', 'Complete', 'Archived'];
 
   constructor(private cmsService: CmsService, private router: Router) {}
 
@@ -44,6 +49,55 @@ export class AdminComponent implements OnInit {
     if (index >= 0 && index < this.events.length) {
       this.activeEventIndex = index;
     }
+  }
+
+  selectAdminSection(section: 'events' | 'submissions') {
+    this.adminSection = section;
+    if (section === 'submissions' && !this.submissions.length) {
+      this.loadSubmissions();
+    }
+  }
+
+  loadSubmissions() {
+    this.cmsService.getSubmissions().subscribe({
+      next: res => this.submissions = res.items || [],
+      error: err => {
+        console.error('Submissions load failed', err);
+        this.showModal('Submissions unavailable', 'Could not load submissions.', 'danger');
+      }
+    });
+  }
+
+  get filteredSubmissions(): AdminSubmission[] {
+    const query = this.submissionSearch.trim().toLowerCase();
+    if (!query) return this.submissions;
+    return this.submissions.filter(row =>
+      [row.submissionTitle, row.name, row.email, row.phone, row.status, row.assignedTo, row.notes]
+        .filter(Boolean)
+        .some(value => String(value).toLowerCase().includes(query))
+    );
+  }
+
+  selectSubmission(submission: AdminSubmission) {
+    this.selectedSubmission = { ...submission };
+  }
+
+  saveSelectedSubmission() {
+    if (!this.selectedSubmission) return;
+    const { submissionId, status, assignedTo, notes } = this.selectedSubmission;
+    this.cmsService.updateSubmissionAdminFields(submissionId, { status, assignedTo, notes }).subscribe({
+      next: updated => {
+        this.submissions = this.submissions.map(row =>
+          row.submissionId === updated.submissionId ? { ...row, ...updated } : row
+        );
+        this.selectedSubmission = { ...this.selectedSubmission!, ...updated };
+        this.showModal('Submission saved', 'Admin fields have been updated.', 'success');
+      },
+      error: err => {
+        console.error('Submission save failed', err);
+        this.showModal('Save failed', 'Could not update the submission.', 'danger');
+      }
+    });
   }
 
   getEventTabLabel(event: CmsEvent, index: number): string {

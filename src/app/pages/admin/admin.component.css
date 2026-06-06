@@ -85,10 +85,156 @@ h4 {
   gap: 8px;
 }
 
+.section-switcher {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  background: #e8eef5;
+  border: 1px solid #c9d5e3;
+  border-radius: 8px;
+}
+
+.section-button {
+  min-height: 34px;
+  padding: 7px 11px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #31506f;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.section-button.active {
+  background: #0a3161;
+  border-color: #0a3161;
+  color: #ffffff;
+}
+
 .admin-workspace {
   display: grid;
   gap: 18px;
   padding-top: 22px;
+}
+
+.submissions-workspace {
+  display: grid;
+  gap: 14px;
+  padding-top: 22px;
+}
+
+.submissions-tools {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+}
+
+.submissions-search {
+  flex: 1 1 320px;
+}
+
+.submissions-table-wrap {
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  box-shadow: 0 14px 38px rgba(16, 35, 61, 0.08);
+}
+
+.submissions-table {
+  width: 100%;
+  min-width: 1100px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.submissions-table th,
+.submissions-table td {
+  max-width: 240px;
+  padding: 11px 12px;
+  border-bottom: 1px solid #e7edf3;
+  color: #26384b;
+  line-height: 1.35;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.submissions-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f2f6fa;
+  color: #0a3161;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.submissions-table tbody tr {
+  cursor: pointer;
+}
+
+.submissions-table tbody tr:hover {
+  background: #f7fafd;
+}
+
+.submission-detail-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  width: min(520px, 100vw);
+  height: 100vh;
+  overflow: auto;
+  padding: 20px;
+  background: #ffffff;
+  border-left: 1px solid #d0d9e4;
+  box-shadow: -14px 0 34px rgba(15, 31, 51, 0.18);
+}
+
+.submission-detail-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8ef;
+}
+
+.submission-contact {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #dbe3ec;
+  border-radius: 8px;
+}
+
+.submission-contact p {
+  color: #42566c;
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+.submission-raw {
+  max-height: 260px;
+  overflow: auto;
+  padding: 12px;
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  color: #26384b;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
 }
 
 .event-tabs {
