@@ -38,6 +38,10 @@ export class SponsorsPlugComponent {
         image: "assets/sponsor_logos/SDHE_logo_2.png",
         url: 'https://www.sdhehomes.com/'
       },
+      {
+        image: "assets/sponsor_logos/oasis_logo.PNG",
+        url: 'https://san-diego.oasisnet.org/san-diego-oasis-at-rancho-bernardo/'
+      },
       // {
       //   image: "assets/sponsor_logos/peraton.png",
       //   url: 'https://www.peraton.com/'
