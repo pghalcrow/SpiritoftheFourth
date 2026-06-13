@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
@@ -60,6 +61,56 @@ class DeployLambdasScriptTests(unittest.TestCase):
             self.assertIn("lambda_function.py", zip_listing)
             self.assertNotIn("stale.pyc", zip_listing)
 
+    def test_package_lambda_vendors_function_requirements(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            source_dir = tmp_path / "lambda"
+            zip_path = tmp_path / "lambda.zip"
+            fake_python = tmp_path / "python3"
+            pip_calls = tmp_path / "pip-calls.jsonl"
+            source_dir.mkdir()
+            (source_dir / "lambda_function.py").write_text("def handler(event, context): return {}\n")
+            (source_dir / "requirements.txt").write_text("requests==2.32.5\n")
+            fake_python.write_text(
+                textwrap.dedent(
+                    f"""\
+                    #!{sys.executable}
+                    import json
+                    import pathlib
+                    import sys
+
+                    args = sys.argv[1:]
+                    with open({str(pip_calls)!r}, "a") as calls:
+                        calls.write(json.dumps(args) + "\\n")
+                    target = pathlib.Path(args[args.index("--target") + 1])
+                    (target / "requests").mkdir()
+                    (target / "requests" / "__init__.py").write_text("__version__ = '2.32.5'\\n")
+                    """
+                )
+            )
+            fake_python.chmod(0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{tmp_path}{os.pathsep}{env['PATH']}"
+
+            result = subprocess.run(
+                ["backend/scripts/package_lambda.sh", str(source_dir), str(zip_path), "3.10"],
+                cwd=Path(__file__).resolve().parents[2],
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            pip_args = json.loads(pip_calls.read_text().splitlines()[0])
+            self.assertIn("--platform", pip_args)
+            self.assertIn("manylinux2014_x86_64", pip_args)
+            self.assertIn("--python-version", pip_args)
+            self.assertIn("3.10", pip_args)
+            zip_listing = subprocess.check_output(["unzip", "-Z1", str(zip_path)], text=True)
+            self.assertIn("requests/__init__.py", zip_listing)
+
     def test_deploy_preserves_existing_environment_variables(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -99,6 +150,7 @@ class DeployLambdasScriptTests(unittest.TestCase):
 
             env = os.environ.copy()
             env["PATH"] = f"{tmp_path}{os.pathsep}{env['PATH']}"
+            env["LAMBDA_VENDOR_DEPS"] = "false"
 
             subprocess.run(
                 ["backend/scripts/deploy_lambdas.sh", "dev"],

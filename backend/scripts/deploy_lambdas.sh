@@ -19,11 +19,12 @@ fi
 deploy_one() {
   local source_dir="$1"
   local function_name="$2"
+  local python_version="$3"
   local zip_path="/tmp/${function_name}.zip"
   local existing_env
   local merged_env
 
-  backend/scripts/package_lambda.sh "${source_dir}" "${zip_path}"
+  backend/scripts/package_lambda.sh "${source_dir}" "${zip_path}" "${python_version}"
   aws lambda update-function-code \
     --region "${REGION}" \
     --function-name "${function_name}" \
@@ -57,6 +58,6 @@ PY
   echo "Deployed ${function_name} with SUBMISSIONS_TABLE=${TABLE_NAME}"
 }
 
-deploy_one backend/lambdas/events_service "${EVENTS_FN}"
-deploy_one backend/lambdas/sotf_mailer "${MAILER_FN}"
-deploy_one backend/lambdas/create_order "${ORDER_FN}"
+deploy_one backend/lambdas/events_service "${EVENTS_FN}" "3.14"
+deploy_one backend/lambdas/sotf_mailer "${MAILER_FN}" "3.9"
+deploy_one backend/lambdas/create_order "${ORDER_FN}" "3.10"
