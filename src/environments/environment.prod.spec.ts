@@ -1,7 +1,7 @@
 import { environment } from './environment.prod';
 
 describe('production environment', () => {
-  it('temporarily routes volunteer notifications to Patrick for live testing', () => {
-    expect(environment.forms.volunteerForm.toEamil).toBe('pghalcrow@gmail.com');
+  it('routes volunteer notifications to original recipients', () => {
+    expect(environment.forms.volunteerForm.toEamil).toBe('dave.spiritofthefourth@gmail.com, joelsurfdog@redshift.com');
   });
 });
