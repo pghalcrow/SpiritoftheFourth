@@ -26,6 +26,10 @@ if [[ -f "${REQUIREMENTS_FILE}" && "${LAMBDA_VENDOR_DEPS:-true}" != "false" ]]; 
     --quiet
 fi
 
+if [[ -n "${GOOGLE_SHEET_CREDENTIALS_FILE:-}" ]]; then
+  cp "${GOOGLE_SHEET_CREDENTIALS_FILE}" "${PACKAGE_DIR}/creds-sa.json"
+fi
+
 rsync -a \
   --exclude '__pycache__/' \
   --exclude '*.pyc' \

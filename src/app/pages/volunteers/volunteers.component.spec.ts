@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { EmailService } from 'src/app/services/email.service';
 import { VolunteersComponent } from './volunteers.component';
 
@@ -41,5 +41,24 @@ describe('VolunteersComponent', () => {
     expect(formData.contactName).toBe('Pat Halcrow');
     expect(formData.availability).toBe('Morning setup');
     expect(formData.message).toBe('Happy to help');
+  });
+
+  it('stops loading and shows an error when volunteer submission fails', async () => {
+    spyOn(console, 'error');
+    emailService.sendEmail.and.returnValue(throwError(() => new Error('storage failed')));
+    component.volunteerForm.setValue({
+      contactName: 'Pat Halcrow',
+      organizationName: '',
+      email: 'pat@example.com',
+      phone: '555-121-2121',
+      availability: 'Morning setup',
+      message: 'Happy to help',
+    });
+
+    await component.onSubmit(component.volunteerForm);
+
+    expect(component.isLoading).toBeFalse();
+    expect(component.showError).toBeTrue();
+    expect(component.volunteerForm.enabled).toBeTrue();
   });
 });

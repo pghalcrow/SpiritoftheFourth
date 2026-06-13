@@ -111,6 +111,33 @@ class DeployLambdasScriptTests(unittest.TestCase):
             zip_listing = subprocess.check_output(["unzip", "-Z1", str(zip_path)], text=True)
             self.assertIn("requests/__init__.py", zip_listing)
 
+    def test_package_lambda_can_include_google_sheet_credentials_from_env(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            source_dir = tmp_path / "lambda"
+            zip_path = tmp_path / "lambda.zip"
+            credentials_path = tmp_path / "creds-sa.json"
+            source_dir.mkdir()
+            (source_dir / "lambda_function.py").write_text("def handler(event, context): return {}\n")
+            credentials_path.write_text('{"client_email":"service@example.com"}\n')
+
+            env = os.environ.copy()
+            env["GOOGLE_SHEET_CREDENTIALS_FILE"] = str(credentials_path)
+            result = subprocess.run(
+                ["backend/scripts/package_lambda.sh", str(source_dir), str(zip_path)],
+                cwd=Path(__file__).resolve().parents[2],
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            zip_listing = subprocess.check_output(["unzip", "-Z1", str(zip_path)], text=True)
+            self.assertIn("creds-sa.json", zip_listing)
+            content = subprocess.check_output(["unzip", "-p", str(zip_path), "creds-sa.json"], text=True)
+            self.assertIn("service@example.com", content)
+
     def test_deploy_preserves_existing_environment_variables(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

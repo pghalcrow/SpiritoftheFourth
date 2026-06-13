@@ -54,13 +54,22 @@ export class VolunteersComponent {
         formType: "volunteerForm",
         ...this.volunteerForm.getRawValue()
       }
-      this.emailService.sendEmail(toAddress, body, subject, replyTo, name, phone, undefined, formData).subscribe(result =>{
-        this.isLoading = false
-        if(result.status){
-          this.showSuccess = true
-          this.showError = false
-          
-        }else{
+      this.emailService.sendEmail(toAddress, body, subject, replyTo, name, phone, undefined, formData).subscribe({
+        next: result => {
+          this.isLoading = false
+          if(result.status){
+            this.showSuccess = true
+            this.showError = false
+
+          }else{
+            this.showSuccess = false
+            this.showError = true
+            this.volunteerForm.enable()
+          }
+        },
+        error: err => {
+          console.error('Volunteer submission failed', err)
+          this.isLoading = false
           this.showSuccess = false
           this.showError = true
           this.volunteerForm.enable()
