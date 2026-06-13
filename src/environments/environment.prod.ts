@@ -30,7 +30,7 @@ export const environment = {
       subject: "New Car Show Entry Request"
     },
     volunteerForm: {
-      toEamil: "dave.spiritofthefourth@gmail.com, joelsurfdog@redshift.com",
+      toEamil: "pghalcrow@gmail.com",
       subject: "New Volunteer Request"
     },
     sponsorshipForm: {
