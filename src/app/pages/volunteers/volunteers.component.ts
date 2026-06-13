@@ -50,7 +50,11 @@ export class VolunteersComponent {
       let replyTo = this.volunteerForm.get("email")!.value
       let name = this.volunteerForm.get("contactName")!.value
       let phone = this.volunteerForm.get("phone")!.value
-      this.emailService.sendEmail(toAddress, body, subject, replyTo, name, phone).subscribe(result =>{
+      let formData = {
+        formType: "volunteerForm",
+        ...this.volunteerForm.getRawValue()
+      }
+      this.emailService.sendEmail(toAddress, body, subject, replyTo, name, phone, undefined, formData).subscribe(result =>{
         this.isLoading = false
         if(result.status){
           this.showSuccess = true

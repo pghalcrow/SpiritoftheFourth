@@ -454,6 +454,15 @@ def lambda_handler(event, context):
                 attachments = event_body['attachments']
 
             success = send_email(host, port, username, password, subject, body, attachments, mail_to, username, reply_to)
+            if success:
+                record_submission_parallel(
+                    form=subject,
+                    name=contact_name,
+                    email=reply_to,
+                    phone=contact_phone,
+                    source=event_body.get("formType", "mailer"),
+                    raw_data={**event_body, "submission_id": str(uuid.uuid4())},
+                )
 
         if success:
             response["statusCode"] = 200

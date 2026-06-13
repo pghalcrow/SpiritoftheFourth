@@ -1,4 +1,5 @@
 import importlib
+import json
 import sys
 import types
 import unittest
@@ -167,6 +168,43 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
             source="volunteerForm",
             raw_data={"submission_id": "mailer-1"},
         )
+
+    def test_normal_mailer_request_records_successful_volunteer_submission(self):
+        mailer = import_sotf_mailer()
+        event = {
+            "body": json.dumps({
+                "toContact": "pghalcrow@gmail.com",
+                "subject": "New Volunteer Request",
+                "replyTo": "pat@example.com",
+                "name": "Pat Halcrow",
+                "phone": "555-1212",
+                "body": "<html>Volunteer details</html>",
+                "formType": "volunteerForm",
+                "availability": "Morning setup",
+                "message": "Happy to help",
+            })
+        }
+
+        with patch.object(mailer, "send_email", return_value=True), \
+            patch.object(mailer, "record_submission_parallel") as record_submission, \
+            patch.dict(mailer.os.environ, {
+                "USERNAME": "sender@example.com",
+                "PASSWORD": "password",
+                "SMTPHOST": "smtp.example.com",
+                "SMTPPORT": "587",
+            }):
+            response = mailer.lambda_handler(event, None)
+
+        self.assertEqual(response["statusCode"], 200)
+        record_submission.assert_called_once()
+        call_kwargs = record_submission.call_args.kwargs
+        self.assertEqual(call_kwargs["form"], "New Volunteer Request")
+        self.assertEqual(call_kwargs["name"], "Pat Halcrow")
+        self.assertEqual(call_kwargs["email"], "pat@example.com")
+        self.assertEqual(call_kwargs["phone"], "555-1212")
+        self.assertEqual(call_kwargs["source"], "volunteerForm")
+        self.assertEqual(call_kwargs["raw_data"]["availability"], "Morning setup")
+        self.assertIn("submission_id", call_kwargs["raw_data"])
 
     def test_mailer_google_sheet_uses_local_environment_overrides(self):
         mailer = import_sotf_mailer()

@@ -20,6 +20,21 @@ export class EmailUtlity {
     let content = "<div><b>" + header + ": </b></div><p><a href=\"tel:" + value.replace(/\D/g, '') + "\" >" + value + "</a></p><br/>"
     return content
   }
+  static escapeHtml(value: any): string {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
+  }
+  static volunteerSummaryRow(label: string, value: any): string {
+    return `
+      <tr>
+        <td style="padding: 12px 14px; border-bottom: 1px solid #e7edf5; color: #526174; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; width: 34%;">${label}</td>
+        <td style="padding: 12px 14px; border-bottom: 1px solid #e7edf5; color: #182536; font-size: 15px; line-height: 1.45;">${value}</td>
+      </tr>`
+  }
 
   static createVendorApplicationHTMLBody(vendorApplicationForm: FormGroup): string {
     let contentString = ""
@@ -138,20 +153,44 @@ export class EmailUtlity {
   }
 
   static createVolunteerFormHTMLBody(volunteerForm: FormGroup): string {
+    const contactName = this.escapeHtml(volunteerForm.get("contactName")!.value)
+    const organizationName = this.escapeHtml(volunteerForm.get("organizationName")?.value)
+    const email = this.escapeHtml(volunteerForm.get("email")!.value)
+    const phone = this.escapeHtml(volunteerForm.get("phone")!.value)
+    const phoneHref = this.escapeHtml(volunteerForm.get("phone")!.value.replace(/\D/g, ''))
+    const availability = this.escapeHtml(volunteerForm.get("availability")!.value)
+    const message = this.escapeHtml(volunteerForm.get("message")!.value).replace(/\n/g, "<br>")
 
-    let contentString = ""
-
-    contentString += this.makeField("Contact Name", [volunteerForm.get("contactName")!.value])
-    if (volunteerForm.get("organizationName")?.value) {
-      contentString += this.makeField("Organization", [volunteerForm.get("organizationName")!.value])
+    let rows = ""
+    rows += this.volunteerSummaryRow("Contact", contactName)
+    if (organizationName) {
+      rows += this.volunteerSummaryRow("Organization", organizationName)
     }
-    contentString += this.makeField("Email", [volunteerForm.get("email")!.value])
-    contentString += this.makePhoneLink("Phone", volunteerForm.get("phone")!.value)
-    contentString += this.makeField("Availability", [volunteerForm.get("availability")!.value])
-    contentString += this.makeField("Message", [volunteerForm.get("message")!.value])
+    rows += this.volunteerSummaryRow("Email", `<a href="mailto:${email}" style="color: #1f5f9f; text-decoration: none; font-weight: 700;">${email}</a>`)
+    rows += this.volunteerSummaryRow("Phone", `<a href="tel:${phoneHref}" style="color: #1f5f9f; text-decoration: none; font-weight: 700;">${phone}</a>`)
+    rows += this.volunteerSummaryRow("Availability", availability)
+    rows += this.volunteerSummaryRow("Message", message)
 
-
-    return this.htmlBegin + contentString + this.htmlEnd
+    return `<!doctype html>
+<html>
+  <body style="margin: 0; padding: 0; background: #f4f7fb; font-family: Georgia, 'Times New Roman', serif; color: #182536;">
+    <div style="max-width: 680px; margin: 0 auto; padding: 28px 16px;">
+      <div style="background: #ffffff; border: 1px solid #dce6f2; border-radius: 10px; overflow: hidden;">
+        <div style="background: #102b46; padding: 24px 28px;">
+          <div style="color: #f5c84c; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;">New volunteer signup</div>
+          <h1 style="margin: 8px 0 0; color: #ffffff; font-size: 28px; line-height: 1.2;">Volunteer Request</h1>
+        </div>
+        <div style="padding: 24px 28px 8px;">
+          <p style="margin: 0 0 18px; color: #526174; font-size: 16px; line-height: 1.55;">A new volunteer request was submitted from the Spirit of the Fourth website.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; border: 1px solid #e7edf5; border-radius: 8px; overflow: hidden;">
+            ${rows}
+          </table>
+        </div>
+        <div style="padding: 16px 28px 24px; color: #7b8797; font-size: 13px; line-height: 1.5;">Reply directly to this email to contact the volunteer.</div>
+      </div>
+    </div>
+  </body>
+</html>`
   }
 
   static createArtistFormHTMLBody(artistForm: FormGroup): string {
