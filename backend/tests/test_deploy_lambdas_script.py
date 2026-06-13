@@ -33,6 +33,33 @@ class DeployLambdasScriptTests(unittest.TestCase):
             self.assertNotIn("__pycache__", zip_listing)
             self.assertNotIn(".pyc", zip_listing)
 
+    def test_package_lambda_replaces_existing_zip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            source_dir = tmp_path / "lambda"
+            zip_path = tmp_path / "lambda.zip"
+            source_dir.mkdir()
+            (source_dir / "lambda_function.py").write_text("def handler(event, context): return {}\n")
+            (tmp_path / "stale.pyc").write_bytes(b"stale")
+
+            subprocess.run(
+                ["zip", "-q", str(zip_path), "stale.pyc"],
+                cwd=tmp_path,
+                check=True,
+            )
+            result = subprocess.run(
+                ["backend/scripts/package_lambda.sh", str(source_dir), str(zip_path)],
+                cwd=Path(__file__).resolve().parents[2],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            zip_listing = subprocess.check_output(["unzip", "-Z1", str(zip_path)], text=True)
+            self.assertIn("lambda_function.py", zip_listing)
+            self.assertNotIn("stale.pyc", zip_listing)
+
     def test_deploy_preserves_existing_environment_variables(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

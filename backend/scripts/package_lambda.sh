@@ -5,6 +5,7 @@ LAMBDA_DIR="$1"
 OUT_ZIP="$2"
 
 rm -rf /tmp/sotf-lambda-package
+rm -f "${OUT_ZIP}"
 mkdir -p /tmp/sotf-lambda-package
 
 rsync -a \
