@@ -1,0 +1,277 @@
+import unittest
+
+from backend.shared.submissions_repository import SubmissionsRepository
+
+
+class FakeTable:
+    def __init__(self):
+        self.items = {}
+        self.page_size = None
+        self.delete_before_update_keys = set()
+
+    def put_item(self, **kwargs):
+        item = kwargs["Item"]
+        key = (item["pk"], item["sk"])
+        condition = kwargs.get("ConditionExpression")
+        if condition and key in self.items:
+            raise Exception("ConditionalCheckFailedException")
+        self.items[key] = item
+        return {"ResponseMetadata": {"HTTPStatusCode": 200}}
+
+    def get_item(self, **kwargs):
+        key = (kwargs["Key"]["pk"], kwargs["Key"]["sk"])
+        item = self.items.get(key)
+        return {"Item": item} if item else {}
+
+    def update_item(self, **kwargs):
+        key = (kwargs["Key"]["pk"], kwargs["Key"]["sk"])
+        if key in self.delete_before_update_keys:
+            self.items.pop(key, None)
+
+        condition = kwargs.get("ConditionExpression")
+        if condition and key not in self.items:
+            raise Exception("ConditionalCheckFailedException")
+
+        item = self.items.setdefault(key, {"pk": key[0], "sk": key[1]})
+        names = kwargs["ExpressionAttributeNames"]
+        values = kwargs["ExpressionAttributeValues"]
+        for placeholder, field_name in names.items():
+            value_key = ":" + placeholder.lstrip("#")
+            if value_key in values:
+                item[field_name] = values[value_key]
+        return {"Attributes": item}
+
+    def delete_item(self, **kwargs):
+        key = (kwargs["Key"]["pk"], kwargs["Key"]["sk"])
+        condition = kwargs.get("ConditionExpression")
+        if condition and key not in self.items:
+            raise Exception("ConditionalCheckFailedException")
+        self.items.pop(key, None)
+        return {}
+
+    def query(self, **kwargs):
+        pk_value = kwargs["ExpressionAttributeValues"][":pk"]
+        rows = [item for (pk, _), item in self.items.items() if pk == pk_value]
+        rows.sort(key=lambda row: row["sk"], reverse=kwargs.get("ScanIndexForward") is False)
+        exclusive_start_key = kwargs.get("ExclusiveStartKey")
+        if exclusive_start_key:
+            start_key = (exclusive_start_key["pk"], exclusive_start_key["sk"])
+            for index, item in enumerate(rows):
+                if (item["pk"], item["sk"]) == start_key:
+                    rows = rows[index + 1:]
+                    break
+
+        limit = kwargs.get("Limit") or len(rows)
+        if self.page_size is not None:
+            limit = min(limit, self.page_size)
+
+        page = rows[:limit]
+        result = {"Items": page}
+        if len(rows) > limit and page:
+            result["LastEvaluatedKey"] = {"pk": page[-1]["pk"], "sk": page[-1]["sk"]}
+        return result
+
+
+class RepositoryTests(unittest.TestCase):
+    def setUp(self):
+        self.table = FakeTable()
+        self.repo = SubmissionsRepository(table=self.table)
+
+    def test_create_submission_and_list(self):
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:00:00-07:00#s1",
+            "recordType": "submission",
+            "submissionId": "s1",
+            "submissionTitle": "Volunteer",
+            "name": "Pat",
+            "email": "pat@example.com",
+            "phone": "555",
+            "status": "New",
+            "assignedTo": "",
+            "notes": "",
+        })
+
+        result = self.repo.list_submissions(limit=10)
+
+        self.assertEqual(result["items"][0]["submissionId"], "s1")
+        self.assertEqual(result["items"][0]["submissionTitle"], "Volunteer")
+
+    def test_create_submission_if_missing_is_idempotent(self):
+        record = {
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:00:00-07:00#s1",
+            "recordType": "submission",
+            "submissionId": "s1",
+            "submissionTitle": "Volunteer",
+        }
+
+        self.assertTrue(self.repo.create_submission_if_missing(record))
+        self.assertFalse(self.repo.create_submission_if_missing({**record, "submissionTitle": "Changed"}))
+
+        result = self.repo.list_submissions(limit=10)
+        self.assertEqual(result["items"][0]["submissionTitle"], "Volunteer")
+
+    def test_create_submission_if_missing_blocks_same_submission_id_with_new_sort_key(self):
+        first = {
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:00:00-07:00#s1",
+            "recordType": "submission",
+            "submissionId": "s1",
+            "submissionTitle": "Volunteer",
+        }
+        second = {
+            **first,
+            "sk": "2026-06-05T10:01:00-07:00#s1",
+            "submissionTitle": "Volunteer retry",
+        }
+
+        self.assertTrue(self.repo.create_submission_if_missing(first))
+        self.assertFalse(self.repo.create_submission_if_missing(second))
+
+        result = self.repo.list_submissions(limit=10)
+        self.assertEqual(len(result["items"]), 1)
+        self.assertEqual(result["items"][0]["submissionTitle"], "Volunteer")
+
+    def test_payment_hold_round_trip(self):
+        self.repo.save_payment_hold("hold-1", {"formData": {"fullName": "Pat"}})
+
+        payload = self.repo.get_payment_hold("hold-1")
+
+        self.assertEqual(payload["formData"]["fullName"], "Pat")
+
+    def test_processed_payment_idempotency(self):
+        self.assertFalse(self.repo.is_processed_payment("p1"))
+        self.assertTrue(self.repo.mark_processed_payment("p1", "stripe", {"sessionId": "cs_123"}))
+        self.assertTrue(self.repo.is_processed_payment("p1"))
+        self.assertFalse(self.repo.mark_processed_payment("p1", "stripe", {"sessionId": "cs_123"}))
+
+    def test_claim_payment_processing_is_atomic(self):
+        self.assertTrue(self.repo.claim_payment_processing("p1", "paypal", {"orderId": "order-1"}))
+        self.assertFalse(self.repo.claim_payment_processing("p1", "paypal", {"orderId": "order-1"}))
+
+        item = self.table.get_item(Key={"pk": "PROCESSED_PAYMENT", "sk": "p1"})["Item"]
+        self.assertEqual(item["status"], "processing")
+        self.assertEqual(item["providerSessionId"], "order-1")
+
+    def test_complete_payment_processing_marks_claim_processed(self):
+        self.repo.claim_payment_processing("p1", "stripe", {"sessionId": "cs_123"})
+
+        updated = self.repo.complete_payment_processing("p1", "stripe", {"sessionId": "cs_123"})
+
+        self.assertEqual(updated["status"], "processed")
+        self.assertEqual(updated["provider"], "stripe")
+        self.assertEqual(updated["providerSessionId"], "cs_123")
+        self.assertTrue(updated["processedAt"])
+
+    def test_release_payment_processing_allows_retry_claim(self):
+        self.assertTrue(self.repo.claim_payment_processing("p1", "stripe", {"sessionId": "cs_123"}))
+
+        self.repo.release_payment_processing("p1")
+
+        self.assertTrue(self.repo.claim_payment_processing("p1", "stripe", {"sessionId": "cs_123"}))
+
+    def test_update_admin_fields(self):
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:00:00-07:00#s1",
+            "recordType": "submission",
+            "submissionId": "s1",
+            "submissionTitle": "Volunteer",
+            "name": "Pat",
+            "email": "pat@example.com",
+            "phone": "555",
+            "status": "New",
+            "assignedTo": "",
+            "notes": "",
+        })
+
+        updated = self.repo.update_submission_admin_fields("s1", "Complete", "Patrick", "Done", "admin")
+
+        self.assertEqual(updated["status"], "Complete")
+        self.assertEqual(updated["assignedTo"], "Patrick")
+        self.assertEqual(updated["notes"], "Done")
+        self.assertEqual(updated["updatedBy"], "admin")
+
+    def test_list_submissions_collects_items_across_pages_up_to_limit(self):
+        self.table.page_size = 2
+        for index in range(5):
+            submission_id = f"s{index}"
+            self.repo.create_submission({
+                "pk": "SUBMISSION",
+                "sk": f"2026-06-05T10:0{index}:00-07:00#{submission_id}",
+                "recordType": "submission",
+                "submissionId": submission_id,
+                "submissionTitle": f"Submission {index}",
+                "name": "Pat",
+                "email": "pat@example.com",
+                "phone": "555",
+                "status": "New",
+                "assignedTo": "",
+                "notes": "",
+            })
+
+        result = self.repo.list_submissions(limit=3)
+
+        self.assertEqual([item["submissionId"] for item in result["items"]], ["s4", "s3", "s2"])
+        self.assertEqual(
+            result["lastEvaluatedKey"],
+            {"pk": "SUBMISSION", "sk": "2026-06-05T10:02:00-07:00#s2"},
+        )
+
+    def test_update_admin_fields_finds_submission_on_later_page(self):
+        self.table.page_size = 1
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:02:00-07:00#s2",
+            "recordType": "submission",
+            "submissionId": "s2",
+            "submissionTitle": "Later",
+            "name": "Pat",
+            "email": "pat@example.com",
+            "phone": "555",
+            "status": "New",
+            "assignedTo": "",
+            "notes": "",
+        })
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:01:00-07:00#s1",
+            "recordType": "submission",
+            "submissionId": "s1",
+            "submissionTitle": "Earlier",
+            "name": "Pat",
+            "email": "pat@example.com",
+            "phone": "555",
+            "status": "New",
+            "assignedTo": "",
+            "notes": "",
+        })
+
+        updated = self.repo.update_submission_admin_fields("s2", "Complete", "Patrick", "Done", "admin")
+
+        self.assertEqual(updated["submissionId"], "s2")
+        self.assertEqual(updated["status"], "Complete")
+
+    def test_update_admin_fields_raises_key_error_when_item_disappears_before_update(self):
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:00:00-07:00#s1",
+            "recordType": "submission",
+            "submissionId": "s1",
+            "submissionTitle": "Volunteer",
+            "name": "Pat",
+            "email": "pat@example.com",
+            "phone": "555",
+            "status": "New",
+            "assignedTo": "",
+            "notes": "",
+        })
+        self.table.delete_before_update_keys.add(("SUBMISSION", "2026-06-05T10:00:00-07:00#s1"))
+
+        with self.assertRaisesRegex(KeyError, "Submission not found: s1"):
+            self.repo.update_submission_admin_fields("s1", "Complete", "Patrick", "Done", "admin")
+
+
+if __name__ == "__main__":
+    unittest.main()

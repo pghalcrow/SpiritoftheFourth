@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <body
+    style="
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      padding: 20px;
+    "
+  >
+    <div
+      style="
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      "
+    >
+      <img
+        src="https://spiritofthefourth.org/assets/logo.png"
+        alt="logo image"
+        style="
+          display: block;
+          margin: 0 auto;
+          max-width: 30%;
+          height: auto;
+          margin-bottom: 20px;
+        "
+      />
+
+      <!-- greeting & message -->
+      <p style="color: #333; text-align: center">{date_of_event}</p>
+      <p style="color: #333; text-align: center">{location_of_event}</p>
+      <h1 style="text-align: center; color: #333">
+        Thank you for your Donation!
+      </h1>
+      <p style="color: #333">Hi {buyers_first_name} {buyers_last_name},</p>
+      <p style="color: #333">
+        We have successfully processed your order. Here are the details:
+      </p>
+
+      <!-- table for Items -->
+      <table
+        style="
+          width: 100%;
+          margin-top: 20px;
+          border-collapse: collapse;
+          text-align: left;
+        "
+      >
+        <tr style="background-color: #f9f9f9">
+          <th style="padding: 10px; border: 1px solid #ddd; color: #333">
+            Item
+          </th>
+          <th style="padding: 10px; border: 1px solid #ddd; color: #333">
+            QTY
+          </th>
+          <th style="padding: 10px; border: 1px solid #ddd; color: #333">
+            Value
+          </th>
+        </tr>
+        {items_html}
+        <!-- dynamically generated rows for items -->
+      </table>
+
+      <p
+        style="
+          font-weight: bold;
+          color: #333;
+          margin-top: 20px;
+          text-align: right;
+        "
+      >
+        Total: ${total_price}
+      </p>
+      <p style="color: #333; text-align: center">
+        Order number: {order_id} | Date Purchased: {purchased_date}
+      </p>
+      <p style="color: #333">
+        {end_blurb} If you have any questions, feel free to reach out to us at
+        <a href="mailto:{contact_email}" style="color: #0066cc"
+          >{contact_email}</a
+        >. See you soon!
+      </p>
+      <p style="text-align: center; font-size: 12px; color: #777">
+        &copy; 2026 Spirit Of the Fourth. All rights reserved.
+      </p>
+    </div>
+  </body>
+</html>

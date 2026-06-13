@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+  <body
+    style="
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      padding: 20px;
+      text-align: center;
+    "
+  >
+    <div
+      style="
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        text-align: left;
+      "
+    >
+      <!-- using table to format horizontally -->
+      <table
+        width="100%"
+        cellpadding="0"
+        cellspacing="0"
+        role="presentation"
+        style="margin-bottom: 20px"
+      >
+        <tr>
+          <td style="width: 30%; vertical-align: top">
+            <img
+              src="https://spiritofthefourth.org/assets/logo.png"
+              alt="logo image"
+              style="max-width: 100%; height: auto"
+            />
+          </td>
+          <td style="width: 70%; text-align: right; vertical-align: top">
+            <h2 style="color: #333; margin: 0">Purchase Order</h2>
+            <p
+              style="
+                color: #333;
+                margin: 0;
+                font-weight: bold;
+                text-decoration: underline;
+              "
+            >
+              <span
+                style="
+                  background-color: yellow;
+                  line-height: 1;
+                  padding: 0;
+                  margin: 0;
+                  display: inline;
+                "
+                >{event}</span
+              >
+            </p>
+
+            <!-- tiny table for displaying IDs -->
+            <table
+              style="
+                width: 200px;
+                margin-top: 10px;
+                border-collapse: collapse;
+                font-size: 11px;
+                margin-bottom: 20px;
+                float: right;
+              "
+            >
+              <tr>
+                <td
+                  style="
+                    padding: 4px;
+                    border: 1px solid #ddd;
+                    white-space: nowrap;
+                  "
+                >
+                  Order ID
+                </td>
+                <td
+                  style="
+                    padding: 4px;
+                    border: 1px solid #ddd;
+                    white-space: nowrap;
+                  "
+                >
+                  {order_id}
+                </td>
+              </tr>
+              <tr>
+                <td
+                  style="
+                    padding: 4px;
+                    border: 1px solid #ddd;
+                    white-space: nowrap;
+                  "
+                >
+                  Customer Name
+                </td>
+                <td
+                  style="
+                    padding: 4px;
+                    border: 1px solid #ddd;
+                    white-space: nowrap;
+                  "
+                >
+                  {buyers_first_name} {buyers_last_name}
+                </td>
+              </tr>
+              <tr>
+                <td
+                  style="
+                    padding: 4px;
+                    border: 1px solid #ddd;
+                    white-space: nowrap;
+                  "
+                >
+                  Customer Email
+                </td>
+                <td
+                  style="
+                    padding: 4px;
+                    border: 1px solid #ddd;
+                    white-space: nowrap;
+                  "
+                >
+                  {buyers_email}
+                </td>
+              </tr>
+              <tr>
+                <td
+                  style="
+                    padding: 4px;
+                    border: 1px solid #ddd;
+                    white-space: nowrap;
+                  "
+                >
+                  Order Date
+                </td>
+                <td
+                  style="
+                    padding: 4px;
+                    border: 1px solid #ddd;
+                    white-space: nowrap;
+                  "
+                >
+                  {purchased_date}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+
+      <!-- greeting & message -->
+      <p style="color: #333">Hello Spirit Of The Fourth,</p>
+      <p style="color: #333">
+        Please find the details of our new purchase order below:
+      </p>
+
+      <!-- table for Items -->
+      <table
+        style="
+          width: 100%;
+          margin-top: 20px;
+          border-collapse: collapse;
+          text-align: left;
+        "
+      >
+        <tr style="background-color: #f9f9f9">
+          <th style="padding: 10px; border: 1px solid #ddd; color: #333">
+            Item
+          </th>
+          <th style="padding: 10px; border: 1px solid #ddd; color: #333">
+            QTY
+          </th>
+          <th style="padding: 10px; border: 1px solid #ddd; color: #333">
+            Value
+          </th>
+        </tr>
+        {items_html}
+        <!-- dynamically generated rows for items -->
+      </table>
+
+      <h3 style="margin-top: 30px; color: #333">Records</h3>
+      <table style="width: 100%; border-collapse: collapse; text-align: left">
+        {participants_table_rows}
+      </table>
+
+      <!-- total price -->
+      <p
+        style="
+          font-weight: bold;
+          color: #333;
+          margin-top: 20px;
+          text-align: right;
+        "
+      >
+        Total: ${total_price}
+      </p>
+      <p style="text-align: center; font-size: 12px; color: #777">
+        &copy; 2026 Spirit Of the Fourth. All rights reserved.
+      </p>
+    </div>
+  </body>
+</html>

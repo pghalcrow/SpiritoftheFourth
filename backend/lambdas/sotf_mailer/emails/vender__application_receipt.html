@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+      <img src="https://spiritofthefourth.org/assets/logo.png" alt="logo image" style="display: block; margin: 0 auto; max-width: 30%; height: auto; margin-bottom: 20px;">
+
+      <!-- greeting & message -->
+      <p style="color: #333; text-align: center;">July 4th</p>
+      <p style="color: #333; text-align: center;">Webb Park and Rancho Bernardo High School</p>
+      <h1 style="text-align: center; color: #333;">Thank you for applying to be a vender</h1>
+      <p style="color: #333;">Hi {buyers_full_name},</p>
+      <p style="color: #333;">Your business information has been submitted.</p>
+      {payment_warning}
+      <!-- table for Items -->
+      <table style="width: 100%; margin-top: 20px; border-collapse: collapse; text-align: left;">
+        <tr style="background-color: #f9f9f9;">
+            <th style="padding: 10px; border: 1px solid #ddd; color: #333;">Vender Type</th>
+            <th style="padding: 10px; border: 1px solid #ddd; color: #333;">Price</th>
+        </tr>
+        <tr style="background-color: #fff;">
+            <td style="padding: 10px; border: 1px solid #ddd; color: #333;">{vendor_type}</td>
+            <td style="padding: 10px; border: 1px solid #ddd; color: #333;">${price}</td>
+          </tr>
+    </table>
+
+      <p style="color: #333;">Questions? Contact Marla at 858-382-9541 or Stephanie at 858-382-9582. See you soon!</p>
+      <p style="text-align: center; font-size: 12px; color: #777;">&copy; 2025 Spirit Of the Fourth. All rights reserved.</p>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Vendor Booth Space Application</title>
+  <style>
+    * {
+        box-sizing: border-box;
+    }
+
+    @page {
+        size: A4;
+        margin: 0;
+    }
+
+    .content-wrapper {
+        margin-left: 20px;
+        margin-right: 5px;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px 60px;
+      color: #000;
+      font-size: 12px;
+    }
+
+    .top-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .logo-address {
+      max-width: 45%;
+    }
+
+    .logo-address img {
+      width: 150px;
+    }
+
+    .event-info {
+      border: 1px solid #000;
+      width: 200px;
+      text-align: center;
+      font-size: 10px;
+    }
+
+    .header {
+      text-align: center;
+      margin-top: 0px;
+      margin-bottom: 0px;
+      font-size: 14px;
+    }
+
+    .form-row {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .form-row label {
+      margin-right: 10px;
+      white-space: nowrap;
+    }
+
+    .form-line {
+      border-bottom: 0.5px solid #000;
+      height: 1.2em;
+      flex-grow: 1;
+      margin-right: 20px;
+      padding-left: 6px;
+      display: flex;
+      align-items: flex-start;
+      font-weight: bold;
+    }
+
+    .form-value {
+      font-size: 1em;
+      color: #000;
+      white-space: normal;
+      word-break: break-word;
+      margin-bottom: 0;
+    }
+
+    .form-value b {
+      line-height: 1.6;
+    }
+
+    /* Only affects long text sections */
+    .form-row.tall {
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+
+    .form-row.tall .form-line {
+      height: auto;
+      align-items: flex-start;
+    }
+
+    .form-row.tall .form-value {
+      margin-bottom: 0;
+      line-height: 1.6;
+      white-space: normal;
+      word-break: break-word;
+    }
+
+    .form-row-multi {
+      display: flex;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .form-row-multi label {
+      margin-right: 8px;
+      white-space: nowrap;
+    }
+
+    .form-row-multi .form-line {
+      border-bottom: 1px solid #000;
+      height: 1em;
+    }
+
+    .section {
+      margin-top: 25px;
+    }
+
+    .box {
+      border: 1px solid #000;
+      padding: 15px;
+      width: auto;
+      margin: 15px 0;
+      font-size: 12px;
+    }
+
+    .box p {
+      margin: 6px 0;
+    }
+
+    .option {
+      margin-right: 30px;
+      display: inline-block;
+    }
+
+    .checkbox {
+      position: relative;
+      display: inline-block;
+    }
+
+    .check-overlay {
+      position: absolute;
+      top: -4px;
+      left: -1px;
+      font-weight: bold;
+      font-size: 20px;
+      color: black;
+      pointer-events: none;
+    }
+
+    .bold {
+      font-weight: bold;
+    }
+
+    .underline {
+      text-decoration: underline;
+    }
+
+    .underlined-text {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      text-decoration-thickness: 1px;
+      font-size: 14px;
+      line-height: 1.4;
+      margin-top: 8px;
+      margin-bottom: 8px;
+      display: block;
+      white-space: normal;
+      word-wrap: break-word;
+    }
+
+    .center {
+      text-align: center;
+    }
+
+    .signature {
+      margin-top: 25px;
+    }
+
+    .footer {
+      margin-top: 25px;
+      font-size: 10px;
+    }
+
+    a {
+      color: #0077cc;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+    <div class="content-wrapper">
+      <div class="top-section">
+        <div class="logo-address">
+          <img src="{LOGO_SRC}" alt="SOTF Logo">
+          <p style="margin-top: 0px;">
+            <strong>P.O. Box 270736<br>San Diego, CA 92198</strong><br>
+            <em>An old-fashioned Independence Day celebration!</em>
+          </p>
+        </div>
+        <div class="event-info">
+          <p><strong>Spirit of the Fourth Community Fair</strong></p>
+          <p>Friday, July 4, 2025<br>9:00 a.m. – 1:00 p.m.<br>Webb Park – Rancho Bernardo</p>
+        </div>
+      </div>
+
+      <p class="header">VENDOR BOOTH SPACE APPLICATION FORM</p>
+
+      <div class="section" style="margin-top: 10px;">
+        <div class="form-row">
+          <label>Name of Organization or Business</label>
+          <span class="form-line"><span class="form-value">{ORG_NAME}</span></span>
+        </div>
+
+        <div class="form-row">
+          <label>Contact Name</label>
+          <span class="form-line"><span class="form-value">{CONTACT_NAME}</span></span>
+        </div>
+
+        <div class="form-row">
+          <label>Address</label>
+          <span class="form-line"><span class="form-value">{ADDRESS}</span></span>
+        </div>
+
+        <div class="form-row-multi">
+          <label>City</label><span class="form-line" style="flex:1"><span class="form-value">{CITY}</span></span>
+          <label>State</label><span class="form-line" style="flex:0.6"><span class="form-value">{STATE}</span></span>
+          <label>Zip</label><span class="form-line" style="flex:0.8"><span class="form-value">{ZIP}</span></span>
+          <label>Phone</label><span class="form-line" style="flex:2"><span class="form-value">{PHONE}</span></span>
+        </div>
+
+        <div class="form-row">
+          <label>E-Mail</label>
+          <span class="form-line"><span class="form-value">{EMAIL}</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="box">
+      <p class="bold center" style="margin-bottom: 20px;"><u>2025 Vendor Booth Fee</u></p>
+      <p class="center">
+        <span class="option checkbox">☐ <b>Non-Profit:</b> No Fee <span class="check-overlay">{NON_PROFIT_CHECK}</span></span>
+        <span class="option checkbox">☐ <b>Information Only:</b> $40 <span class="check-overlay">{INFO_ONLY_CHECK}</span></span>
+        <span class="option checkbox">☐ <b>Non-Food Sales:</b> $55 <span class="check-overlay">{NON_FOOD_CHECK}</span></span>
+      </p>
+      <hr style="width:65%">
+      <p class="bold">*Food Sales / Food Trucks:</p>
+      <p class="center" style="margin-bottom: 30px;">
+        <span class="option checkbox">☐ <b>Daytime Only:</b> $100 <span class="check-overlay">{DAYTIME_ONLY_CHECK}</span></span>
+        <span class="option checkbox">☐ <b>Evening Only:</b> $250 <span class="check-overlay">{EVENING_ONLY_CHECK}</span></span>
+        <span class="option checkbox">☐ <b>Daytime AND Evening:</b> $175 <span class="check-overlay">{BOTH_EVENTS_CHECK}</span></span>
+      </p>
+      <p class="center bold"><em>(Evening event subject to PUSD rules and regulations)</em></p>
+      <p style="margin-bottom: 20px;">Both daytime and evening fee includes an approximate 10’ × 10’ space. Vendor must provide own canopy, table & chairs unless other arrangements have been made. Daytime booths must be set up by 8:45 a.m. on July 4 and remain until 1:00 p.m. If participating in the evening event, vendors must arrive at Bernardo Heights Middle School no later than 3:30 p.m. and are required to remain until the end of the fireworks.</p>
+      <p class="bold center">No refunds for cancellations after June 20, 2026</p>
+    </div>
+
+    <div class="content-wrapper">
+      <div class="section">
+        <div class="form-row tall" style="flex-direction: column; align-items: flex-start; display: block; margin-bottom: 16px;">
+          <label>Product / Service Description / Menu Items</label>
+            <span class="form-value" style="text-decoration: underline; line-height: 1.6; display: block; margin-bottom: 16px;"> <!-- Added margin-bottom -->
+              <b>{PRODUCT_DESCRIPTION}</b>
+            </span>
+          </span>
+        </div>
+        <div class="form-row tall" style="flex-direction: column; align-items: flex-start; display: block; margin-bottom: 16px;">
+          <label>Special Booth Requests</label>
+            <span class="form-value" style="text-decoration: underline; line-height: 1.6; display: block;">
+              <b>{SPECIAL_REQUESTS}</b>
+            </span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+      <div class="section">
+        <p class="bold underline">*FOOD SALES:</p>
+        <p>
+          A Temporary Food Facility (TFF) permit is required for anyone that sells or provides food or beverages at a temporary event. Please provide a copy of your permit with this application. Further information available at:<br>
+          <a href="mailto:FHDTempEvents@sdcounty.ca.gov">FHDTempEvents@sdcounty.ca.gov</a>
+        </p>
+      </div>
+
+      <div class="section">
+        <p>
+          I hereby agree that should any loss or damage occur from any cause to the Property that I may enter, I will make no claim against Bernardo Town Center Property Owners’ Association, or the Spirit of the Fourth, Inc. Committee. I further agree to indemnify and hold harmless the above Sponsors against any legal proceedings for any personal injury arising from or occasioned by any employee of mine.
+        </p>
+      </div>
+
+      <div class="signature">
+        <div class="form-row-multi">
+          <label class="bold" style="flex:2">Typing your name below is your signature</label><span style="flex:.25"></span>
+          <label>Title</label><span class="form-line" style="flex:1.85"><span class="form-value">{ORG_NAME}</span></span>
+        </div>
+
+        <div class="form-row-multi">
+          <label>Name</label><span class="form-line" style="flex:1"><span class="form-value">{SIGNER_NAME}</span></span>
+          <label>Date</label><span class="form-line" style="flex:1"><span class="form-value">{DATE}</span></span>
+        </div>
+      </div>
+
+      <div class="footer center">
+        <p><b>Please email the completed form to</b> <strong>softcommunityfair@gmail.com</strong>. <b>If paying by check please mail to:</b><br>
+          Spirit of the Fourth, Inc., Attn: Community Fair, PO Box 270736, San Diego CA 92198</p>
+        <p><b>Payments also accepted</b> by Venmo: <strong>@SpiritOfTheFourth</strong> or <strong><a href="https://PayPal.Me/Spiritofthefourth" target="_blank">PayPal.Me/Spiritofthefourth</a></strong></p>
+        <p><strong>Questions?</strong> Contact Marla at 858-382-9541 or Stephanie at 858-382-9582</p>
+      </div>
+    </div>
+  </body>
+</html>

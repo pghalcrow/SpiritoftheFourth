@@ -46,3 +46,8 @@ Thumbs.db
 
 # Local AWS export/deployment artifacts contain credentials, logs, ZIPs, and vendored dependencies.
 /aws-export/
+
+# Local Python backend runtime
+/backend/.venv/
+__pycache__/
+*.py[cod]
