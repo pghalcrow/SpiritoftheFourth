@@ -11,6 +11,10 @@ export class SponsorsPlugComponent {
   sponsors: Sponsor[] = []
   constructor() {
     this.sponsors.push({
+      image: "assets/sponsor_logos/THE-SHOP.png",
+      url: "https://theshoppizza.com/"
+    },
+    {
       image: "assets/sponsor_logos/cosd.png",
       url: "https://www.sandiego.gov/"
     },
