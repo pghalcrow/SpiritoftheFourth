@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 import uuid
 import re
 from zoneinfo import ZoneInfo
@@ -370,6 +371,7 @@ def create_submission_record(
     submitted_at=None,
 ):
     submission_id = raw_data.get("submission_id") or raw_data.get("submissionId") or uuid.uuid4().hex[:12]
+    dynamodb_amount = Decimal(str(amount)) if amount is not None else None
     record = map_live_submission(
         submission_id=submission_id,
         title=form,
@@ -380,7 +382,7 @@ def create_submission_record(
         raw_data=raw_data,
         payment_status=payment_status,
         payment_provider=payment_provider,
-        amount=amount,
+        amount=dynamodb_amount,
         currency="USD",
         submitted_at=submitted_at,
     )

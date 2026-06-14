@@ -3,8 +3,10 @@ import json
 import sys
 import types
 import unittest
+from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
+from boto3.dynamodb.types import TypeSerializer
 
 
 def import_create_order_app():
@@ -144,6 +146,34 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
 
         self.assertEqual(worksheet, "Event Submissions")
         self.assertEqual(opened, ["/tmp/local-creds.json", "Forms Submissions Local"])
+
+    def test_paid_submission_amount_is_dynamodb_safe_decimal(self):
+        app = import_create_order_app()
+
+        class FakeRepo:
+            def __init__(self):
+                self.record = None
+
+            def create_submission(self, record):
+                self.record = record
+
+        repo = FakeRepo()
+
+        with patch.object(app, "get_submissions_repository", return_value=repo):
+            app.create_submission_record(
+                form="motorShowOrder Order",
+                name="Pat Halcrow",
+                email="pat@example.com",
+                phone="555-1212",
+                source="motorShowOrder",
+                raw_data={"submission_id": "paid-1"},
+                payment_status="paid",
+                payment_provider="stripe",
+                amount=89.0,
+            )
+
+        TypeSerializer().serialize(repo.record)
+        self.assertEqual(repo.record["amount"], Decimal("89.0"))
 
     def test_mailer_records_submission_in_google_sheet_and_dynamodb(self):
         mailer = import_sotf_mailer()
