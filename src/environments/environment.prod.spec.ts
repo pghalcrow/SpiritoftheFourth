@@ -5,8 +5,8 @@ describe('production environment', () => {
     expect(environment.forms.volunteerForm.toEamil).toBe('dave.spiritofthefourth@gmail.com, joelsurfdog@redshift.com');
   });
 
-  it('temporarily routes motor show testing through Patrick and Stripe test mode', () => {
-    expect(environment.forms.carShow.toEamil).toBe('pghalcrow@gmail.com');
-    expect(environment.stripe.pk).toMatch(/^pk_test_/);
+  it('routes motor show notifications and Stripe to live production values', () => {
+    expect(environment.forms.carShow.toEamil).toBe('cowge41@gmail.com, tim@shinn.com');
+    expect(environment.stripe.pk).toMatch(/^pk_live_/);
   });
 });

@@ -5,7 +5,7 @@ export const environment = {
     fromEmail: "adm.spiritofthefourth@gmail.com"
   },
   stripe: {
-    pk: "pk_test_51N6ITZCtYBFkGDnFnqxO5njTXiRYsHAx8UQ4E9jxmIl392iDU6FLSu9wFpXQ09PvT9ACFjbBwtyfj2WjIxUgyTbZ006rnkZaql"
+    pk: "pk_live_51N6ITZCtYBFkGDnFjqlCYuxO0JKLaoNHBmq1I56Hde6k4QbSMqDk15NtZf6gyzi9Wnwem6K0zLpxO3D8Ypab6Qks00de6HVbgz"
   },
   paypal: {
     donationEnv: "production",
@@ -26,7 +26,7 @@ export const environment = {
   },
   forms: {
     carShow: {
-      toEamil: "pghalcrow@gmail.com",
+      toEamil: "cowge41@gmail.com, tim@shinn.com",
       subject: "New Car Show Entry Request"
     },
     volunteerForm: {
