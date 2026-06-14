@@ -21,6 +21,7 @@ def main() -> None:
                     "dynamodb:PutItem",
                     "dynamodb:GetItem",
                     "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
                     "dynamodb:Query",
                 ],
                 "Resource": TABLE_ARNS,

@@ -372,6 +372,7 @@ def create_submission_record(
 ):
     submission_id = raw_data.get("submission_id") or raw_data.get("submissionId") or uuid.uuid4().hex[:12]
     dynamodb_amount = Decimal(str(amount)) if amount is not None else None
+    dynamodb_raw_data = to_dynamodb_safe(raw_data)
     record = map_live_submission(
         submission_id=submission_id,
         title=form,
@@ -379,7 +380,7 @@ def create_submission_record(
         email=email,
         phone=phone,
         source=source,
-        raw_data=raw_data,
+        raw_data=dynamodb_raw_data,
         payment_status=payment_status,
         payment_provider=payment_provider,
         amount=dynamodb_amount,
@@ -396,6 +397,16 @@ def create_submission_record(
         repo.create_submission(record)
     print("✅ DynamoDB submission created")
     return record
+
+
+def to_dynamodb_safe(value):
+    if isinstance(value, float):
+        return Decimal(str(value))
+    if isinstance(value, list):
+        return [to_dynamodb_safe(item) for item in value]
+    if isinstance(value, dict):
+        return {key: to_dynamodb_safe(item) for key, item in value.items()}
+    return value
 
 def build_dynamic_event_items(event):
     pricing = event.get("pricing", {})

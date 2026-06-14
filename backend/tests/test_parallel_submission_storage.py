@@ -166,7 +166,14 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
                 email="pat@example.com",
                 phone="555-1212",
                 source="motorShowOrder",
-                raw_data={"submission_id": "paid-1"},
+                raw_data={
+                    "submission_id": "paid-1",
+                    "pricing": {
+                        "pricePerPlayer": 110.0,
+                        "addOns": [{"field": "Tee Sign Hole Sponsor", "price": 100.0}],
+                    },
+                    "grandTotal": 210.0,
+                },
                 payment_status="paid",
                 payment_provider="stripe",
                 amount=89.0,
@@ -174,6 +181,9 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
 
         TypeSerializer().serialize(repo.record)
         self.assertEqual(repo.record["amount"], Decimal("89.0"))
+        self.assertEqual(repo.record["rawData"]["pricing"]["pricePerPlayer"], Decimal("110.0"))
+        self.assertEqual(repo.record["rawData"]["pricing"]["addOns"][0]["price"], Decimal("100.0"))
+        self.assertEqual(repo.record["rawData"]["grandTotal"], Decimal("210.0"))
 
     def test_mailer_records_submission_in_google_sheet_and_dynamodb(self):
         mailer = import_sotf_mailer()
