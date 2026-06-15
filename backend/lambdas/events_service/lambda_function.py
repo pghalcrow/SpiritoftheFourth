@@ -7,6 +7,7 @@ from decimal import Decimal
 import boto3
 
 from backend.shared.submissions_repository import SubmissionsRepository
+from backend.shared.runtime_mode import is_local_test_mode
 
 
 s3 = boto3.client("s3")
@@ -15,6 +16,15 @@ BUCKET_NAME = os.environ.get("BUCKET_NAME")
 SITE_BUCKET_NAME = os.environ.get("SITE_BUCKET_NAME")
 FILE_KEY = "events.json"
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+DEVELOPER_PASSWORD = os.environ.get("DEVELOPER_PASSWORD", "C0ffeeCup0215")
+ADMIN_TOKEN = "cms-admin-token"
+DEVELOPER_TOKEN = "cms-developer-token"
+NO_CACHE_HEADERS = {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
 
 
 def lambda_handler(event, context):
@@ -27,6 +37,15 @@ def lambda_handler(event, context):
 
     if http_method == "POST" and raw_path == "/admin/login":
         return admin_login(event)
+
+    if raw_path == "/admin/test-mode":
+        if not is_developer_authorized(event):
+            return json_response(403, {"error": "Developer role required"})
+        if http_method == "GET":
+            return get_test_mode()
+        if http_method == "PATCH":
+            body = json.loads(event.get("body", "{}"))
+            return update_test_mode(body)
 
     if http_method == "POST" and raw_path == "/admin/events":
         if not is_authorized(event):
@@ -51,10 +70,12 @@ def lambda_handler(event, context):
     if raw_path.startswith("/admin/submissions/"):
         if not is_authorized(event):
             return json_response(401, {"error": "Unauthorized"})
+        submission_id = raw_path.rsplit("/", 1)[-1]
         if http_method == "PATCH":
-            submission_id = raw_path.rsplit("/", 1)[-1]
             body = json.loads(event.get("body", "{}"))
             return update_submission_admin_fields(submission_id, body)
+        if http_method == "DELETE":
+            return delete_submission(submission_id)
 
     return json_response(405, {"message": "Method Not Allowed"})
 
@@ -84,9 +105,7 @@ def get_events():
 
         return {
             "statusCode": 200,
-            "headers": {
-                "Content-Type": "application/json",
-            },
+            "headers": NO_CACHE_HEADERS,
             "body": content,
         }
 
@@ -100,7 +119,9 @@ def admin_login(event):
         password = body.get("password", "")
 
         if password == ADMIN_PASSWORD:
-            return json_response(200, {"success": True, "token": "cms-admin-token"})
+            return json_response(200, {"success": True, "token": ADMIN_TOKEN, "role": "admin"})
+        if password == DEVELOPER_PASSWORD:
+            return json_response(200, {"success": True, "token": DEVELOPER_TOKEN, "role": "developer"})
         return json_response(200, {"success": False})
     except Exception as e:
         return json_response(500, {"success": False, "error": str(e)})
@@ -114,7 +135,28 @@ def is_authorized(event):
         return False
 
     token = auth_header.replace("Bearer ", "")
-    return token == "cms-admin-token"
+    return token in {ADMIN_TOKEN, DEVELOPER_TOKEN}
+
+
+def is_developer_authorized(event):
+    headers = event.get("headers", {})
+    auth_header = headers.get("authorization") or headers.get("Authorization")
+    if not auth_header:
+        return False
+    return auth_header.replace("Bearer ", "") == DEVELOPER_TOKEN
+
+
+def get_test_mode():
+    if is_local_test_mode():
+        return json_response(200, {"testMode": True, "localOnly": True})
+    return json_response(200, get_submissions_repository().get_runtime_settings())
+
+
+def update_test_mode(body):
+    if is_local_test_mode():
+        return json_response(200, {"testMode": True, "localOnly": True})
+    updated = get_submissions_repository().set_runtime_test_mode(bool(body.get("enabled")), "developer")
+    return json_response(200, updated)
 
 
 def update_events(new_json):
@@ -176,5 +218,13 @@ def update_submission_admin_fields(submission_id, body):
             updated_by="admin",
         )
         return json_response(200, updated)
+    except KeyError as e:
+        return json_response(404, {"error": str(e)})
+
+
+def delete_submission(submission_id):
+    try:
+        deleted = get_submissions_repository().delete_submission(submission_id)
+        return json_response(200, {"success": True, "submissionId": deleted["submissionId"]})
     except KeyError as e:
         return json_response(404, {"error": str(e)})

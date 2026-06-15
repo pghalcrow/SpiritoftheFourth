@@ -2,10 +2,13 @@ from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import html
 import os
+from pathlib import Path
 import re
 import smtplib
 import boto3
+from backend.shared.runtime_mode import is_test_mode, test_mode_email
 
 _PLACEHOLDER_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
@@ -13,6 +16,8 @@ _PLACEHOLDER_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
 def resolve_email_recipient(mail_to: str) -> dict:
     override_to = os.environ.get("EMAIL_OVERRIDE_TO", "").strip()
     original_to = (mail_to or "").strip()
+    if is_test_mode():
+        override_to = test_mode_email()
 
     if override_to:
         return {
@@ -29,11 +34,11 @@ def resolve_email_recipient(mail_to: str) -> dict:
 
 class EmailSender:
     def __init__(self):
-        self.host = os.environ["SMTPHOST"]
-        self.port = int(os.environ["SMTPPORT"])
-        self.username = os.environ["USERNAME"]
-        self.password = os.environ["PASSWORD"]
         self.email_transport = os.environ.get("EMAIL_TRANSPORT", "smtp").strip().lower()
+        self.host = os.environ.get("SMTPHOST", "")
+        self.port = int(os.environ.get("SMTPPORT", "587"))
+        self.username = os.environ.get("USERNAME", "")
+        self.password = os.environ.get("PASSWORD", "")
         self.ses_region = os.environ.get("SES_REGION", "us-east-1").strip()
         self.ses_source_email = os.environ.get("SES_SOURCE_EMAIL", "").strip()
 
@@ -53,6 +58,10 @@ class EmailSender:
         source_email = self._source_email(mail_from)
 
         try:
+            if self.email_transport == "local":
+                print(f"LOCAL email skipped: {msg.get('Subject', '')} -> {', '.join(recipients)}")
+                return True
+
             if self.email_transport == "ses":
                 ses_client = boto3.client("ses", region_name=self.ses_region)
                 ses_client.send_raw_email(
@@ -81,7 +90,11 @@ class EmailSender:
         Any other braces (inline CSS/JS, JSON snippets, etc.) are left as-is
         so templates don't need to double-escape them for str.format.
         """
-        with open(email_file, "r") as file:
+        template_path = Path(email_file)
+        if not template_path.is_absolute():
+            template_path = Path(__file__).resolve().parent / template_path
+
+        with open(template_path, "r") as file:
             html_body = file.read()
 
         def _replace(match: "re.Match") -> str:
@@ -265,15 +278,38 @@ class EmailSender:
 
             if value is None or value == "":
                 continue
+            label = self.format_field_label(key)
+            escaped_value = html.escape(str(value))
 
             rows += f"""
             <tr>
                 <td style="padding:8px;border:1px solid #ddd;font-weight:bold;">
-                    {key}
+                    {label}
                 </td>
                 <td style="padding:8px;border:1px solid #ddd;">
-                    {value}
+                    {escaped_value}
                 </td>
             </tr>
             """
         return rows
+
+    def format_field_label(self, key: str) -> str:
+        labels = {
+            "contactName": "Contact Name",
+            "streetAddress": "Street Address",
+            "zipcode": "Zip Code",
+            "paradeAnnouncement": "Parade Announcement",
+            "wantGift": "Appreciation Gift",
+            "signatureName": "Signature Name",
+            "entryType": "Entry Type",
+            "vipName": "VIP Name",
+            "vipOwnCar": "Providing Own Car",
+            "driversName": "Driver Name",
+            "driversEmail": "Driver Email",
+            "driversPhone": "Driver Phone",
+            "availableSeats": "Available VIP Seats",
+            "clubAffiliation": "Club Affiliation",
+        }
+        if key in labels:
+            return labels[key]
+        return re.sub(r"[_-]+", " ", re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", key)).title()

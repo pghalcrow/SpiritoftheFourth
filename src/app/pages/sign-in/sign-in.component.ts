@@ -19,6 +19,7 @@ export class SignInComponent {
         next: (res) => {
           if (res.success) {
             sessionStorage.setItem('adminToken', res.token!);
+            sessionStorage.setItem('adminRole', res.role || 'admin');
             this.router.navigate(['/admin']);
           } else {
             this.errorMessage = 'Incorrect password.';

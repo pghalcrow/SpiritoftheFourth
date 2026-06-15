@@ -1,11 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { CmsService, CmsEvent, AdminSubmission } from 'src/app/services/cms.service';
+import { environment } from 'src/environments/environment';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { Observable, forkJoin } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
 type AdminModalVariant = 'success' | 'danger' | 'warning';
+type PricingMode = 'free' | 'fixed' | 'perParticipant';
+const ALLOWED_EVENT_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
 
 interface AdminModal {
   title: string;
@@ -14,6 +18,11 @@ interface AdminModal {
   confirmText: string;
   cancelText?: string;
   onConfirm?: () => void;
+}
+
+interface SubmissionDisplayRow {
+  label: string;
+  value: string;
 }
 
 @Component({
@@ -26,23 +35,149 @@ export class AdminComponent implements OnInit {
   activeEventIndex = 0;
   selectedFile?: File;
   modal?: AdminModal;
-  adminSection: 'events' | 'submissions' = 'events';
+  adminSection: 'events' | 'submissions' = 'submissions';
   submissions: AdminSubmission[] = [];
   selectedSubmission?: AdminSubmission;
+  selectedSubmissionDetailRows: SubmissionDisplayRow[] = [];
+  selectedSubmissionAddOnRows: SubmissionDisplayRow[] = [];
   submissionSearch = '';
   submissionStatuses = ['New', 'In Review', 'Follow Up', 'Complete', 'Archived'];
+  testMode = false;
+  testModeLocalOnly = false;
+  testModeLoading = false;
 
-  constructor(private cmsService: CmsService, private router: Router) {}
+  activePricingHelp: string | null = null;
+  pricingHelp = {
+    mode: 'How this event is billed. “Fixed Price” charges one flat amount per registration. “Per Participant” multiplies your price by the number of people registered — useful for teams or groups. “Free” hides payment and shows a Sign Up button instead.',
+    field: 'Per-participant pricing counts the people added to one of your “Group” form fields (for example a “Team Members” group). Choose that group here. If this list is empty, you have not created a Group field yet — add one with the button below, or add a field of type “Group” in the Form Fields section above and then choose it here.',
+    price: 'The amount charged for each counted participant. The order total is this price times the number of participants — the group members, plus the primary registrant when that toggle is on — before any add-ons.',
+    primary: 'When on, the person filling out the form counts as a paying participant too. Leave it off when the primary registrant organizes the group but is not attending themselves.'
+  };
+
+  constructor(private cmsService: CmsService, private router: Router, private sanitizer: DomSanitizer) {}
 
   ngOnInit() {
     this.cmsService.getEvents().subscribe(res => {
-      this.events = res.events || [];
+      this.events = (res.events || []).map(event => this.normalizeEventForEditor(event));
       this.activeEventIndex = this.events.length ? 0 : 0;
     });
+    this.loadSubmissions();
+    this.loadTestMode();
   }
 
   get activeEvent(): CmsEvent | undefined {
     return this.events[this.activeEventIndex];
+  }
+
+  normalizeEventForEditor(event: CmsEvent): CmsEvent {
+    const contactEmails = this.normalizeContactEmails(event.eventMeta?.contactEmails, event.eventMeta?.contactEmail);
+    return {
+      ...event,
+      isVisible: event.isVisible !== false,
+      pricing: {
+        ...event.pricing,
+        pricingMode: this.derivePricingMode(event),
+      },
+      eventMeta: {
+        ...event.eventMeta,
+        dateOfEvent: this.normalizeDateForPicker(event.eventMeta?.dateOfEvent || ''),
+        contactEmail: contactEmails[0] || '',
+        contactEmails
+      }
+    };
+  }
+
+  normalizeContactEmails(contactEmails?: string[], legacyContactEmail?: string): string[] {
+    const emails = Array.isArray(contactEmails) && contactEmails.length
+      ? contactEmails
+      : [legacyContactEmail || ''];
+    const normalized = emails.map(email => String(email || '').trim()).filter(Boolean);
+    return normalized.length ? normalized : [''];
+  }
+
+  normalizeDateForPicker(value: string): string {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+
+    const date = new Date(trimmed);
+    if (Number.isNaN(date.getTime())) return trimmed;
+
+    const pad = (part: number) => String(part).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  }
+
+  getInputValue(event: Event): string {
+    return (event.target as HTMLInputElement).value;
+  }
+
+  derivePricingMode(event: CmsEvent): PricingMode {
+    const mode = event.pricing?.pricingMode;
+    if (mode === 'free' || mode === 'fixed' || mode === 'perParticipant') {
+      return mode;
+    }
+
+    const hasParticipantField = Boolean(event.pricing?.basePlayerField && event.pricing.basePlayerField !== 'N/A');
+    if (hasParticipantField || event.pricing?.includePrimaryPlayer) {
+      return 'perParticipant';
+    }
+
+    return Number(event.pricing?.pricePerPlayer || 0) > 0 ? 'fixed' : 'free';
+  }
+
+  get adminHeaderTitle(): string {
+    return this.adminSection === 'submissions' ? 'Submissions' : 'Upcoming Events';
+  }
+
+  get isDeveloper(): boolean {
+    return sessionStorage.getItem('adminRole') === 'developer';
+  }
+
+  get testModeLabel(): string {
+    return this.testMode ? 'Test Mode' : 'Live Mode';
+  }
+
+  loadTestMode() {
+    if (!this.isDeveloper) return;
+    if (!environment.production) {
+      this.testMode = true;
+      this.testModeLocalOnly = true;
+      return;
+    }
+    this.cmsService.getTestMode().subscribe({
+      next: res => {
+        this.testMode = res.testMode;
+        this.testModeLocalOnly = Boolean(res.localOnly);
+      },
+      error: err => {
+        console.error('Test mode status failed', err);
+        this.showModal('Test mode unavailable', 'Could not load developer test mode status.', 'danger');
+      }
+    });
+  }
+
+  toggleTestMode(enabled: boolean) {
+    if (!this.isDeveloper || this.testModeLocalOnly) return;
+    this.testModeLoading = true;
+    this.cmsService.updateTestMode(enabled).subscribe({
+      next: res => {
+        this.testMode = res.testMode;
+        this.testModeLocalOnly = Boolean(res.localOnly);
+        this.testModeLoading = false;
+        this.showModal(
+          this.testMode ? 'Test mode enabled' : 'Live mode enabled',
+          this.testMode
+            ? 'Admin emails will route to the test inbox and Stripe will use test keys.'
+            : 'Admin emails and Stripe payments will use live production settings.',
+          'success'
+        );
+      },
+      error: err => {
+        console.error('Test mode update failed', err);
+        this.testModeLoading = false;
+        this.showModal('Test mode update failed', 'Could not update developer test mode.', 'danger');
+      }
+    });
   }
 
   selectEvent(index: number) {
@@ -80,6 +215,173 @@ export class AdminComponent implements OnInit {
 
   selectSubmission(submission: AdminSubmission) {
     this.selectedSubmission = { ...submission };
+    this.selectedSubmissionDetailRows = this.getSubmissionDetailRows(this.selectedSubmission);
+    this.selectedSubmissionAddOnRows = this.getSubmissionAddOns(this.selectedSubmission);
+  }
+
+  clearSelectedSubmission() {
+    this.selectedSubmission = undefined;
+    this.selectedSubmissionDetailRows = [];
+    this.selectedSubmissionAddOnRows = [];
+  }
+
+  formatSubmissionDate(value?: string): string {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+
+    const pad = (part: number) => String(part).padStart(2, '0');
+    return [
+      date.getFullYear(),
+      pad(date.getMonth() + 1),
+      pad(date.getDate())
+    ].join('-') + ` ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  getSubmissionDetailRows(submission?: AdminSubmission): SubmissionDisplayRow[] {
+    const rawData = submission?.rawData;
+    if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) {
+      return [];
+    }
+
+    const excludedFields = new Set([
+      'action',
+      'type',
+      'paymentMethod',
+      'pricing',
+      'addOns',
+      'players',
+      'total',
+      'grandTotal',
+      'submission_id',
+      'stripe_session_id',
+      'paypal_order_id',
+      'firstName',
+      'lastName',
+      'fullName',
+      'contactName',
+      'name',
+      'email',
+      'phone',
+      'additionalPlaques',
+      'additionalSmall',
+      'additionalMedium',
+      'additionalLarge',
+      'additionalXLarge',
+      'additionalXXLarge',
+      'additionalXXXLarge',
+      'comboSize',
+      'attachments',
+      'body',
+      'fileDropRef',
+      'subject',
+      'toContact',
+      'replyTo',
+    ]);
+
+    const preferredOrder = [
+      'streetAddress',
+      'city',
+      'state',
+      'zipcode',
+      'year',
+      'make',
+      'model',
+      'color',
+      'clubAffiliation',
+      'message',
+      'availability',
+      'vendorStatus',
+      'vendorType',
+      'companyName',
+      'website',
+      'description',
+      'specialRequests',
+      'signatureName',
+    ];
+
+    const keys = Object.keys(rawData)
+      .filter(key => !excludedFields.has(key) && this.hasDisplayValue(rawData[key]))
+      .sort((a, b) => {
+        const aIndex = preferredOrder.indexOf(a);
+        const bIndex = preferredOrder.indexOf(b);
+        if (aIndex >= 0 || bIndex >= 0) {
+          return (aIndex >= 0 ? aIndex : Number.MAX_SAFE_INTEGER) - (bIndex >= 0 ? bIndex : Number.MAX_SAFE_INTEGER);
+        }
+        return this.formatSubmissionFieldLabel(a).localeCompare(this.formatSubmissionFieldLabel(b));
+      });
+
+    return keys.map(key => ({
+      label: this.formatSubmissionFieldLabel(key),
+      value: this.formatSubmissionFieldValue(rawData[key]),
+    }));
+  }
+
+  getSubmissionAddOns(submission?: AdminSubmission): SubmissionDisplayRow[] {
+    const rawData = submission?.rawData;
+    if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) {
+      return [];
+    }
+
+    const rows: SubmissionDisplayRow[] = [];
+    if (this.hasDisplayValue(rawData.comboSize)) {
+      rows.push({ label: 'T-Shirt & Plaque Bundle', value: String(rawData.comboSize) });
+    }
+
+    [
+      ['additionalPlaques', 'Additional Plaque'],
+      ['additionalSmall', 'Additional T-Shirt - Small'],
+      ['additionalMedium', 'Additional T-Shirt - Medium'],
+      ['additionalLarge', 'Additional T-Shirt - Large'],
+      ['additionalXLarge', 'Additional T-Shirt - XLarge'],
+      ['additionalXXLarge', 'Additional T-Shirt - XXLarge'],
+      ['additionalXXXLarge', 'Additional T-Shirt - XXXLarge'],
+    ].forEach(([field, label]) => {
+      const quantity = Number(rawData[field]);
+      if (Number.isFinite(quantity) && quantity > 0) {
+        rows.push({ label, value: String(quantity) });
+      }
+    });
+
+    return rows;
+  }
+
+  private hasDisplayValue(value: any): boolean {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (typeof value === 'number') return Number.isFinite(value);
+    if (typeof value === 'boolean') return true;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'object') return Object.keys(value).length > 0;
+    return true;
+  }
+
+  private formatSubmissionFieldLabel(key: string): string {
+    const labels: Record<string, string> = {
+      streetAddress: 'Street Address',
+      zipcode: 'Zip Code',
+      year: 'Vehicle Year',
+      make: 'Make',
+      model: 'Model',
+      color: 'Color',
+      clubAffiliation: 'Club Affiliation',
+      availability: 'Availability',
+      message: 'Message',
+    };
+
+    if (labels[key]) return labels[key];
+
+    return key
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/[_-]+/g, ' ')
+      .replace(/\b\w/g, char => char.toUpperCase());
+  }
+
+  private formatSubmissionFieldValue(value: any): string {
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (Array.isArray(value)) return value.map(item => this.formatSubmissionFieldValue(item)).join(', ');
+    if (value && typeof value === 'object') return JSON.stringify(value);
+    return String(value);
   }
 
   saveSelectedSubmission() {
@@ -91,11 +393,42 @@ export class AdminComponent implements OnInit {
           row.submissionId === updated.submissionId ? { ...row, ...updated } : row
         );
         this.selectedSubmission = { ...this.selectedSubmission!, ...updated };
+        this.selectedSubmissionDetailRows = this.getSubmissionDetailRows(this.selectedSubmission);
+        this.selectedSubmissionAddOnRows = this.getSubmissionAddOns(this.selectedSubmission);
         this.showModal('Submission saved', 'Admin fields have been updated.', 'success');
       },
       error: err => {
         console.error('Submission save failed', err);
         this.showModal('Save failed', 'Could not update the submission.', 'danger');
+      }
+    });
+  }
+
+  requestDeleteSelectedSubmission() {
+    if (!this.selectedSubmission) return;
+    const title = this.selectedSubmission.submissionTitle || 'this submission';
+    this.showModal(
+      'Delete submission',
+      `Are you sure you want to delete ${title}? This cannot be undone.`,
+      'danger',
+      'Delete Submission',
+      'Cancel',
+      () => this.deleteSelectedSubmission()
+    );
+  }
+
+  deleteSelectedSubmission() {
+    if (!this.selectedSubmission) return;
+    const submissionId = this.selectedSubmission.submissionId;
+    this.cmsService.deleteSubmission(submissionId).subscribe({
+      next: () => {
+        this.submissions = this.submissions.filter(row => row.submissionId !== submissionId);
+        this.clearSelectedSubmission();
+        this.showModal('Submission deleted', 'The submission has been deleted.', 'success');
+      },
+      error: err => {
+        console.error('Submission delete failed', err);
+        this.showModal('Delete failed', 'Could not delete the submission.', 'danger');
       }
     });
   }
@@ -108,8 +441,27 @@ export class AdminComponent implements OnInit {
     return this.cmsService.resolveAssetUrl(url);
   }
 
+  hasEventImage(event: CmsEvent): boolean {
+    return Boolean(event.flyerUrl || event.selectedFilePreviewUrl);
+  }
+
+  getEventImagePreviewSrc(event: CmsEvent): string | SafeUrl {
+    if (event.selectedFilePreviewUrl) {
+      return this.sanitizer.bypassSecurityTrustUrl(event.selectedFilePreviewUrl);
+    }
+    return this.getFlyerSrc(event.flyerUrl);
+  }
+
+  removeEventImage(event: CmsEvent) {
+    this.revokeEventPreviewUrl(event);
+    event.flyerUrl = '';
+    event.selectedFile = undefined;
+    event.selectedFilePreviewUrl = undefined;
+  }
+
   logout() {
     sessionStorage.removeItem('adminToken');
+    sessionStorage.removeItem('adminRole');
     this.router.navigate(['/sign-in']);
   }
 
@@ -134,6 +486,18 @@ export class AdminComponent implements OnInit {
   }
 
   saveEvents() {
+    if (!this.validateEventsBeforeSave()) {
+      return;
+    }
+
+    const invalidImageEvent = this.events.find(event => event.selectedFile && !this.isSupportedEventImage(event.selectedFile));
+    if (invalidImageEvent) {
+      this.showUnsupportedImageModal();
+      this.adminSection = 'events';
+      this.activeEventIndex = Math.max(this.events.indexOf(invalidImageEvent), 0);
+      return;
+    }
+
     const uploadObservables: Observable<any>[] = [];
 
     this.events.forEach(event => {
@@ -142,6 +506,8 @@ export class AdminComponent implements OnInit {
           tap(res => {
             event.flyerUrl = res.url; // update flyerUrl with S3 URL
             event.selectedFile = undefined; // clear the file
+            this.revokeEventPreviewUrl(event);
+            event.selectedFilePreviewUrl = undefined;
           })
         );
         uploadObservables.push(upload$);
@@ -161,18 +527,126 @@ export class AdminComponent implements OnInit {
     }
   }
 
+  validateEventsBeforeSave(): boolean {
+    const invalidEvent = this.events.find(event =>
+      !event.title?.trim() ||
+      !event.eventMeta?.dateOfEvent?.trim() ||
+      !event.eventMeta?.location?.trim()
+    );
+
+    if (!invalidEvent) {
+      return true;
+    }
+
+    this.showModal(
+      'Event details required',
+      'Event title, date, and location are required before saving.',
+      'warning'
+    );
+    this.adminSection = 'events';
+    this.activeEventIndex = Math.max(this.events.indexOf(invalidEvent), 0);
+    return false;
+  }
+
+  togglePricingHelp(key: string, ev?: Event) {
+    ev?.preventDefault();
+    ev?.stopPropagation();
+    this.activePricingHelp = this.activePricingHelp === key ? null : key;
+  }
+
+  hasGroupField(event: CmsEvent): boolean {
+    return event.formFields.some(field => field.type === 'group');
+  }
+
+  addParticipantGroup(event: CmsEvent) {
+    const groupField = {
+      name: 'teamMembers',
+      label: 'Team Members',
+      type: 'group',
+      required: false,
+      maxMembers: 4,
+      fields: []
+    };
+    event.formFields.push(groupField);
+    event.pricing.basePlayerField = groupField.name;
+  }
+
+  pricingPreview(event: CmsEvent): string {
+    const price = Number(event.pricing?.pricePerPlayer || 0);
+    const priceLabel = price > 0 ? `$${price}` : 'The per-participant price';
+    const sources: string[] = [];
+    const groupField = event.formFields.find(
+      field => field.type === 'group' && field.name === event.pricing.basePlayerField
+    );
+    if (groupField) {
+      sources.push(`each person added to “${groupField.label || 'the participant group'}”`);
+    }
+    if (event.pricing.includePrimaryPlayer) {
+      sources.push('the primary registrant');
+    }
+    if (!sources.length) {
+      return 'No participants are counted yet, so every order totals $0. Pick a participant group below or turn on “Include Primary Participant”.';
+    }
+    return `${priceLabel} is charged for ${sources.join(' and ')}.`;
+  }
+
+  onPricingModeChange(event: CmsEvent, mode: PricingMode) {
+    event.pricing.pricingMode = mode;
+    if (mode === 'free') {
+      event.pricing.basePlayerField = 'N/A';
+      event.pricing.includePrimaryPlayer = false;
+      event.pricing.pricePerPlayer = 0;
+      return;
+    }
+
+    if (mode === 'fixed') {
+      event.pricing.basePlayerField = 'N/A';
+      event.pricing.includePrimaryPlayer = false;
+      return;
+    }
+
+    const currentField = event.formFields.find(field => field.type === 'group' && field.name === event.pricing.basePlayerField);
+    if (!currentField) {
+      const firstGroup = event.formFields.find(field => field.type === 'group');
+      event.pricing.basePlayerField = firstGroup?.name || 'N/A';
+    }
+  }
+
+  addEventContactEmail(event: CmsEvent) {
+    event.eventMeta.contactEmails = this.normalizeContactEmails(event.eventMeta.contactEmails, event.eventMeta.contactEmail);
+    event.eventMeta.contactEmails.push('');
+  }
+
+  removeEventContactEmail(event: CmsEvent, index: number) {
+    event.eventMeta.contactEmails = this.normalizeContactEmails(event.eventMeta.contactEmails, event.eventMeta.contactEmail);
+    event.eventMeta.contactEmails.splice(index, 1);
+    if (!event.eventMeta.contactEmails.length) {
+      event.eventMeta.contactEmails.push('');
+    }
+    event.eventMeta.contactEmail = event.eventMeta.contactEmails[0] || '';
+  }
+
+  updateEventContactEmail(event: CmsEvent, index: number, value: string) {
+    event.eventMeta.contactEmails = this.normalizeContactEmails(event.eventMeta.contactEmails, event.eventMeta.contactEmail);
+    event.eventMeta.contactEmails[index] = value;
+    event.eventMeta.contactEmail = event.eventMeta.contactEmails.find(email => email.trim())?.trim() || '';
+  }
+
+  trackContactEmailByIndex(index: number): number {
+    return index;
+  }
+
   // Actually save the JSON after images are uploaded
   finalizeSave() {
-    this.events.forEach(event => {
-      const peopleGroup = event.formFields.find(f => f.type === 'group');
-      if (peopleGroup) {
-        peopleGroup.name = 'teamMembers';
-        event.pricing.basePlayerField = 'teamMembers';
-      }
-    });
-
     const updatedEvents = this.events.map(event => ({
       ...event,
+      isVisible: event.isVisible !== false,
+      pricing: this.normalizePricingForSave(event),
+      eventMeta: {
+        ...event.eventMeta,
+        contactEmails: this.normalizeContactEmails(event.eventMeta.contactEmails, event.eventMeta.contactEmail).filter(email => email.trim()),
+        contactEmail: this.normalizeContactEmails(event.eventMeta.contactEmails, event.eventMeta.contactEmail).find(email => email.trim()) || ''
+      },
       sections: this.buildSections(event)
     }));
 
@@ -189,6 +663,34 @@ export class AdminComponent implements OnInit {
     });
   }
 
+  normalizePricingForSave(event: CmsEvent) {
+    const mode = this.derivePricingMode(event);
+    const pricing = {
+      ...event.pricing,
+      pricingMode: mode,
+    };
+
+    if (mode === 'free') {
+      return {
+        ...pricing,
+        basePlayerField: 'N/A',
+        includePrimaryPlayer: false,
+        pricePerPlayer: 0,
+        addOns: [],
+      };
+    }
+
+    if (mode === 'fixed') {
+      return {
+        ...pricing,
+        basePlayerField: 'N/A',
+        includePrimaryPlayer: false,
+      };
+    }
+
+    return pricing;
+  }
+
   // Update onFileSelected to store the file in the event
   onFileSelected(event: any, cmsEvent: CmsEvent) {
     const file: File = event.target.files[0];
@@ -196,9 +698,34 @@ export class AdminComponent implements OnInit {
 
     if (!file.type.startsWith("image/")) {
       this.showModal('Invalid image', 'Only images are allowed!', 'warning');
+      event.target.value = '';
       return;
     }
+
+    if (!this.isSupportedEventImage(file)) {
+      this.showUnsupportedImageModal();
+      event.target.value = '';
+      return;
+    }
+    this.revokeEventPreviewUrl(cmsEvent);
+    cmsEvent.flyerUrl = '';
     cmsEvent.selectedFile = file;
+    cmsEvent.selectedFilePreviewUrl = URL.createObjectURL(file);
+    event.target.value = '';
+  }
+
+  private isSupportedEventImage(file: File): boolean {
+    return ALLOWED_EVENT_IMAGE_TYPES.has(file.type);
+  }
+
+  private showUnsupportedImageModal() {
+    this.showModal('Unsupported image format', 'Use a PNG, JPG, or WebP image before saving.', 'warning');
+  }
+
+  private revokeEventPreviewUrl(event: CmsEvent) {
+    if (event.selectedFilePreviewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(event.selectedFilePreviewUrl);
+    }
   }
 
   addEvent() {
@@ -207,14 +734,17 @@ export class AdminComponent implements OnInit {
       type: '',
       flyerUrl: '',
       description: '',
+      isVisible: true,
       eventMeta: {
         dateOfEvent: '',
         location: '',
         endBlurb: '',
-        contactEmail: ''
+        contactEmail: '',
+        contactEmails: ['']
       },
       pricing: {
-        basePlayerField: '',
+        pricingMode: 'fixed',
+        basePlayerField: 'N/A',
         includePrimaryPlayer: false,
         pricePerPlayer: 0,
         addOns: []
@@ -225,6 +755,7 @@ export class AdminComponent implements OnInit {
 
     this.events.push(newEvent);
     this.activeEventIndex = this.events.length - 1;
+    this.adminSection = 'events';
   }
 
   editEvent(index: number) {

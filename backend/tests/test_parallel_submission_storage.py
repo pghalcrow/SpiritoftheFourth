@@ -27,6 +27,9 @@ class FakeEmailSender:
     def format_email(self, _template, _context):
         return "<html></html>"
 
+    def build_form_fields_html(self, _form_data):
+        return "<table></table>"
+
     def send_email(self, **_kwargs):
         return True
 
@@ -35,6 +38,35 @@ class FakeEmailSender:
 
 
 class ParallelSubmissionStorageTests(unittest.TestCase):
+    def test_mailer_lambda_handles_cors_preflight_for_file_uploads(self):
+        mailer = import_sotf_mailer()
+
+        response = mailer.lambda_handler(
+            {
+                "requestContext": {"http": {"method": "OPTIONS"}},
+                "headers": {
+                    "Origin": "http://localhost:4200",
+                    "Access-Control-Request-Method": "POST",
+                },
+            },
+            None,
+        )
+
+        self.assertEqual(response["statusCode"], 204)
+        self.assertEqual(response["headers"]["Access-Control-Allow-Origin"], "http://localhost:4200")
+        self.assertIn("POST", response["headers"]["Access-Control-Allow-Methods"])
+
+    def test_mailer_test_mode_routes_admin_email_to_test_recipient(self):
+        mailer = import_sotf_mailer()
+
+        with patch.object(mailer, "is_test_mode", return_value=True), \
+            patch.dict(mailer.os.environ, {"TEST_MODE_EMAIL": "pghalcrow@gmail.com"}, clear=True):
+            recipients = mailer.resolve_email_recipients("live@example.com", ["reply@example.com"])
+
+        self.assertEqual(recipients["send_to"], ["pghalcrow@gmail.com"])
+        self.assertEqual(recipients["header_to"], "pghalcrow@gmail.com")
+        self.assertEqual(recipients["original_to"], "live@example.com, reply@example.com")
+
     def test_no_payment_vendor_updates_google_sheet_and_dynamodb(self):
         app = import_create_order_app()
         form_data = {
@@ -87,6 +119,40 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
         self.assertEqual(repo.saved[0][0], "hold-1")
         self.assertEqual(repo.saved[0][1]["eventTitle"], "Golf")
 
+    def test_create_stripe_embedded_session_uses_test_key_and_returns_test_publishable_key_in_test_mode(self):
+        app = import_create_order_app()
+
+        class FakeStripeOrderService:
+            api_keys = []
+
+            def __init__(self, api_key):
+                self.api_keys.append(api_key)
+
+            def create_embedded_checkout_session(self, **_kwargs):
+                return {"statusCode": 200, "body": json.dumps({"client_secret": "cs_test_secret"})}
+
+        with patch.object(app, "is_test_mode", return_value=True), \
+            patch.object(app, "StripeOrderService", FakeStripeOrderService), \
+            patch.object(app, "store_dynamic_submission"), \
+            patch.dict(app.os.environ, {
+                "ENVIRONMENT": "prod",
+                "RETURN_URL": "https://spiritofthefourth.org",
+                "STRIPE_API_KEY": "sk_live_real",
+                "STRIPE_TEST_API_KEY": "sk_test_real",
+                "STRIPE_TEST_PUBLISHABLE_KEY": "pk_test_real",
+            }, clear=True):
+            response = app.lambda_handler({
+                "action": "createStripeEmbeddedSession",
+                "type": "sponsor",
+                "email": "buyer@example.com",
+                "grandTotal": 100,
+            }, None)
+
+        self.assertEqual(FakeStripeOrderService.api_keys, ["sk_test_real"])
+        body = json.loads(response["body"])
+        self.assertEqual(body["client_secret"], "cs_test_secret")
+        self.assertEqual(body["publishable_key"], "pk_test_real")
+
     def test_lookup_dynamic_submission_falls_back_to_google_sheet(self):
         app = import_create_order_app()
 
@@ -121,6 +187,25 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
 
         self.assertEqual(appended_rows[0][0], "new-submission")
         self.assertEqual(len(appended_rows), 1)
+
+    def test_create_order_sheet_timestamps_use_pacific_time(self):
+        app = import_create_order_app()
+        appended_rows = []
+
+        class FakeWorksheet:
+            def append_row(self, row):
+                appended_rows.append(row)
+
+            def get_all_values(self):
+                return []
+
+        with patch.object(app, "get_worksheet", return_value=FakeWorksheet()), \
+            patch.object(app, "pacific_sheet_timestamp", return_value="2026-06-15 13:30"):
+            app.update_google_sheet("Volunteer", "Pat", "pat@example.com", "555-1212", "Sheet1")
+            app.mark_google_processed_submission("sub-1")
+
+        self.assertEqual(appended_rows[0][1], "2026-06-15 13:30")
+        self.assertEqual(appended_rows[1][1], "2026-06-15 13:30")
 
     def test_create_order_google_sheet_uses_local_environment_overrides(self):
         app = import_create_order_app()
@@ -184,6 +269,108 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
         self.assertEqual(repo.record["rawData"]["pricing"]["pricePerPlayer"], Decimal("110.0"))
         self.assertEqual(repo.record["rawData"]["pricing"]["addOns"][0]["price"], Decimal("100.0"))
         self.assertEqual(repo.record["rawData"]["grandTotal"], Decimal("210.0"))
+
+    def test_stripe_buyer_info_uses_first_and_last_name(self):
+        app = import_create_order_app()
+
+        buyer_info = app.get_stripe_buyer_info(
+            {"customer_email": "pat@example.com"},
+            {"firstName": "Pat", "lastName": "Halcrow", "email": "form@example.com"},
+        )
+
+        self.assertEqual(buyer_info["full_name"], "Pat Halcrow")
+        self.assertEqual(buyer_info["first_name"], "Pat")
+        self.assertEqual(buyer_info["last_name"], "Halcrow")
+
+    def test_event_meta_supports_multiple_contact_emails(self):
+        app = import_create_order_app()
+
+        event_meta = app.get_event_meta(
+            "golfEvent",
+            {
+                "title": "Golf Fundraiser",
+                "eventMeta": {
+                    "contactEmail": "legacy@example.com",
+                    "contactEmails": ["first@example.com", "second@example.com", ""],
+                },
+            },
+            {"teamMembers": []},
+            "resa@example.com",
+        )
+
+        self.assertEqual(event_meta["contact_email"], "first@example.com, second@example.com")
+        self.assertEqual(event_meta["contact_emails"], ["first@example.com", "second@example.com"])
+        self.assertEqual(
+            app.get_event_seller_recipients(event_meta, "resa@example.com"),
+            {"resa@example.com", "first@example.com", "second@example.com"},
+        )
+
+    def test_motor_show_email_line_items_include_add_on_sizes_and_quantities(self):
+        app = import_create_order_app()
+
+        html = app.build_motor_show_items_html({
+            "comboSize": "Large",
+            "additionalPlaques": 2,
+            "additionalSmall": 1,
+            "additionalMedium": 0,
+            "additionalLarge": 3,
+            "additionalXLarge": 0,
+            "additionalXXLarge": 1,
+            "additionalXXXLarge": 0,
+        })
+
+        self.assertIn("Motor Show Entry", html)
+        self.assertIn("T-Shirt & Plaque Bundle - Large", html)
+        self.assertIn("Additional Plaque", html)
+        self.assertIn(">2<", html)
+        self.assertIn("Additional T-Shirt - Small", html)
+        self.assertIn(">1<", html)
+        self.assertIn("Additional T-Shirt - Large", html)
+        self.assertIn(">3<", html)
+        self.assertIn("Additional T-Shirt - XXLarge", html)
+        self.assertNotIn("Additional T-Shirt - Medium", html)
+
+    def test_free_dynamic_event_signup_updates_google_sheet_and_dynamodb(self):
+        app = import_create_order_app()
+        form_data = {
+            "type": "freePicnic",
+            "eventTitle": "Community Picnic",
+            "fullName": "Pat Halcrow",
+            "email": "pat@example.com",
+            "phone": "555-1212",
+            "grandTotal": 0,
+            "pricing": {"pricePerPlayer": 0},
+            "teamMembers": [],
+        }
+
+        with patch.object(app, "EmailSender", return_value=FakeEmailSender()), \
+            patch.object(app, "get_event_config", return_value={
+                "title": "Community Picnic",
+                "eventMeta": {
+                    "dateOfEvent": "July 4, 2026",
+                    "location": "Town Park",
+                    "contactEmail": "event@example.com",
+                },
+                "sections": [{"type": "fields", "fields": ["fullName", "email", "phone"]}],
+            }), \
+            patch.object(app, "update_google_sheet") as update_google_sheet, \
+            patch.object(app, "create_submission_record") as create_submission_record, \
+            patch.dict(app.os.environ, {"RESA_EMAIL": "resa@example.com"}):
+            response = app.process_free_event_signup(form_data, "free-1")
+
+        self.assertEqual(response["status"], "submitted")
+        self.assertEqual(response["submission_id"], "free-1")
+        update_google_sheet.assert_called_once_with(
+            form="Community Picnic Signup",
+            name="Pat Halcrow",
+            email="pat@example.com",
+            phone="555-1212",
+            sheet_name="Event Submissions",
+        )
+        create_submission_record.assert_called_once()
+        self.assertEqual(create_submission_record.call_args.kwargs["payment_status"], "none")
+        self.assertEqual(create_submission_record.call_args.kwargs["payment_provider"], "none")
+        self.assertEqual(create_submission_record.call_args.kwargs["amount"], 0)
 
     def test_mailer_records_submission_in_google_sheet_and_dynamodb(self):
         mailer = import_sotf_mailer()
@@ -272,6 +459,27 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
         self.assertEqual(appended[0], "/tmp/local-creds.json")
         self.assertEqual(appended[1], "Forms Submissions Local")
         self.assertEqual(appended[2][0], "Volunteer")
+
+    def test_mailer_google_sheet_timestamp_uses_pacific_time(self):
+        mailer = import_sotf_mailer()
+        appended = []
+
+        class FakeSheet:
+            sheet1 = types.SimpleNamespace(append_row=lambda row: appended.append(row))
+
+        class FakeClient:
+            def open(self, _name):
+                return FakeSheet()
+
+        fake_gspread = types.SimpleNamespace(
+            service_account=lambda _credential_path: FakeClient(),
+        )
+
+        with patch.dict(sys.modules, {"gspread": fake_gspread}), \
+            patch.object(mailer, "pacific_sheet_timestamp", return_value="2026-06-15 13:30"):
+            mailer.update_google_sheet("Volunteer", "Pat", "pat@example.com", "555-1212")
+
+        self.assertEqual(appended[0][1], "2026-06-15 13:30")
 
 
 if __name__ == "__main__":

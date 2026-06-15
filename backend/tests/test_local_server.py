@@ -1,6 +1,9 @@
 import json
 import os
+import sys
+import types
 import unittest
+from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
 
@@ -10,7 +13,11 @@ from backend.local_server import (
     create_lambda_event,
     create_test_submission,
     get_local_submissions_repository,
+    get_local_worksheet,
+    process_local_stripe_session,
+    seed_local_payment_hold_from_worksheet,
 )
+from backend.local_repository import LocalSubmissionsRepository
 from backend.shared.submissions_repository import SubmissionsRepository
 
 
@@ -50,6 +57,55 @@ class LocalServerTests(unittest.TestCase):
 
         self.assertEqual(response.headers["Access-Control-Allow-Origin"], "http://127.0.0.1:4200")
 
+    def test_cors_allows_event_cache_busting_headers(self):
+        client = create_app().test_client()
+
+        response = client.options(
+            "/events",
+            headers={
+                "Origin": "http://localhost:4200",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "cache-control,pragma",
+            },
+        )
+
+        allowed_headers = response.headers["Access-Control-Allow-Headers"].lower()
+        self.assertIn("cache-control", allowed_headers)
+        self.assertIn("pragma", allowed_headers)
+
+    def test_cors_allows_admin_delete_requests(self):
+        client = create_app().test_client()
+
+        response = client.options(
+            "/admin/submissions/s1",
+            headers={
+                "Origin": "http://localhost:4200",
+                "Access-Control-Request-Method": "DELETE",
+            },
+        )
+
+        self.assertIn("DELETE", response.headers["Access-Control-Allow-Methods"])
+
+    def test_create_app_sets_local_webhook_secret_default(self):
+        with patch.dict(os.environ, {}, clear=True):
+            create_app()
+
+            self.assertEqual(os.environ["WEBHOOK_SECRET"], "local-dev-webhook-secret")
+            self.assertEqual(os.environ["S3_ATTACHMENT_BUCKET"], "sotf-file-upload-470065668628-us-west-2")
+            self.assertEqual(os.environ["LOCAL_TEST_MODE"], "true")
+
+    def test_local_admin_test_mode_is_always_enabled_and_local_only(self):
+        client = create_app().test_client()
+
+        response = client.patch(
+            "/admin/test-mode",
+            json={"enabled": False},
+            headers={"Authorization": "Bearer cms-developer-token"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"testMode": True, "localOnly": True})
+
     def test_can_read_events_from_configured_local_events_file(self):
         import tempfile
 
@@ -62,7 +118,33 @@ class LocalServerTests(unittest.TestCase):
                 response = client.get("/events")
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Cache-Control"], "no-store, no-cache, must-revalidate, max-age=0")
+        self.assertEqual(response.headers["Pragma"], "no-cache")
         self.assertEqual(response.get_json()["events"][0]["title"], "Golf Fundraiser")
+
+    def test_local_admin_upload_writes_image_to_configured_assets_dir(self):
+        import base64
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            assets_dir = Path(tmp) / "assets"
+            encoded = base64.b64encode(b"local image").decode("ascii")
+
+            with patch.dict(os.environ, {"LOCAL_ASSETS_DIR": str(assets_dir)}):
+                client = create_app().test_client()
+                response = client.post(
+                    "/admin/upload",
+                    json={
+                        "fileName": "new flyer.png",
+                        "base64": encoded,
+                        "contentType": "image/png",
+                    },
+                    headers={"Authorization": "Bearer cms-admin-token"},
+                )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.get_json(), {"success": True, "url": "assets/new_flyer.png"})
+            self.assertEqual((assets_dir / "new_flyer.png").read_bytes(), b"local image")
 
     def test_can_use_dynamodb_repository_for_local_submissions(self):
         with patch.dict(
@@ -76,6 +158,210 @@ class LocalServerTests(unittest.TestCase):
             repo = get_local_submissions_repository()
 
         self.assertIsInstance(repo, SubmissionsRepository)
+
+    def test_local_server_routes_stripe_embedded_sessions_to_order_lambda(self):
+        class FakeStripeOrderService:
+            def __init__(self, _api_key):
+                pass
+
+            def create_embedded_checkout_session(self, **_kwargs):
+                return {"statusCode": 200, "body": json.dumps({"client_secret": "cs_test_local_secret"})}
+
+        with patch.dict(
+            os.environ,
+            {
+                "RETURN_URL": "http://localhost:4200",
+                "STRIPE_API_KEY": "sk_test_local",
+                "SUBMISSIONS_TABLE": "sotf-submissions-local",
+            },
+        ), patch("backend.local_server.create_order_app.StripeOrderService", FakeStripeOrderService):
+            client = create_app().test_client()
+            response = client.post(
+                "/",
+                json={
+                    "action": "createStripeEmbeddedSession",
+                    "type": "motorShowOrder",
+                    "email": "local@example.com",
+                    "total": 25,
+                    "grandTotal": 25,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.data)["client_secret"], "cs_test_local_secret")
+
+    def test_local_server_routes_mailer_payloads_to_mailer_lambda(self):
+        with patch("backend.local_server.sotf_mailer.lambda_handler") as lambda_handler:
+            lambda_handler.return_value = {"statusCode": 200, "body": json.dumps({"status": True})}
+            client = create_app().test_client()
+
+            response = client.post(
+                "/",
+                json={
+                    "toContact": "dave@example.com",
+                    "subject": "New Volunteer Request",
+                    "replyTo": "pat@example.com",
+                    "name": "Pat Halcrow",
+                    "phone": "555-1212",
+                    "body": "<p>Volunteer</p>",
+                    "formType": "volunteerForm",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.data)["status"], True)
+
+    def test_local_server_routes_presigned_upload_payloads_to_mailer_lambda(self):
+        with patch("backend.local_server.sotf_mailer.lambda_handler") as lambda_handler:
+            lambda_handler.return_value = {
+                "statusCode": 200,
+                "body": json.dumps({
+                    "status": True,
+                    "folderKey": "folder-1",
+                    "signedURLs": {"vendor.pdf": {"url": "https://example.com", "fields": {}}},
+                }),
+            }
+            client = create_app().test_client()
+
+            response = client.post(
+                "/",
+                json={
+                    "getSignedURLs": True,
+                    "fileNames": ["vendor.pdf"],
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.data)["folderKey"], "folder-1")
+        self.assertEqual(lambda_handler.call_args.args[0]["rawPath"], "/")
+        event = lambda_handler.call_args.args[0]
+        self.assertEqual(json.loads(event["body"])["getSignedURLs"], True)
+        self.assertEqual(json.loads(event["body"])["fileNames"], ["vendor.pdf"])
+
+    def test_local_worksheet_can_write_to_configured_google_sheet(self):
+        calls = []
+
+        class FakeClient:
+            def open(self, name):
+                calls.append(("open", name))
+                return types.SimpleNamespace(
+                    worksheet=lambda worksheet_name: calls.append(("worksheet", worksheet_name)) or "real worksheet"
+                )
+
+        fake_gspread = types.SimpleNamespace(
+            service_account=lambda credential_path: calls.append(("service_account", credential_path)) or FakeClient()
+        )
+
+        with patch.dict(sys.modules, {"gspread": fake_gspread}), patch.dict(
+            os.environ,
+            {
+                "LOCAL_WRITE_GOOGLE_SHEET": "true",
+                "GOOGLE_SHEET_CREDENTIALS": "/tmp/local-creds.json",
+                "GOOGLE_SHEET_NAME": "Forms Submissions",
+            },
+        ):
+            worksheet = get_local_worksheet("Event Submissions")
+
+        self.assertEqual(worksheet, "real worksheet")
+        self.assertEqual(calls, [
+            ("service_account", "/tmp/local-creds.json"),
+            ("open", "Forms Submissions"),
+            ("worksheet", "Event Submissions"),
+        ])
+
+    def test_local_repository_persists_payment_holds(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = LocalSubmissionsRepository(Path(tmp) / "submissions.json")
+
+            repo.save_payment_hold("hold-1", {"formData": {"email": "local@example.com"}})
+
+            self.assertEqual(
+                repo.get_payment_hold("hold-1"),
+                {"formData": {"email": "local@example.com"}},
+            )
+
+    def test_local_repository_serializes_decimal_amounts(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = LocalSubmissionsRepository(Path(tmp) / "submissions.json")
+
+            repo.create_submission({
+                "submissionId": "sub-decimal",
+                "submittedAt": "2026-06-14T07:00:00-07:00",
+                "amount": Decimal("89.00"),
+            })
+
+            self.assertEqual(repo.list_submissions()["items"][0]["amount"], 89.0)
+
+    def test_process_local_stripe_session_replays_completion_through_order_lambda(self):
+        calls = []
+
+        class FakeStripeOrderService:
+            def __init__(self, api_key):
+                calls.append(("service", api_key))
+
+            def retrieve_session(self, session_id):
+                calls.append(("retrieve", session_id))
+                return {
+                    "statusCode": 200,
+                    "body": json.dumps({
+                        "id": "cs_test_paid",
+                        "payment_status": "paid",
+                        "status": "complete",
+                        "metadata": {
+                            "event_type": "motorShowOrder",
+                            "submission_id": "sub-1",
+                        },
+                    }),
+                }
+
+        with patch.dict(os.environ, {"STRIPE_API_KEY": "sk_test_local"}), patch(
+            "backend.local_server.create_order_app.StripeOrderService",
+            FakeStripeOrderService,
+        ), patch("backend.local_server.create_order_app.lambda_handler") as lambda_handler:
+            lambda_handler.return_value = {"statusCode": 200, "body": json.dumps({"status": "webhook processed"})}
+
+            result = process_local_stripe_session("cs_test_paid")
+
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(calls, [("service", "sk_test_local"), ("retrieve", "cs_test_paid")])
+        replay_event = lambda_handler.call_args.args[0]
+        replay_body = json.loads(replay_event["body"])
+        self.assertEqual(replay_body["type"], "checkout.session.completed")
+        self.assertEqual(replay_body["data"]["object"]["id"], "cs_test_paid")
+        self.assertIn("Stripe-Signature", replay_event["headers"])
+
+    def test_seed_local_payment_hold_reads_legacy_local_worksheet_rows(self):
+        import tempfile
+
+        original_path = LOCAL_REPOSITORY.path
+        original_holds_path = LOCAL_REPOSITORY.holds_path
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                tmp_path = Path(tmp)
+                worksheet_path = tmp_path / "worksheets.json"
+                LOCAL_REPOSITORY.path = tmp_path / "submissions.json"
+                LOCAL_REPOSITORY.holds_path = tmp_path / "submissions_payment_holds.json"
+                worksheet_path.write_text(json.dumps({
+                    "Event Hold": [
+                        ["sub-legacy", json.dumps({"formData": {"email": "legacy@example.com"}})]
+                    ]
+                }))
+
+                with patch.dict(os.environ, {"LOCAL_WORKSHEETS_FILE": str(worksheet_path)}):
+                    seeded = seed_local_payment_hold_from_worksheet("sub-legacy")
+
+                self.assertTrue(seeded)
+                self.assertEqual(
+                    LOCAL_REPOSITORY.get_payment_hold("sub-legacy"),
+                    {"formData": {"email": "legacy@example.com"}},
+                )
+        finally:
+            LOCAL_REPOSITORY.path = original_path
+            LOCAL_REPOSITORY.holds_path = original_holds_path
 
 
 if __name__ == "__main__":

@@ -171,6 +171,19 @@ class RepositoryTests(unittest.TestCase):
 
         self.assertTrue(self.repo.claim_payment_processing("p1", "stripe", {"sessionId": "cs_123"}))
 
+    def test_runtime_settings_default_to_live_mode(self):
+        settings = self.repo.get_runtime_settings()
+
+        self.assertFalse(settings["testMode"])
+
+    def test_runtime_test_mode_round_trip(self):
+        updated = self.repo.set_runtime_test_mode(True, "developer")
+
+        self.assertTrue(updated["testMode"])
+        self.assertEqual(updated["updatedBy"], "developer")
+        self.assertTrue(updated["updatedAt"])
+        self.assertTrue(self.repo.get_runtime_settings()["testMode"])
+
     def test_update_admin_fields(self):
         self.repo.create_submission({
             "pk": "SUBMISSION",
@@ -271,6 +284,30 @@ class RepositoryTests(unittest.TestCase):
 
         with self.assertRaisesRegex(KeyError, "Submission not found: s1"):
             self.repo.update_submission_admin_fields("s1", "Complete", "Patrick", "Done", "admin")
+
+    def test_delete_submission_removes_submission_record(self):
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:00:00-07:00#s1",
+            "recordType": "submission",
+            "submissionId": "s1",
+            "submissionTitle": "Volunteer",
+            "name": "Pat",
+            "email": "pat@example.com",
+            "phone": "555",
+            "status": "New",
+            "assignedTo": "",
+            "notes": "",
+        })
+
+        deleted = self.repo.delete_submission("s1")
+
+        self.assertEqual(deleted["submissionId"], "s1")
+        self.assertEqual(self.repo.list_submissions(limit=10)["items"], [])
+
+    def test_delete_submission_raises_key_error_when_missing(self):
+        with self.assertRaisesRegex(KeyError, "Submission not found: missing"):
+            self.repo.delete_submission("missing")
 
 
 if __name__ == "__main__":

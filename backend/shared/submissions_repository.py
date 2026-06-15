@@ -1,6 +1,6 @@
 from datetime import datetime
 import os
-from zoneinfo import ZoneInfo
+from backend.shared.time_utils import pacific_now_iso
 
 try:
     import boto3
@@ -10,11 +10,8 @@ except ImportError:
     ClientError = None
 
 
-PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
-
-
 def _now_iso():
-    return datetime.now(PACIFIC_TZ).replace(microsecond=0).isoformat()
+    return pacific_now_iso()
 
 
 class SubmissionsRepository:
@@ -156,6 +153,34 @@ class SubmissionsRepository:
             ConditionExpression="attribute_exists(pk) AND attribute_exists(sk)",
         )
 
+    def get_runtime_settings(self):
+        result = self.table.get_item(Key={"pk": "SETTINGS", "sk": "RUNTIME"})
+        item = result.get("Item")
+        if not item:
+            return {"testMode": False, "updatedBy": "", "updatedAt": ""}
+        return {
+            "testMode": bool(item.get("testMode", False)),
+            "updatedBy": item.get("updatedBy", ""),
+            "updatedAt": item.get("updatedAt", ""),
+        }
+
+    def set_runtime_test_mode(self, enabled, updated_by):
+        updated_at = _now_iso()
+        record = {
+            "pk": "SETTINGS",
+            "sk": "RUNTIME",
+            "recordType": "runtime_settings",
+            "testMode": bool(enabled),
+            "updatedBy": updated_by,
+            "updatedAt": updated_at,
+        }
+        self.table.put_item(Item=record)
+        return {
+            "testMode": record["testMode"],
+            "updatedBy": record["updatedBy"],
+            "updatedAt": record["updatedAt"],
+        }
+
     def list_submissions(self, limit=100):
         items = []
         last_key = None
@@ -207,6 +232,22 @@ class SubmissionsRepository:
                 raise KeyError(f"Submission not found: {submission_id}") from error
             raise
         return result["Attributes"]
+
+    def delete_submission(self, submission_id):
+        submission = self._find_submission_by_id(submission_id)
+        if submission is None:
+            raise KeyError(f"Submission not found: {submission_id}")
+
+        try:
+            self.table.delete_item(
+                Key={"pk": submission["pk"], "sk": submission["sk"]},
+                ConditionExpression="attribute_exists(pk) AND attribute_exists(sk)",
+            )
+        except Exception as error:
+            if self._is_conditional_check_failed(error):
+                raise KeyError(f"Submission not found: {submission_id}") from error
+            raise
+        return submission
 
     def _find_submission_by_id(self, submission_id):
         last_key = None

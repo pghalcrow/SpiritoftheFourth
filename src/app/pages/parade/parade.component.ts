@@ -189,25 +189,33 @@ export class ParadeComponent {
       let subject = ''
       let body = ''
       let replyTo = ''
+      let formType = ''
       if(formKey == "VIP"){
         toAddress =  environment.forms.vipEntryForm.toEamil
         subject = environment.forms.vipEntryForm.subject
         body = EmailUtlity.createVIPEntryHTMLBody(form!)
         replyTo = this.vipEntryForm.get('email')!.value
+        formType = 'vipEntryForm'
       }else if (formKey == "PARADE"){
         toAddress =  environment.forms.paradeEntryForm.toEamil
         subject = environment.forms.paradeEntryForm.subject
         body = EmailUtlity.createParadeEntryHTMLBody(form!)
         replyTo = this.paradeEntryForm.get('email')!.value
+        formType = 'paradeEntryForm'
       }else if(formKey == "CAR"){
         toAddress =  environment.forms.carEntryForm.toEamil
         subject = environment.forms.carEntryForm.subject
         body = EmailUtlity.createCarEntryHTMLBody(form!)
         replyTo = this.carEntryForm.get('email')!.value
+        formType = 'carEntryForm'
       }
 
+      const formData = {
+        formType,
+        ...form!.getRawValue()
+      }
 
-      this.emailService.sendEmail(toAddress, body, subject, replyTo, form!.get("contactName")!.value, form!.get("phone")!.value).subscribe(result =>{
+      this.emailService.sendEmail(toAddress, body, subject, replyTo, form!.get("contactName")!.value, form!.get("phone")!.value, undefined, formData).subscribe(result =>{
         this.isLoading = false
         if(result.status){
           this.showSuccess = true

@@ -177,6 +177,19 @@ class SubmissionsMappingTest(unittest.TestCase):
         self.assertEqual(record["submittedAt"], "2026-06-05T10:00:00-07:00")
         self.assertEqual(record["sk"], "2026-06-05T10:00:00-07:00#live-1")
 
+    def test_maps_motor_show_live_submission_to_admin_order_label(self):
+        record = map_live_submission(
+            submission_id="motor-1",
+            title="Payment received for Motor Show Event",
+            name="Pat Halcrow",
+            email="pat@example.com",
+            phone="555-1212",
+            source="motorShowOrder",
+            raw_data={"type": "motorShowOrder"},
+        )
+
+        self.assertEqual(record["submissionTitle"], "Motor Show Event Order")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -53,7 +53,9 @@ class StripeOrderService:
     def retrieve_session(self, session_id):
         try:
             session = stripe.checkout.Session.retrieve(session_id, expand=["payment_intent"])
-            return {"statusCode": 200, "body": json.dumps(dict(session))}
+            if hasattr(session, "_to_dict_recursive"):
+                session = session._to_dict_recursive()
+            return {"statusCode": 200, "body": json.dumps(session)}
         except stripe.error.StripeError as e:
             return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
 

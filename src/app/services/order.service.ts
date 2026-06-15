@@ -53,6 +53,14 @@ export class OrderService {
     );
   }
 
+  processLocalStripeSession(sessionId: string): Observable<any> {
+    return this.httpClient.post<any>(
+      environment.order.url,
+      { action: 'processLocalStripeSession', sessionId },
+      { headers: new HttpHeaders({ 'Content-Type': 'application/json' }) }
+    );
+  }
+
   createEventPayPalOrder(payload: any): Observable<any> {
     return this.httpClient.post<any>(
       environment.order.url,
@@ -60,6 +68,14 @@ export class OrderService {
       {
         headers: new HttpHeaders({ 'Content-Type': 'application/json' })
       }
+    );
+  }
+
+  processFreeEventSignup(payload: any): Observable<any> {
+    return this.httpClient.post<any>(
+      environment.order.url,
+      { ...payload, action: 'processFreeEventSignup' },
+      { headers: new HttpHeaders({ 'Content-Type': 'application/json' }) }
     );
   }
 }

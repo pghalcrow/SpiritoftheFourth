@@ -163,22 +163,30 @@ export class VendorsComponent {
         const basePayload = { ...formData, toContact: toAddress, subject: subject, replyTo: replyTo, name: name, phone: phone, body: body, grandTotal: fee };
 
         if (this.files.length > 0) {
-          this.uploadService.postFiles(this.files).subscribe(folder => {
-            folder.subscribe((folder: string) => {
-              this.finalizeVendorSubmission({ ...basePayload, attachments: folder }, fee);
-            });
+          this.uploadService.postFiles(this.files).subscribe({
+            next: (folder: string) => this.finalizeVendorSubmission({ ...basePayload, attachments: folder }, fee),
+            error: error => {
+              console.log(error);
+              this.isLoading = false;
+              this.showError = true;
+              this.vendorApplicationForm.enable();
+            }
           });
         } else {
           this.finalizeVendorSubmission({ ...basePayload, attachments: '' }, fee);
         }
       } else if (formType === 'artist') {
         // Artist form processing
+        const formData = {
+          formType: 'artistSignUpForm',
+          ...this.artistForm.getRawValue()
+        };
         toAddress = environment.forms.artistSignUpForm.toEamil;
         subject = environment.forms.artistSignUpForm.subject;
         body = EmailUtlity.createArtistFormHTMLBody(this.artistForm);
 
         // Send artist email
-        this.emailService.sendEmail(toAddress, body, subject, replyTo, name, phone).subscribe(result => {
+        this.emailService.sendEmail(toAddress, body, subject, replyTo, name, phone, undefined, formData).subscribe(result => {
           this.isLoading = false;
           if (result.status) {
             this.showSuccess = true;
@@ -263,7 +271,10 @@ export class VendorsComponent {
         next: async (response) => {
           try {
             const clientSecret = response.client_secret;
-            const stripe = Stripe(environment.stripe.pk);
+            if (!clientSecret) {
+              throw new Error('Stripe embedded checkout response did not include a client secret.');
+            }
+            const stripe = Stripe(response.publishable_key || environment.stripe.pk);
             this.showStripeCheckout = true;
             await new Promise(r => setTimeout(r, 50));
             this.stripeCheckout = await stripe.initEmbeddedCheckout({
@@ -288,12 +299,19 @@ export class VendorsComponent {
     };
 
     if (this.files.length > 0) {
-      this.uploadService.postFiles(this.files).subscribe(folder => {
-        folder.subscribe((folder: string) => launchCheckout(folder));
+      this.uploadService.postFiles(this.files).subscribe({
+        next: (folder: string) => launchCheckout(folder),
+        error: () => this.handleVendorStripeUploadError()
       });
     } else {
       launchCheckout('');
     }
+  }
+
+  private handleVendorStripeUploadError() {
+    this.stripeIsLoading = false;
+    this.vendorApplicationForm.enable();
+    alert('Error uploading attachments. Please try again.');
   }
 
   destroyStripeCheckout() {

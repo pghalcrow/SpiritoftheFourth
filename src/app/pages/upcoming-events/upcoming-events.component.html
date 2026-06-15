@@ -1,80 +1,100 @@
-<div class="container gx-0">
-  <div class="row gx-0">
-    <h1 class="oswald-font text-center mt-3">Upcoming Event(s)</h1>
-    <hr style="width: 50%; margin: 0 auto" />
-    <div class="col-12 justify-center text-center">
+<div class="upcoming-events-page">
+  <div class="events-shell">
+    <header class="events-heading">
+      <h1 class="oswald-font">Upcoming Event(s)</h1>
+    </header>
+
+    <div class="events-list">
+      <section *ngIf="!events.length" class="empty-events" data-testid="no-upcoming-events">
+        <h2>No upcoming events are scheduled right now.</h2>
+        <p>Please check back soon for new Spirit of the Fourth events.</p>
+      </section>
+
       <ng-template #fieldRenderer let-field let-fg="fg">
-        <div class="form-field" [formGroup]="fg">
+        <div class="form-field" [class.checkbox-field]="field.type === 'checkbox'" [formGroup]="fg">
           <label *ngIf="field.type !== 'checkbox'" class="text-label">
-            {{ field.label }}
+            <span>{{ field.label }}</span>
             <input [type]="field.type" [formControlName]="field.name" />
           </label>
           <label *ngIf="field.type === 'checkbox'" class="checkbox-label">
             <input type="checkbox" [formControlName]="field.name" />
-            {{ field.label }}
+            <span>{{ field.label }}</span>
           </label>
         </div>
       </ng-template>
 
-      <div *ngFor="let event of events; let i = index">
-        <h2>{{ event.title }}</h2>
-        <img [src]="getFlyerSrc(event.flyerUrl)" alt="{{ event.title }} flyer" class="flyer-img shadow mt-3" />
+      <article *ngFor="let event of events; let i = index" class="event-panel" data-testid="upcoming-event">
+        <header class="event-panel-header">
+          <p *ngIf="formatEventDate(event)" class="event-date">{{ formatEventDate(event) }}</p>
+          <h2>{{ event.title }}</h2>
+          <p *ngIf="event.eventMeta.location" class="event-location">{{ event.eventMeta.location }}</p>
+          <p *ngIf="event.description" class="event-description">{{ event.description }}</p>
+        </header>
 
-        <form *ngIf="event.formGroup as fg" [formGroup]="fg" (ngSubmit)="onSubmit(event)" [hidden]="stripeCheckoutEventIndex === i">
-          <div *ngFor="let section of event.sections">
-            <!-- NORMAL FIELD SECTION -->
-            <ng-container *ngIf="section.type === 'fields'">
-              <div *ngFor="let fieldName of section.fields">
-                <ng-container *ngIf="event.fieldMap[fieldName] as field">
-                  <ng-container *ngIf="field.type !== 'group'">
-                    <ng-container
-                      *ngTemplateOutlet="fieldRenderer; context: { $implicit: field, fg: fg }"
-                    ></ng-container>
+        <img
+          *ngIf="hasFlyer(event)"
+          [src]="getFlyerSrc(event.flyerUrl)"
+          alt="{{ event.title }} flyer"
+          class="flyer-img"
+        />
+
+        <form *ngIf="event.formGroup as fg" class="event-form" [formGroup]="fg" (ngSubmit)="onSubmit(event)" [hidden]="stripeCheckoutEventIndex === i">
+          <div class="event-form-grid">
+            <ng-container *ngFor="let section of event.sections">
+              <ng-container *ngIf="section.type === 'fields'">
+                <ng-container *ngFor="let fieldName of section.fields">
+                  <ng-container *ngIf="event.fieldMap[fieldName] as field">
+                    <ng-container *ngIf="field.type !== 'group'">
+                      <ng-container
+                        *ngTemplateOutlet="fieldRenderer; context: { $implicit: field, fg: fg }"
+                      ></ng-container>
+                    </ng-container>
                   </ng-container>
                 </ng-container>
-              </div>
+              </ng-container>
             </ng-container>
+          </div>
 
-            <!-- GROUP SECTION -->
+          <div *ngFor="let section of event.sections">
             <ng-container *ngIf="section.type === 'group'">
               <ng-container *ngIf="event.fieldMap[section.field] as field">
-                <h3 *ngIf="getMembers(fg, field.name).length > 0">
-                  {{ field.label }}
-                </h3>
+                <section class="participant-section">
+                  <div class="participant-heading">
+                    <h3>{{ field.label }}</h3>
+                    <button
+                      type="button"
+                      class="secondary-action"
+                      (click)="addMember(event, field)"
+                      [disabled]="getMembers(fg, field.name).length >= field.maxMembers"
+                    >
+                      Add Participant
+                    </button>
+                  </div>
 
-                <p>{{ event.description }}</p>
-
-                <ng-container *ngIf="getMembers(fg, field.name).length > 0">
                   <div [formArrayName]="field.name">
                     <div
                       *ngFor="let member of getMembers(fg, field.name).controls; let i = index"
                       [formGroupName]="i"
                       class="team-member"
                     >
-                      <div *ngFor="let subField of field.fields" class="form-field">
-                        <label class="text-label">
-                          {{ subField.label }}
-                          <input [type]="subField.type" [formControlName]="subField.name" />
-                        </label>
+                      <div class="team-member-fields">
+                        <div *ngFor="let subField of field.fields" class="form-field">
+                          <label class="text-label">
+                            <span>{{ subField.label }}</span>
+                            <input [type]="subField.type" [formControlName]="subField.name" />
+                          </label>
+                        </div>
                       </div>
 
-                      <button type="button" (click)="removeMember(fg, field.name, i)">Remove</button>
+                      <button type="button" class="text-action" (click)="removeMember(fg, field.name, i)">Remove</button>
                     </div>
                   </div>
-                </ng-container>
-
-                <button
-                  type="button"
-                  (click)="addMember(event, field)"
-                  [disabled]="getMembers(fg, field.name).length >= field.maxMembers"
-                >
-                  Add Participant
-                </button>
+                </section>
               </ng-container>
             </ng-container>
           </div>
 
-          <div class="add-ons">
+          <div *ngIf="event.pricing.addOns?.length" class="add-ons">
             <div *ngFor="let addOn of event.pricing.addOns" class="add-on-item">
               <label>
                 <input type="checkbox" [formControlName]="addOn.field" />
@@ -83,19 +103,34 @@
             </div>
           </div>
 
-          <h3>Total: ${{ calculateTotal(event) }}</h3>
+          <p *ngIf="event.eventMeta.endBlurb" class="event-end-blurb">{{ event.eventMeta.endBlurb }}</p>
 
-          <div class="payment-row">
-            <button type="button" [disabled]="stripeIsLoading" class="payment-btn card-btn" (click)="onStripeEvent(event, i)">
-              <span *ngIf="stripeIsLoading" class="spinner-border spinner-border-sm" role="status"></span>
-              <i *ngIf="!stripeIsLoading" class="fa-regular fa-credit-card"></i>
-              {{ stripeIsLoading ? 'Starting card payment...' : 'Pay by Credit Card' }}
-            </button>
-            <button type="submit" class="payment-btn paypal-btn" (click)="paymentMethod = 'paypal'">
-              <i class="fa-brands fa-paypal"></i> PayPal
+          <div class="event-total">Total: ${{ calculateTotal(event) }}</div>
+
+          <div *ngIf="isFreeEvent(event); else paidEventButtons" class="payment-row">
+            <button
+              type="button"
+              class="payment-btn card-btn"
+              [attr.data-testid]="'free-event-signup-' + i"
+              (click)="onFreeEventSignup(event)"
+            >
+              Sign Up
             </button>
           </div>
-          <div class="card-security-note mt-2 mb-0">
+
+          <ng-template #paidEventButtons>
+            <div class="payment-row">
+              <button type="button" [disabled]="stripeIsLoading" class="payment-btn card-btn" (click)="onStripeEvent(event, i)">
+                <span *ngIf="stripeIsLoading" class="spinner-border spinner-border-sm" role="status"></span>
+                <i *ngIf="!stripeIsLoading" class="fa-regular fa-credit-card"></i>
+                {{ stripeIsLoading ? 'Starting card payment...' : 'Pay by Credit Card' }}
+              </button>
+              <button type="submit" class="payment-btn paypal-btn" (click)="paymentMethod = 'paypal'">
+                <i class="fa-brands fa-paypal"></i> PayPal
+              </button>
+            </div>
+          </ng-template>
+          <div *ngIf="!isFreeEvent(event)" class="card-security-note mt-2 mb-0">
             <i class="fa-solid fa-lock card-security-note-icon" aria-hidden="true"></i>
             <p>
               <strong>Payments made by credit card are processed securely by Stripe.</strong>
@@ -104,71 +139,13 @@
           </div>
         </form>
 
-        <!-- STRIPE EMBEDDED CHECKOUT (per event) -->
         <div [hidden]="stripeCheckoutEventIndex !== i" class="mt-3">
           <div [id]="'stripe-checkout-event-' + i"></div>
           <div class="text-center mt-3">
-            <button type="button" class="btn btn-outline-secondary" (click)="cancelEventStripe()">← Back to form</button>
+            <button type="button" class="btn btn-outline-secondary" (click)="cancelEventStripe()">Back to form</button>
           </div>
         </div>
-      </div>
-    </div>
-
-    <div class="text-center mt-4 sponsor-section">
-      <h3>Not participating in the tournament?</h3>
-      <p>Fill out this form to sponsor a tee sign.</p>
-      <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
-
-      <form [formGroup]="sponsorForm" (ngSubmit)="submitSponsor()">
-        <div class="form-field">
-          <label class="text-label">
-            Name
-            <input type="text" formControlName="name" />
-          </label>
-        </div>
-
-        <div class="form-field">
-          <label class="text-label">
-            Email
-            <input type="email" formControlName="email" />
-          </label>
-        </div>
-
-        <div class="form-field">
-          <label class="text-label">
-            Phone
-            <input type="text" formControlName="phone" />
-          </label>
-        </div>
-
-        <h3>Total: $100</h3>
-
-        <div class="payment-row">
-          <button type="button" [disabled]="stripeIsLoading" class="payment-btn sponsor-card-btn" (click)="onSponsorStripeClick()">
-            <span *ngIf="stripeIsLoading" class="spinner-border spinner-border-sm" role="status"></span>
-            <i *ngIf="!stripeIsLoading" class="fa-regular fa-credit-card"></i>
-            {{ stripeIsLoading ? 'Starting card payment...' : 'Pay by Credit Card' }}
-          </button>
-          <button type="submit" class="payment-btn sponsor-paypal-btn" (click)="sponsorPaymentMethod = 'paypal'">
-            <i class="fa-brands fa-paypal"></i> PayPal
-          </button>
-        </div>
-        <div class="card-security-note mt-2 mb-0">
-          <i class="fa-solid fa-lock card-security-note-icon" aria-hidden="true"></i>
-          <p>
-            <strong>Payments made by credit card are processed securely by Stripe.</strong>
-            The card payment form is rendered and managed by Stripe - your card number, expiration, and CVC are sent directly from your browser to Stripe and never touch Spirit of the Fourth servers. We do not receive, store, or have access to your card details.
-          </p>
-        </div>
-      </form>
-
-      <!-- STRIPE EMBEDDED CHECKOUT (sponsor) -->
-      <div [hidden]="!showSponsorStripeCheckout" class="mt-3">
-        <div id="stripe-checkout-sponsor"></div>
-        <div class="text-center mt-3">
-          <button type="button" class="btn btn-outline-secondary" (click)="cancelSponsorStripe()">← Back to form</button>
-        </div>
-      </div>
+      </article>
     </div>
   </div>
 </div>

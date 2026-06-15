@@ -1,19 +1,23 @@
+import base64
 import json
 import os
+import re
 import sys
 import uuid
-from datetime import datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "backend" / "lambdas" / "create_order"))
 
 from backend.local_repository import LocalSubmissionsRepository
 from backend.shared.submissions_mapping import map_live_submission
 from backend.shared.submissions_repository import SubmissionsRepository
+from backend.shared.time_utils import pacific_now_iso
 
 import backend.lambdas.events_service.lambda_function as events_service
+import backend.lambdas.create_order.app as create_order_app
+import backend.lambdas.sotf_mailer.lambda_function as sotf_mailer
 
 
 LOCAL_EVENTS_FILE = Path(os.environ.get("LOCAL_EVENTS_FILE", "backend/.local/events.json"))
@@ -44,10 +48,27 @@ def create_app():
 
     app = Flask(__name__)
     os.environ.setdefault("ADMIN_PASSWORD", "admin")
+    os.environ.setdefault("DEVELOPER_PASSWORD", "C0ffeeCup0215")
+    os.environ.setdefault("LOCAL_TEST_MODE", "true")
+    os.environ.setdefault("ENVIRONMENT", "dev")
+    os.environ.setdefault("RETURN_URL", "http://localhost:4200")
+    os.environ.setdefault("SUBMISSIONS_TABLE", "sotf-submissions-local")
+    os.environ.setdefault("WEBHOOK_SECRET", "local-dev-webhook-secret")
+    os.environ.setdefault("EMAIL_TRANSPORT", "local")
+    os.environ.setdefault("RESA_EMAIL", "local@example.com")
+    os.environ.setdefault("PO_MOTOR_SHOW_EMAIL_1", "local@example.com")
+    os.environ.setdefault("PO_MOTOR_SHOW_EMAIL_2", "local@example.com")
+    os.environ.setdefault("S3_ATTACHMENT_BUCKET", "sotf-file-upload-470065668628-us-west-2")
     events_service.ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+    events_service.DEVELOPER_PASSWORD = os.environ.get("DEVELOPER_PASSWORD")
     events_service.get_submissions_repository = get_local_submissions_repository
     events_service.get_events = local_get_events
     events_service.update_events = local_update_events
+    events_service.upload_image = local_upload_image
+    create_order_app.get_submissions_repository = get_local_submissions_repository
+    create_order_app.get_worksheet = get_local_worksheet
+    create_order_app.load_events_config = local_load_events_config
+    sotf_mailer.get_submissions_repository = get_local_submissions_repository
 
     @app.after_request
     def add_cors(response):
@@ -63,12 +84,12 @@ def create_app():
         response.headers["Access-Control-Allow-Origin"] = (
             request_origin if request_origin in allowed_origins else "http://localhost:4200"
         )
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
-        response.headers["Access-Control-Allow-Methods"] = "GET,POST,PATCH,OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization,Cache-Control,Pragma"
+        response.headers["Access-Control-Allow-Methods"] = "GET,POST,PATCH,DELETE,OPTIONS"
         return response
 
-    @app.route("/", defaults={"path": ""}, methods=["GET", "POST", "PATCH", "OPTIONS"])
-    @app.route("/<path:path>", methods=["GET", "POST", "PATCH", "OPTIONS"])
+    @app.route("/", defaults={"path": ""}, methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"])
+    @app.route("/<path:path>", methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"])
     def lambda_route(path):
         if request.method == "OPTIONS":
             return Response(status=204)
@@ -77,16 +98,144 @@ def create_app():
         if raw_path == "/local/test-submission" and request.method == "POST":
             return jsonify(create_test_submission(request.get_json(silent=True) or {}))
 
+        body = request.get_json(silent=True) or {}
+        if body.get("action") == "processLocalStripeSession":
+            return lambda_response(process_local_stripe_session(body.get("sessionId")))
+
+        if is_order_request(body):
+            result = create_order_app.lambda_handler(
+                create_lambda_event(request.method, raw_path, body, dict(request.headers)),
+                None,
+            )
+            return lambda_response(result)
+
+        if is_mailer_request(body):
+            result = sotf_mailer.lambda_handler(
+                create_lambda_event(request.method, raw_path, body, dict(request.headers)),
+                None,
+            )
+            return lambda_response(result)
+
         event = create_lambda_event(
             request.method,
             raw_path,
-            request.get_json(silent=True) or {},
+            body,
             dict(request.headers),
         )
         result = events_service.lambda_handler(event, None)
         return lambda_response(result)
 
     return app
+
+
+def is_order_request(body):
+    if body.get("action") in {
+        "createOrder",
+        "captureOrder",
+        "createStripeSession",
+        "createStripeEmbeddedSession",
+        "processFreeEventSignup",
+    }:
+        return True
+    return body.get("event_type") in {"CHECKOUT.ORDER.APPROVED", "CHECKOUT.ORDER.COMPLETED"}
+
+
+def is_mailer_request(body):
+    if body.get("getSignedURLs"):
+        return True
+    return bool(body.get("subject") and body.get("body") and body.get("toContact"))
+
+
+class LocalWorksheet:
+    def __init__(self, name):
+        self.name = name
+        self.path = Path(os.environ.get("LOCAL_WORKSHEETS_FILE", "backend/.local/worksheets.json"))
+
+    def _read(self):
+        if not self.path.exists():
+            return {}
+        return json.loads(self.path.read_text() or "{}")
+
+    def _write(self, data):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(data, indent=2, sort_keys=True))
+
+    def append_row(self, row):
+        data = self._read()
+        data.setdefault(self.name, []).append(row)
+        self._write(data)
+
+    def get_all_values(self):
+        return self._read().get(self.name, [])
+
+    def get_all_records(self):
+        rows = self.get_all_values()
+        if not rows:
+            return []
+        headers = rows[0]
+        return [dict(zip(headers, row)) for row in rows[1:]]
+
+
+def get_local_worksheet(sheet_name):
+    if os.environ.get("LOCAL_WRITE_GOOGLE_SHEET", "").lower() in {"1", "true", "yes"}:
+        import gspread
+
+        credentials_path = os.environ.get("GOOGLE_SHEET_CREDENTIALS", "creds-sa.json")
+        spreadsheet_name = os.environ.get("GOOGLE_SHEET_NAME", "Forms Submissions")
+        gc = gspread.service_account(credentials_path)
+        return gc.open(spreadsheet_name).worksheet(sheet_name)
+
+    return LocalWorksheet(sheet_name)
+
+
+def local_load_events_config():
+    return json.loads(local_get_events()["body"])
+
+
+def process_local_stripe_session(session_id):
+    if not session_id:
+        return {"statusCode": 400, "body": json.dumps({"error": "Missing sessionId"})}
+
+    stripe_service = create_order_app.StripeOrderService(os.environ["STRIPE_API_KEY"])
+    session_response = stripe_service.retrieve_session(session_id)
+    if session_response.get("statusCode") != 200:
+        return session_response
+
+    session = json.loads(session_response.get("body") or "{}")
+    if session.get("payment_status") != "paid":
+        return {
+            "statusCode": 409,
+            "body": json.dumps({"error": "Stripe session is not paid", "payment_status": session.get("payment_status")}),
+        }
+
+    metadata = session.get("metadata", {}) or {}
+    submission_id = metadata.get("submission_id")
+    if submission_id and not LOCAL_REPOSITORY.get_payment_hold(submission_id):
+        seed_local_payment_hold_from_worksheet(submission_id)
+
+    stripe_event = {
+        "type": "checkout.session.completed",
+        "data": {"object": session},
+    }
+
+    original_construct_event = create_order_app.stripe.Webhook.construct_event
+    create_order_app.stripe.Webhook.construct_event = lambda payload, sig_header, secret: stripe_event
+    try:
+        return create_order_app.lambda_handler(
+            create_lambda_event("POST", "/", stripe_event, {"Stripe-Signature": "local-dev-signature"}),
+            None,
+        )
+    finally:
+        create_order_app.stripe.Webhook.construct_event = original_construct_event
+
+
+def seed_local_payment_hold_from_worksheet(submission_id):
+    rows = LocalWorksheet("Event Hold").get_all_values()
+    for row in rows:
+        if len(row) >= 2 and row[0] == submission_id:
+            LOCAL_REPOSITORY.save_payment_hold(submission_id, json.loads(row[1]))
+            return True
+    return False
 
 
 def local_get_events():
@@ -96,7 +245,7 @@ def local_get_events():
         events_file.write_text(json.dumps({"events": []}, indent=2))
     return {
         "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
+        "headers": events_service.NO_CACHE_HEADERS,
         "body": events_file.read_text(),
     }
 
@@ -110,9 +259,30 @@ def local_update_events(new_json):
     return events_service.json_response(200, {"success": True})
 
 
+def local_upload_image(data):
+    try:
+        original_file_name = data["fileName"]
+        file_content = base64.b64decode(data["base64"])
+        content_type = data.get("contentType", "application/octet-stream")
+
+        allowed_types = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
+        if content_type not in allowed_types:
+            return events_service.json_response(400, {"error": "Invalid file type"})
+
+        safe_name = re.sub(r"[^A-Za-z0-9_\-\.]", "_", original_file_name)
+        assets_dir = Path(os.environ.get("LOCAL_ASSETS_DIR", "src/assets"))
+        assets_dir.mkdir(parents=True, exist_ok=True)
+        (assets_dir / safe_name).write_bytes(file_content)
+
+        return events_service.json_response(200, {"success": True, "url": f"assets/{safe_name}"})
+
+    except Exception as e:
+        return events_service.json_response(500, {"error": str(e)})
+
+
 def create_test_submission(payload):
     submission_id = payload.get("submissionId") or uuid.uuid4().hex[:12]
-    submitted_at = datetime.now(ZoneInfo("America/Los_Angeles")).isoformat(timespec="seconds")
+    submitted_at = pacific_now_iso()
     record = map_live_submission(
         submission_id=submission_id,
         title=payload.get("submissionTitle", "Local Test Submission"),

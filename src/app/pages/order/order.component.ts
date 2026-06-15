@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { OrderService } from 'src/app/services/order.service';
+import { environment } from 'src/environments/environment';
 
 @Component({
   selector: 'app-order',
@@ -64,11 +65,24 @@ export class OrderComponent implements OnInit {
 
   // Handle Stripe payment confirmation
   private handleStripePayment(sessionId: string) {
-    if (sessionId) {
-      this.message = `Thank you for your order. Your merchandise will be available for pick up at the event registration table on ${this.eventDate}`;
-    } else {
+    if (!sessionId) {
       this.message = `An error occurred. Session ID is missing. Please contact us at ${this.emailContact}.`;
+      return;
     }
+
+    if (!environment.production) {
+      this.orderService.processLocalStripeSession(sessionId).subscribe(
+        () => {
+          this.message = `Thank you for your order. Your merchandise will be available for pick up at the event registration table on ${this.eventDate}`;
+        },
+        error => {
+          this.message = `Your payment succeeded, but local processing failed. Please contact us at ${this.emailContact}. Error: ${error.message}`;
+        }
+      );
+      return;
+    }
+
+    this.message = `Thank you for your order. Your merchandise will be available for pick up at the event registration table on ${this.eventDate}`;
   }
 
   // Handle PayPal payment confirmation
@@ -83,4 +97,3 @@ export class OrderComponent implements OnInit {
     );
   }
 }
-

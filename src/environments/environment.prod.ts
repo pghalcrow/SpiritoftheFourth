@@ -66,7 +66,8 @@ export const environment = {
       login: "/admin/login",
       adminEvents: "/admin/events",
       submissions: "/admin/submissions",
-      upload: "/admin/upload"
+      upload: "/admin/upload",
+      testMode: "/admin/test-mode"
     }
   }
 };

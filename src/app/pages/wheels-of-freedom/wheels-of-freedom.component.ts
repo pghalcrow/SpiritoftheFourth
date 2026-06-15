@@ -36,13 +36,14 @@ export class WheelsOfFreedomComponent {
   stripeIsLoading: boolean = false;
   stripePreloadInFlight: boolean = false;
   preloadedStripeClientSecret: string | null = null;
+  preloadedStripePublishableKey: string | null = null;
   private preloadedStripePayloadKey: string | null = null;
   private stripePreloadRequestKey: string | null = null;
   private stripePreloadSubscription: Subscription | null = null;
   private cartPreloadTimer: ReturnType<typeof setTimeout> | null = null;
   private stripePreloadWaiters: Array<{
     payloadKey: string;
-    callback: (clientSecret: string | null) => void;
+    callback: (clientSecret: string | null, publishableKey?: string | null) => void;
   }> = [];
 
   cartTotal: number = 0;
@@ -207,7 +208,14 @@ export class WheelsOfFreedomComponent {
         document.getElementById('purchasePlaqueModalToggle')?.click();
       }});
     
-    this.motorShowForm.get('addShirtBundle')?.valueChanges.subscribe(() => {
+    this.motorShowForm.get('addShirtBundle')?.valueChanges.subscribe((checked) => {
+      const selectedShirt = this.motorShowForm.get('selectedShirt');
+      if (checked) {
+        selectedShirt?.setValidators(Validators.required);
+      } else {
+        selectedShirt?.clearValidators();
+      }
+      selectedShirt?.updateValueAndValidity();
       this.updateCartTotal();
     });
 
@@ -288,7 +296,7 @@ export class WheelsOfFreedomComponent {
     const payloadKey = this.getStripePayloadKey(payload);
 
     if (this.preloadedStripeClientSecret && this.preloadedStripePayloadKey === payloadKey) {
-      this.mountStripeCheckout(this.preloadedStripeClientSecret);
+      this.mountStripeCheckout(this.preloadedStripeClientSecret, this.preloadedStripePublishableKey || undefined);
       return;
     }
 
@@ -296,9 +304,9 @@ export class WheelsOfFreedomComponent {
       this.stripeIsLoading = true;
       this.stripePreloadWaiters.push({
         payloadKey,
-        callback: (clientSecret) => {
+        callback: (clientSecret, publishableKey) => {
           if (clientSecret && this.getStripePayloadKey(this.buildStripePayload()) === payloadKey) {
-            this.mountStripeCheckout(clientSecret);
+            this.mountStripeCheckout(clientSecret, publishableKey || undefined);
             return;
           }
 
@@ -315,7 +323,7 @@ export class WheelsOfFreedomComponent {
   private createAndMountStripeCheckout(payload: any) {
     this.orderService.createStripeEmbeddedSession(payload).subscribe({
       next: async (response) => {
-        await this.mountStripeCheckout(response.client_secret);
+        await this.mountStripeCheckout(response.client_secret, response.publishable_key);
       },
       error: () => {
         this.stripeIsLoading = false;
@@ -366,6 +374,7 @@ export class WheelsOfFreedomComponent {
     if (this.stripePreloadInFlight && this.stripePreloadRequestKey === payloadKey) return;
 
     this.preloadedStripeClientSecret = null;
+    this.preloadedStripePublishableKey = null;
     this.preloadedStripePayloadKey = null;
     this.stripePreloadInFlight = true;
     this.stripePreloadRequestKey = payloadKey;
@@ -378,12 +387,14 @@ export class WheelsOfFreedomComponent {
 
         if (latestPayloadKey === payloadKey) {
           this.preloadedStripeClientSecret = response.client_secret;
+          this.preloadedStripePublishableKey = response.publishable_key || null;
           this.preloadedStripePayloadKey = payloadKey;
         }
 
         this.resolveStripePreloadWaiters(
           payloadKey,
-          latestPayloadKey === payloadKey ? response.client_secret : null
+          latestPayloadKey === payloadKey ? response.client_secret : null,
+          latestPayloadKey === payloadKey ? response.publishable_key : null
         );
         this.finishStripePreload(payloadKey);
       },
@@ -413,14 +424,14 @@ export class WheelsOfFreedomComponent {
     }
   }
 
-  private resolveStripePreloadWaiters(payloadKey: string, clientSecret: string | null) {
+  private resolveStripePreloadWaiters(payloadKey: string, clientSecret: string | null, publishableKey?: string | null) {
     const matchingWaiters = this.stripePreloadWaiters.filter(waiter => waiter.payloadKey === payloadKey);
     this.stripePreloadWaiters = this.stripePreloadWaiters.filter(waiter => waiter.payloadKey !== payloadKey);
-    matchingWaiters.forEach(waiter => waiter.callback(clientSecret));
+    matchingWaiters.forEach(waiter => waiter.callback(clientSecret, publishableKey));
   }
 
-  private async mountStripeCheckout(clientSecret: string) {
-    const stripe = Stripe(environment.stripe.pk);
+  private async mountStripeCheckout(clientSecret: string, publishableKey?: string) {
+    const stripe = Stripe(publishableKey || environment.stripe.pk);
     this.showStripeCheckout = true;
     this.stripeIsLoading = false;
     await new Promise(r => setTimeout(r, 50));

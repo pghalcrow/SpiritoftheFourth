@@ -168,6 +168,15 @@ class DeployLambdasScriptTests(unittest.TestCase):
                         assert variables["ADMIN_PASSWORD"] == "secret"
                         assert variables["SMTPHOST"] == "smtp.example.com"
                         assert variables["SUBMISSIONS_TABLE"] == "sotf-submissions-dev"
+                    elif args[:2] == ["lambda", "update-function-url-config"]:
+                        cors_arg = args[args.index("--cors") + 1]
+                        cors = json.loads(cors_arg)
+                        assert args[args.index("--function-name") + 1] == "dev_events_service"
+                        assert "PATCH" in cors["AllowMethods"]
+                        assert "DELETE" in cors["AllowMethods"]
+                        assert "OPTIONS" in cors["AllowMethods"]
+                        assert "cache-control" in cors["AllowHeaders"]
+                        assert "pragma" in cors["AllowHeaders"]
                     else:
                         raise SystemExit(f"Unexpected aws args: {{args}}")
                     """
@@ -192,6 +201,8 @@ class DeployLambdasScriptTests(unittest.TestCase):
             calls = [json.loads(line) for line in calls_path.read_text().splitlines()]
             config_updates = [call for call in calls if call[:2] == ["lambda", "update-function-configuration"]]
             self.assertEqual(len(config_updates), 3)
+            function_url_updates = [call for call in calls if call[:2] == ["lambda", "update-function-url-config"]]
+            self.assertEqual(len(function_url_updates), 1)
 
 
 if __name__ == "__main__":

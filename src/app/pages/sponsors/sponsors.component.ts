@@ -61,7 +61,11 @@ export class SponsorsComponent implements OnInit {
       let subject = environment.forms.sponsorshipForm.subject
       let body = EmailUtlity.createSponsorshipHTMLBody(this.sponsorForm)
       let replyTo = this.sponsorForm.get('email')!.value
-      this.emailService.sendEmail(toAddress, body, subject, replyTo, this.sponsorForm!.get("contactName")!.value, this.sponsorForm!.get("phone")!.value).subscribe(result => {
+      const formData = {
+        formType: 'sponsorshipForm',
+        ...this.sponsorForm.getRawValue()
+      }
+      this.emailService.sendEmail(toAddress, body, subject, replyTo, this.sponsorForm!.get("contactName")!.value, this.sponsorForm!.get("phone")!.value, undefined, formData).subscribe(result => {
         this.isLoading = false
         if (result.status) {
           this.showSuccess = true

@@ -8,22 +8,20 @@ import { CmsService } from 'src/app/services/cms.service';
 
 describe('SignInComponent', () => {
   let fixture: ComponentFixture<SignInComponent>;
+  let router: jasmine.SpyObj<Router>;
+  let cmsService: jasmine.SpyObj<CmsService>;
 
   beforeEach(async () => {
+    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
+    cmsService = jasmine.createSpyObj<CmsService>('CmsService', ['login']);
+    cmsService.login.and.returnValue(of({ success: true, token: 'cms-admin-token', role: 'admin' }));
+
     await TestBed.configureTestingModule({
       declarations: [SignInComponent],
       imports: [FormsModule],
       providers: [
-        {
-          provide: CmsService,
-          useValue: {
-            login: () => of({ success: true, token: 'cms-admin-token' }),
-          },
-        },
-        {
-          provide: Router,
-          useValue: { navigate: jasmine.createSpy('navigate') },
-        },
+        { provide: CmsService, useValue: cmsService },
+        { provide: Router, useValue: router },
       ],
     }).compileComponents();
 
@@ -38,5 +36,17 @@ describe('SignInComponent', () => {
     expect(nativeElement.querySelector('.admin-login-card')).toBeTruthy();
     expect(nativeElement.querySelector('.password-field')).toBeTruthy();
     expect(nativeElement.querySelector('.login-button')).toBeTruthy();
+  });
+
+  it('stores the returned admin role after login', () => {
+    cmsService.login.and.returnValue(of({ success: true, token: 'cms-developer-token', role: 'developer' }));
+    const component = fixture.componentInstance;
+
+    component.password = 'C0ffeeCup0215';
+    component.login();
+
+    expect(sessionStorage.getItem('adminToken')).toBe('cms-developer-token');
+    expect(sessionStorage.getItem('adminRole')).toBe('developer');
+    expect(router.navigate).toHaveBeenCalledWith(['/admin']);
   });
 });

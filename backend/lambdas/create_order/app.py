@@ -18,11 +18,50 @@ from StripeOrderService import StripeOrderService
 from EmailSender import EmailSender
 from backend.shared.submissions_mapping import map_live_submission
 from backend.shared.submissions_repository import SubmissionsRepository
+from backend.shared.runtime_mode import (
+    LIVE_PUBLISHABLE_KEY_DEFAULT,
+    TEST_PUBLISHABLE_KEY_DEFAULT,
+    is_test_mode,
+)
+from backend.shared.time_utils import pacific_display_date, pacific_now_iso, pacific_sheet_timestamp
 
 EVENTS_CACHE = None
 
 def get_submissions_repository():
     return SubmissionsRepository()
+
+
+def get_stripe_secret_key():
+    if is_test_mode():
+        if os.environ.get("LOCAL_TEST_MODE"):
+            return os.environ.get("STRIPE_TEST_API_KEY") or os.environ["STRIPE_API_KEY"]
+        return os.environ["STRIPE_TEST_API_KEY"]
+    return os.environ["STRIPE_API_KEY"]
+
+
+def get_stripe_webhook_secret():
+    if is_test_mode():
+        if os.environ.get("LOCAL_TEST_MODE"):
+            return os.environ.get("STRIPE_TEST_WEBHOOK_SECRET") or os.environ["WEBHOOK_SECRET"]
+        return os.environ["STRIPE_TEST_WEBHOOK_SECRET"]
+    return os.environ["WEBHOOK_SECRET"]
+
+
+def get_stripe_publishable_key():
+    if is_test_mode():
+        return os.environ.get("STRIPE_TEST_PUBLISHABLE_KEY", TEST_PUBLISHABLE_KEY_DEFAULT)
+    return os.environ.get("STRIPE_PUBLISHABLE_KEY", LIVE_PUBLISHABLE_KEY_DEFAULT)
+
+
+def attach_stripe_publishable_key(response):
+    if response.get("statusCode") != 200:
+        return response
+    try:
+        body = json.loads(response.get("body") or "{}")
+    except json.JSONDecodeError:
+        return response
+    body["publishable_key"] = get_stripe_publishable_key()
+    return {**response, "body": json.dumps(body)}
 
 
 def get_worksheet(sheet_name):
@@ -96,14 +135,29 @@ def get_section_fields(event_config):
 
     return section_fields
 
+def get_contact_emails(event_meta, resa_email):
+    configured = event_meta.get("contactEmails")
+    if isinstance(configured, list):
+        emails = [str(email).strip() for email in configured if str(email or "").strip()]
+    else:
+        legacy_email = str(event_meta.get("contactEmail") or "").strip()
+        emails = [legacy_email] if legacy_email else []
+
+    return emails or ([resa_email] if resa_email else [])
+
+def get_event_seller_recipients(event_meta, resa_email):
+    return {recipient for recipient in [resa_email, *event_meta.get("contact_emails", [])] if recipient}
+
 def get_event_meta(event_type, event_config, form_data, resa_email):
     event_meta = event_config.get("eventMeta", {})
+    contact_emails = get_contact_emails(event_meta, resa_email)
     return {
         "event_title": event_config.get("title", event_type),
         "date_of_event": event_meta.get("dateOfEvent", ""),
         "location_of_event": event_meta.get("location", ""),
         "end_blurb": event_meta.get("endBlurb", ""),
-        "contact_email": event_meta.get("contactEmail", resa_email),
+        "contact_email": ", ".join(contact_emails),
+        "contact_emails": contact_emails,
         "additional_team_members": form_data.get("teamMembers", [])
     }
 
@@ -196,6 +250,70 @@ def build_motor_show_table(form_data):
     """
 
     return html
+
+
+def build_item_row(name, quantity, value):
+    return f"""
+        <tr style="background-color: #fff;">
+            <td style="padding: 10px; border: 1px solid #ddd; color: #333;">{name}</td>
+            <td style="padding: 10px; border: 1px solid #ddd; color: #333;">{quantity}</td>
+            <td style="padding: 10px; border: 1px solid #ddd; color: #333;">${value:.2f}</td>
+        </tr>
+    """
+
+
+def _positive_int(value):
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def format_motor_show_add_ons(form_data):
+    parts = []
+    combo_size = form_data.get("comboSize")
+    if combo_size:
+        parts.append(f"T-Shirt & Plaque Bundle - {combo_size}")
+    add_ons = [
+        ("additionalPlaques", "Additional Plaque"),
+        ("additionalSmall", "T-Shirt Small"),
+        ("additionalMedium", "T-Shirt Medium"),
+        ("additionalLarge", "T-Shirt Large"),
+        ("additionalXLarge", "T-Shirt XL"),
+        ("additionalXXLarge", "T-Shirt 2XL"),
+        ("additionalXXXLarge", "T-Shirt 3XL"),
+    ]
+    for field, label in add_ons:
+        qty = _positive_int(form_data.get(field))
+        if qty:
+            parts.append(f"{label} x{qty}")
+    return ", ".join(parts)
+
+
+def build_motor_show_items_html(form_data):
+    rows = [build_item_row("Motor Show Entry", 1, 25)]
+
+    combo_size = form_data.get("comboSize")
+    if combo_size:
+        rows.append(build_item_row(f"T-Shirt & Plaque Bundle - {combo_size}", 1, 35))
+
+    add_ons = [
+        ("additionalPlaques", "Additional Plaque", 5),
+        ("additionalSmall", "Additional T-Shirt - Small", 24),
+        ("additionalMedium", "Additional T-Shirt - Medium", 24),
+        ("additionalLarge", "Additional T-Shirt - Large", 24),
+        ("additionalXLarge", "Additional T-Shirt - XLarge", 24),
+        ("additionalXXLarge", "Additional T-Shirt - XXLarge", 26),
+        ("additionalXXXLarge", "Additional T-Shirt - XXXLarge", 26),
+    ]
+
+    for field, label, unit_price in add_ons:
+        quantity = _positive_int(form_data.get(field))
+        if quantity:
+            rows.append(build_item_row(label, quantity, unit_price * quantity))
+
+    return "".join(rows)
+
 
 def build_email_context(event_title, order_id, event_meta, buyer_info, items_html, form_fields_html, participants_table_rows, total_price, purchased_date):
     return {
@@ -293,7 +411,7 @@ def send_vendor_emails_direct(form_data, submission_id):
     resa_email = os.environ.get("RESA_EMAIL")
     sotf_representative = os.environ.get("PO_VENDOR_EMAIL", resa_email)
 
-    purchased_date = datetime.now().strftime("%m/%d/%Y")
+    purchased_date = pacific_display_date()
     buyer_full_name = form_data.get("contactName", "")
     buyer_email = form_data.get("email", "")
 
@@ -339,10 +457,10 @@ def send_vendor_emails_direct(form_data, submission_id):
     print("✅ Non-profit vendor emails sent and DynamoDB submission created")
 
 
-def update_google_sheet(form, name, email, phone, sheet_name):
-    date = datetime.now().strftime("%Y-%m-%d %H:%M")
+def update_google_sheet(form, name, email, phone, sheet_name, add_ons=""):
+    date = pacific_sheet_timestamp()
     worksheet = get_worksheet(sheet_name)
-    worksheet.append_row([form, date, name, email, phone])
+    worksheet.append_row([form, date, name, email, phone, add_ons])
 
 
 def mark_google_processed_submission(submission_id):
@@ -352,7 +470,7 @@ def mark_google_processed_submission(submission_id):
         print(f"⚠️ Submission {submission_id} already processed in Google Sheet")
         return False
 
-    worksheet.append_row([submission_id, datetime.now().strftime("%Y-%m-%d %H:%M")])
+    worksheet.append_row([submission_id, pacific_sheet_timestamp()])
     print(f"✅ Submission {submission_id} marked as processed in Google Sheet")
     return True
 
@@ -509,9 +627,19 @@ def build_stripe_line_items(event):
     return items
 
 
+def get_form_full_name(form_data):
+    explicit_name = form_data.get("fullName") or form_data.get("contactName") or form_data.get("name")
+    if explicit_name:
+        return str(explicit_name).strip()
+
+    first_name = str(form_data.get("firstName") or "").strip()
+    last_name = str(form_data.get("lastName") or "").strip()
+    return " ".join(part for part in (first_name, last_name) if part)
+
+
 def get_stripe_buyer_info(session, form_data):
     customer_email = session.get("customer_email") or form_data.get("email", "")
-    full_name = form_data.get("fullName") or form_data.get("contactName") or form_data.get("name") or customer_email
+    full_name = get_form_full_name(form_data) or customer_email
     name_parts = full_name.split() if full_name else []
     first_name = name_parts[0] if name_parts else "Customer"
     last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
@@ -527,10 +655,11 @@ def format_paypal_date(timestamp):
     if timestamp:
         for date_format in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ"):
             try:
-                return datetime.strptime(timestamp, date_format).strftime("%m/%d/%Y")
+                parsed = datetime.strptime(timestamp, date_format).replace(tzinfo=ZoneInfo("UTC"))
+                return parsed.astimezone(ZoneInfo("America/Los_Angeles")).strftime("%m/%d/%Y")
             except ValueError:
                 pass
-    return datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%m/%d/%Y")
+    return pacific_display_date()
 
 
 def paypal_timestamp_to_iso(timestamp):
@@ -601,6 +730,7 @@ def process_paypal_order_completion(resource, event_create_time=None):
         form_fields_html = email_sender.build_form_fields_html(filtered_form_data)
         participants_table_rows = build_participants_table(clean_form_data)
         if order_type == "Motor Show Event":
+            items_html = build_motor_show_items_html(form_data)
             participants_table_rows = build_motor_show_table(clean_form_data)
 
         purchased_date = format_paypal_date(event_create_time or resource.get("update_time") or resource.get("create_time"))
@@ -632,7 +762,7 @@ def process_paypal_order_completion(resource, event_create_time=None):
             sellers_body = email_sender.format_email(po_email_template, context)
 
             sotf_representative = os.environ.get(f"PO_{order_type.upper()}_EMAIL", resa_email)
-            seller_recipients = {resa_email, event_meta["contact_email"]}
+            seller_recipients = get_event_seller_recipients(event_meta, resa_email)
             if order_type == "Motor Show Event":
                 motor_show_email1 = os.environ.get("PO_MOTOR_SHOW_EMAIL_1")
                 motor_show_email2 = os.environ.get("PO_MOTOR_SHOW_EMAIL_2")
@@ -651,14 +781,15 @@ def process_paypal_order_completion(resource, event_create_time=None):
 
             update_google_sheet(
                 form=email_subject,
-                name=form_data.get("fullName", buyer_info["full_name"]),
+                name=get_form_full_name(form_data) or buyer_info["full_name"],
                 email=form_data.get("email", buyer_info["email"]),
                 phone=form_data.get("phone", ""),
                 sheet_name="Event Submissions",
+                add_ons=format_motor_show_add_ons(form_data) if order_type == "Motor Show Event" else "",
             )
             create_submission_record(
                 form=email_subject,
-                name=form_data.get("fullName", buyer_info["full_name"]),
+                name=get_form_full_name(form_data) or buyer_info["full_name"],
                 email=form_data.get("email", buyer_info["email"]),
                 phone=form_data.get("phone", ''),
                 source=order_type,
@@ -691,6 +822,82 @@ def stripe_items_to_email_html(email_sender, stripe_service, session_id):
     except Exception as e:
         print(f"❌ Failed to build Stripe items HTML: {e}")
         return ""
+
+
+def process_free_event_signup(form_data, submission_id=None):
+    submission_id = submission_id or uuid.uuid4().hex[:12]
+    event_type = form_data.get("type", "dynamic_event")
+    resa_email = os.environ.get("RESA_EMAIL")
+    event_config = get_event_config(event_type)
+    event_meta = get_event_meta(event_type, event_config, form_data, resa_email)
+    email_sender = EmailSender()
+
+    full_name = get_form_full_name(form_data) or form_data.get("email", "Customer")
+    name_parts = full_name.split()
+    buyer_info = {
+        "email": form_data.get("email", ""),
+        "first_name": name_parts[0] if name_parts else "Customer",
+        "last_name": " ".join(name_parts[1:]) if len(name_parts) > 1 else "",
+        "full_name": full_name,
+    }
+
+    allowed_fields = get_section_fields(event_config)
+    filtered_form_data = {k: v for k, v in form_data.items() if k in allowed_fields}
+    excluded_fields = {
+        "action", "type", "eventTitle", "paymentMethod", "grandTotal",
+        "pricing", "addOns", "players", "tSignHoleSponsor"
+    }
+    clean_form_data = {k: v for k, v in form_data.items() if k not in excluded_fields}
+
+    items_html = """
+        <tr style="background-color: #fff;">
+            <td style="padding: 10px; border: 1px solid #ddd; color: #333;">No payment required</td>
+            <td style="padding: 10px; border: 1px solid #ddd; color: #333;">1</td>
+            <td style="padding: 10px; border: 1px solid #ddd; color: #333;">$0.00</td>
+        </tr>
+    """
+    form_fields_html = email_sender.build_form_fields_html(filtered_form_data)
+    participants_table_rows = build_participants_table(clean_form_data)
+    purchased_date = pacific_display_date()
+    submitted_at = pacific_now_iso()
+
+    context_data = build_email_context(
+        event_meta["event_title"], submission_id, event_meta, buyer_info,
+        items_html, form_fields_html, participants_table_rows, "0.00", purchased_date
+    )
+
+    buyers_body = email_sender.format_email("emails/buyer__receipt.html", context_data)
+    sellers_body = email_sender.format_email("emails/seller__po.html", context_data)
+    sotf_representative = os.environ.get(f"PO_{event_type.upper()}_EMAIL", resa_email)
+    seller_recipients = get_event_seller_recipients(event_meta, resa_email)
+    email_subject = f"{event_meta['event_title']} Signup"
+
+    if buyer_info["email"]:
+        email_sender.send_email(body=buyers_body, subject=email_subject, mail_to=buyer_info["email"], mail_from=sotf_representative)
+    for recipient in seller_recipients:
+        if recipient:
+            email_sender.send_email(body=sellers_body, subject=email_subject, mail_to=recipient, mail_from=sotf_representative)
+
+    update_google_sheet(
+        form=email_subject,
+        name=full_name,
+        email=form_data.get("email", ""),
+        phone=form_data.get("phone", ""),
+        sheet_name="Event Submissions",
+    )
+    create_submission_record(
+        form=email_subject,
+        name=full_name,
+        email=form_data.get("email", ""),
+        phone=form_data.get("phone", ""),
+        source=event_type,
+        raw_data={**form_data, "submission_id": submission_id},
+        payment_status="none",
+        payment_provider="none",
+        amount=0,
+        submitted_at=submitted_at,
+    )
+    return {"status": "submitted", "submission_id": submission_id}
 
 
 def store_dynamic_submission(event, submission_id):
@@ -788,9 +995,13 @@ def lambda_handler(event, context):
         response_body = {}
         order_details = None
 
+        if "action" in event and event["action"] == "processFreeEventSignup":
+            response_code = 200
+            response_body = process_free_event_signup(event)
+
         # 4005 5192 0000 0004
         # Paypal - json for creating a paypal session
-        if "action" in event and event['action'] == 'createOrder':
+        elif "action" in event and event['action'] == 'createOrder':
             print("🔥 CREATE ORDER EVENT:")
             print(json.dumps(event, indent=2))
             print("create order action received")
@@ -963,7 +1174,7 @@ def lambda_handler(event, context):
         # Stripe - create checkout session (generic for any event type)
         elif "action" in event and event['action'] in ('createStripeSession', 'createStripeEmbeddedSession'):
             return_url = os.environ['RETURN_URL']
-            stripe_api_key = os.environ['STRIPE_API_KEY']
+            stripe_api_key = get_stripe_secret_key()
             stripe_service = StripeOrderService(stripe_api_key)
 
             event_type = event.get('type', 'general_order')
@@ -995,21 +1206,25 @@ def lambda_handler(event, context):
             metadata_event_type = display_type_map.get(event_type, event_type)
 
             if event['action'] == 'createStripeEmbeddedSession':
-                return stripe_service.create_embedded_checkout_session(
+                return attach_stripe_publishable_key(
+                    stripe_service.create_embedded_checkout_session(
+                        event_type=metadata_event_type,
+                        submission_id=submission_id,
+                        line_items=line_items,
+                        customer_email=customer_email,
+                        return_base_url=return_url
+                    )
+                )
+
+            return attach_stripe_publishable_key(
+                stripe_service.create_checkout_session(
                     event_type=metadata_event_type,
                     submission_id=submission_id,
                     line_items=line_items,
                     customer_email=customer_email,
-                    return_base_url=return_url
+                    return_base_url=return_url,
+                    cancel_path=cancel_path
                 )
-
-            return stripe_service.create_checkout_session(
-                event_type=metadata_event_type,
-                submission_id=submission_id,
-                line_items=line_items,
-                customer_email=customer_email,
-                return_base_url=return_url,
-                cancel_path=cancel_path
             )
 
         # Stripe - webhook handler (generic for any event type, mirrors PayPal webhook)
@@ -1017,7 +1232,7 @@ def lambda_handler(event, context):
             claim_acquired = False
             claimed_submission_id = None
             try:
-                endpoint_secret = os.environ['WEBHOOK_SECRET']
+                endpoint_secret = get_stripe_webhook_secret()
                 # construct_event verifies the signature — use return value only for that;
                 # access data from the already-parsed dict to avoid SDK object .get() issues
                 stripe.Webhook.construct_event(
@@ -1051,7 +1266,7 @@ def lambda_handler(event, context):
                 submission_payload = lookup_dynamic_submission(submission_id)
                 form_data = submission_payload.get("formData", {})
 
-                stripe_api_key = os.environ['STRIPE_API_KEY']
+                stripe_api_key = get_stripe_secret_key()
                 stripe_service = StripeOrderService(stripe_api_key)
 
                 buyer_info = get_stripe_buyer_info(session, form_data)
@@ -1080,6 +1295,7 @@ def lambda_handler(event, context):
                 form_fields_html = email_sender.build_form_fields_html(filtered_form_data)
                 participants_table_rows = build_participants_table(clean_form_data)
                 if event_type in ("Motor Show Event", "motorShowOrder"):
+                    items_html = build_motor_show_items_html(form_data)
                     participants_table_rows = build_motor_show_table(clean_form_data)
 
                 context_data = build_email_context(
@@ -1103,7 +1319,7 @@ def lambda_handler(event, context):
                     buyers_body = email_sender.format_email("emails/buyer__receipt.html", context_data)
                     sellers_body = email_sender.format_email("emails/seller__po.html", context_data)
                     sotf_representative = os.environ.get(f"PO_{event_type.upper()}_EMAIL", resa_email)
-                    seller_recipients = {resa_email, event_meta["contact_email"]}
+                    seller_recipients = get_event_seller_recipients(event_meta, resa_email)
                     if event_type == "motorShowOrder":
                         motor_show_email1 = os.environ.get("PO_MOTOR_SHOW_EMAIL_1")
                         motor_show_email2 = os.environ.get("PO_MOTOR_SHOW_EMAIL_2")
@@ -1119,16 +1335,18 @@ def lambda_handler(event, context):
                         else:
                             email_sender.send_email(body=sellers_body, subject=email_subject, mail_to=recipient, mail_from=sotf_representative)
 
+                sheet_form_name = "Motor Show Event Order" if event_type == "motorShowOrder" else email_subject
                 update_google_sheet(
-                    form=email_subject,
-                    name=form_data.get("fullName", buyer_info["full_name"]),
+                    form=sheet_form_name,
+                    name=get_form_full_name(form_data) or buyer_info["full_name"],
                     email=form_data.get("email", buyer_info["email"]),
                     phone=form_data.get("phone", ""),
                     sheet_name="Event Submissions",
+                    add_ons=format_motor_show_add_ons(form_data) if event_type in ("Motor Show Event", "motorShowOrder") else "",
                 )
                 create_submission_record(
                     form=email_subject,
-                    name=form_data.get("fullName", buyer_info["full_name"]),
+                    name=get_form_full_name(form_data) or buyer_info["full_name"],
                     email=form_data.get("email", buyer_info["email"]),
                     phone=form_data.get("phone", ""),
                     source=event_type,

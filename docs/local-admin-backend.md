@@ -16,6 +16,22 @@ For local admin login, set:
 export ADMIN_PASSWORD=admin
 ```
 
+For local Stripe checkout, use the test secret key that matches `environment.local.ts`:
+
+```bash
+export STRIPE_API_KEY="$(aws lambda get-function-configuration \
+  --region us-west-2 \
+  --function-name dev_create_order \
+  --query 'Environment.Variables.STRIPE_API_KEY' \
+  --output text)"
+export PDFSHIFTAPIKEY="$(aws lambda get-function-configuration \
+  --region us-west-2 \
+  --function-name dev_create_order \
+  --query 'Environment.Variables.PDFSHIFTAPIKEY' \
+  --output text)"
+export RETURN_URL=http://localhost:4200
+```
+
 To also append test rows to a Google Sheet, use a non-production sheet and set:
 
 ```bash

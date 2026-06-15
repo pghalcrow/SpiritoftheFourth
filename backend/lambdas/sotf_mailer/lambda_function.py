@@ -1,7 +1,5 @@
 import base64
 import pathlib
-from datetime import datetime
-import pytz
 import smtplib
 import os
 import json
@@ -15,9 +13,22 @@ from botocore.exceptions import ClientError
 import requests
 from backend.shared.submissions_mapping import map_live_submission
 from backend.shared.submissions_repository import SubmissionsRepository
+from backend.shared.runtime_mode import is_test_mode, test_mode_email
+from backend.shared.time_utils import pacific_display_date, pacific_sheet_timestamp
 
 def get_submissions_repository():
     return SubmissionsRepository()
+
+
+def cors_headers(event=None):
+    headers = (event or {}).get("headers", {}) or {}
+    origin = headers.get("Origin") or headers.get("origin") or "*"
+    return {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "POST,OPTIONS",
+    }
 
 
 def update_google_sheet(form, name, email, phone):
@@ -25,7 +36,7 @@ def update_google_sheet(form, name, email, phone):
 
     credentials_path = os.environ.get("GOOGLE_SHEET_CREDENTIALS", "creds-sa.json")
     form_name = os.environ.get("GOOGLE_SHEET_NAME", "Forms Submissions")
-    date = datetime.now().strftime("%Y-%m-%d %H:%M")
+    date = pacific_sheet_timestamp()
     gc = gspread.service_account(credentials_path)
     sheet = gc.open(form_name)
     sheet.sheet1.append_row([form, date, name, email, phone])
@@ -96,6 +107,9 @@ def resolve_email_recipients(mail_to, extra_recipients=None):
     for email in extra_recipients or []:
         if email and email.strip():
             original_recipients.append(email.strip())
+
+    if is_test_mode():
+        override_to = test_mode_email()
 
     if override_to:
         return {
@@ -284,13 +298,18 @@ def send_vender_email(host, port, username, password, subject, attachments, mail
 
 
 def lambda_handler(event, context):
+    if event.get("requestContext", {}).get("http", {}).get("method") == "OPTIONS" or event.get("httpMethod") == "OPTIONS":
+        return {
+            "isBase64Encoded": False,
+            "statusCode": 204,
+            "headers": cors_headers(event),
+            "body": "",
+        }
 
     event_body = json.loads(event['body'])
     response = {
         "isBase64Encoded": False,
-        "headers": {
-            "Content-Type": "application/json"
-        }
+        "headers": cors_headers(event),
     }
     if 'getSignedURLs' in event_body and event_body['getSignedURLs']:
         s3_client = boto3.client('s3')
@@ -334,10 +353,7 @@ def lambda_handler(event, context):
             special_requests = event_body['specialRequests']
             signer_name = event_body['signatureName']
 
-            pacific = pytz.timezone("America/Los_Angeles")
-            now_pacific = datetime.now(pacific)
-            formatted_date = now_pacific.strftime("%m/%d/%Y")
-            date = formatted_date
+            date = pacific_display_date()
 
             vendor_prices = {
                 "Non-Profit": 0,

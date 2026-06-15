@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, Subscription, forkJoin, map } from 'rxjs';
+import { Observable, forkJoin, map, switchMap } from 'rxjs';
 import { environment } from 'src/environments/environment';
 
 @Injectable({
@@ -24,29 +24,21 @@ export class FileServerService {
 
   }
 
-  postFiles(files: File[]): Observable<any>{
-    
+  postFiles(files: File[]): Observable<string>{
 
     let fileNames = files.map(x => x.name)
 
-    return this.getPresignedURLs(fileNames).pipe(map(results => {
+    return this.getPresignedURLs(fileNames).pipe(switchMap(results => {
       var tasks: Observable<any>[] = []
       files.forEach(sendFile => {
         let item = results['signedURLs'][sendFile.name]
         let url = item['url']
-        let key = item['fields']['key']
-        let securityToken = item['fields']['x-amz-security-token']
-        let policy = item['fields']['policy']
-        let signature = item['fields']['signature']
-        let accessKey = item['fields']['AWSAccessKeyId']
 
         const formData: FormData = new FormData()
 
-        formData.append('key', key)
-        formData.append('AWSAccessKeyId', accessKey)
-        formData.append('x-amz-security-token', securityToken)
-        formData.append('policy', policy)
-        formData.append('signature', signature)
+        Object.entries(item['fields']).forEach(([key, value]) => {
+          formData.append(key, String(value))
+        })
         formData.append('file', sendFile, sendFile.name);
         tasks.push(this.httpClient.post<any>(url, formData))
       })

@@ -1,10 +1,11 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from 'src/environments/environment';
 import { FormGroup } from '@angular/forms';
 
 export interface EventPricing {
+  pricingMode?: 'free' | 'fixed' | 'perParticipant';
   basePlayerField: string;
   includePrimaryPlayer: boolean;
   pricePerPlayer: number;
@@ -19,6 +20,7 @@ export interface EventMeta {
   location: string;
   endBlurb: string;
   contactEmail: string;
+  contactEmails?: string[];
 }
 
 export interface Event {
@@ -26,6 +28,7 @@ export interface Event {
   type: string;
   flyerUrl: string;
   description: string;
+  isVisible?: boolean;
   eventMeta: EventMeta;
   pricing: EventPricing;
   formFields: any[];
@@ -36,11 +39,13 @@ export interface Event {
 
 export interface CmsEvent extends Event {
   selectedFile?: File;
+  selectedFilePreviewUrl?: string;
 }
 
 export interface AdminLoginResponse {
   success: boolean;
   token?: string;
+  role?: 'admin' | 'developer';
 }
 
 export interface AdminSubmission {
@@ -71,6 +76,18 @@ export interface AdminSubmissionUpdate {
   notes: string;
 }
 
+export interface AdminSubmissionDeleteResponse {
+  success: boolean;
+  submissionId: string;
+}
+
+export interface AdminTestModeResponse {
+  testMode: boolean;
+  updatedBy?: string;
+  updatedAt?: string;
+  localOnly?: boolean;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -82,7 +99,15 @@ export class CmsService {
 
   /** Fetch events from CMS */
   getEvents(): Observable<{ events: Event[] }> {
-    return this.http.get<{ events: Event[] }>(`${this.baseUrl}${this.routes.events}`);
+    return this.http.get<{ events: Event[] }>(
+      `${this.baseUrl}${this.routes.events}?_=${Date.now()}`,
+      {
+        headers: new HttpHeaders({
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        }),
+      }
+    );
   }
 
   updateEvents(events: Event[]): Observable<{ success: boolean }> {
@@ -110,6 +135,31 @@ export class CmsService {
     return this.http.patch<AdminSubmission>(
       `${this.baseUrl}${this.routes.submissions}/${submissionId}`,
       update,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  }
+
+  deleteSubmission(submissionId: string): Observable<AdminSubmissionDeleteResponse> {
+    const token = sessionStorage.getItem('adminToken');
+    return this.http.delete<AdminSubmissionDeleteResponse>(
+      `${this.baseUrl}${this.routes.submissions}/${submissionId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  }
+
+  getTestMode(): Observable<AdminTestModeResponse> {
+    const token = sessionStorage.getItem('adminToken');
+    return this.http.get<AdminTestModeResponse>(
+      `${this.baseUrl}${this.routes.testMode}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  }
+
+  updateTestMode(enabled: boolean): Observable<AdminTestModeResponse> {
+    const token = sessionStorage.getItem('adminToken');
+    return this.http.patch<AdminTestModeResponse>(
+      `${this.baseUrl}${this.routes.testMode}`,
+      { enabled },
       { headers: { Authorization: `Bearer ${token}` } }
     );
   }

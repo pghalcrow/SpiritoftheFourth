@@ -35,6 +35,53 @@ export class EmailUtlity {
         <td style="padding: 12px 14px; border-bottom: 1px solid #e7edf5; color: #182536; font-size: 15px; line-height: 1.45;">${value}</td>
       </tr>`
   }
+  static adminSummaryRow(label: string, value: any): string {
+    return this.volunteerSummaryRow(this.escapeHtml(label), value)
+  }
+  static emailLink(value: any): string {
+    const email = this.escapeHtml(value)
+    return `<a href="mailto:${email}" style="color: #1f5f9f; text-decoration: none; font-weight: 700;">${email}</a>`
+  }
+  static phoneLink(value: any): string {
+    const phone = this.escapeHtml(value)
+    const phoneHref = this.escapeHtml(String(value ?? "").replace(/\D/g, ''))
+    return `<a href="tel:${phoneHref}" style="color: #1f5f9f; text-decoration: none; font-weight: 700;">${phone}</a>`
+  }
+  static formattedAddress(form: FormGroup): string {
+    return [
+      form.get("streetAddress")?.value,
+      form.get("city")?.value,
+      form.get("state")?.value,
+      form.get("zipcode")?.value,
+    ].filter(Boolean).join(", ").replace(", CA, ", ", CA ")
+  }
+  static normalizedAdminEmail(title: string, eyebrow: string, intro: string, rows: Array<[string, any]>): string {
+    const rowHtml = rows
+      .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+      .map(([label, value]) => this.adminSummaryRow(label, value))
+      .join("")
+
+    return `<!doctype html>
+<html>
+  <body style="margin: 0; padding: 0; background: #f4f7fb; font-family: Georgia, 'Times New Roman', serif; color: #182536;">
+    <div style="max-width: 680px; margin: 0 auto; padding: 28px 16px;">
+      <div style="background: #ffffff; border: 1px solid #dce6f2; border-radius: 10px; overflow: hidden;">
+        <div style="background: #102b46; padding: 24px 28px;">
+          <div style="color: #f5c84c; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;">${this.escapeHtml(eyebrow)}</div>
+          <h1 style="margin: 8px 0 0; color: #ffffff; font-size: 28px; line-height: 1.2;">${this.escapeHtml(title)}</h1>
+        </div>
+        <div style="padding: 24px 28px 8px;">
+          <p style="margin: 0 0 18px; color: #526174; font-size: 16px; line-height: 1.55;">${this.escapeHtml(intro)}</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; border: 1px solid #e7edf5; border-radius: 8px; overflow: hidden;">
+            ${rowHtml}
+          </table>
+        </div>
+        <div style="padding: 16px 28px 24px; color: #7b8797; font-size: 13px; line-height: 1.5;">Reply directly to this email to contact the submitter.</div>
+      </div>
+    </div>
+  </body>
+</html>`
+  }
 
   static createVendorApplicationHTMLBody(vendorApplicationForm: FormGroup): string {
     let contentString = ""
@@ -55,84 +102,92 @@ export class EmailUtlity {
   }
 
   static createVIPEntryHTMLBody(form: FormGroup) {
-    let contentString = ""
-
-    contentString += this.makeField("VIP Name", [form.get("vipName")!.value])
-
-
-    contentString += this.makeField("Contact Name", [form.get("contactName")!.value])
-    contentString += this.makeField("Email", [form.get("email")!.value])
-    contentString += this.makePhoneLink("Phone", form.get("phone")!.value)
-    contentString += this.makeField("Address", [form.get("streetAddress")!.value, form.get("city")!.value + ",", form.get("state")!.value, form.get("zipcode")!.value])
-
-    contentString += this.makeField("Parade Announcement", [form.get("paradeAnnouncement")!.value])
-    contentString += this.makeField("Providing Own Car", [form.get("vipOwnCar")!.value])
+    const rows: Array<[string, any]> = [
+      ["VIP Name", this.escapeHtml(form.get("vipName")!.value)],
+      ["Contact Name", this.escapeHtml(form.get("contactName")!.value)],
+      ["Email", this.emailLink(form.get("email")!.value)],
+      ["Phone", this.phoneLink(form.get("phone")!.value)],
+      ["Address", this.escapeHtml(this.formattedAddress(form))],
+      ["Parade Announcement", this.escapeHtml(form.get("paradeAnnouncement")!.value)],
+      ["Providing Own Car", this.escapeHtml(form.get("vipOwnCar")!.value)],
+    ]
 
     if (form.get("vipOwnCar")!.value == 'Yes') {
-      contentString += this.makeField("Drivers Name", [form.get("driversName")!.value])
-      contentString += this.makeField("Drivers Email", [form.get("driversEmail")!.value])
-      contentString += this.makePhoneLink("Drivers Phone", form.get("driversPhone")!.value)
-      contentString += this.makeField("Car Details", [form.get("year")!.value, form.get("make")!.value, form.get("model")!.value + ",", form.get("color")!.value])
+      rows.push(
+        ["Driver Name", this.escapeHtml(form.get("driversName")!.value)],
+        ["Driver Email", this.emailLink(form.get("driversEmail")!.value)],
+        ["Driver Phone", this.phoneLink(form.get("driversPhone")!.value)],
+        ["Car Details", this.escapeHtml(`${form.get("year")!.value} ${form.get("make")!.value} ${form.get("model")!.value}, ${form.get("color")!.value}`)]
+      )
     }
 
-    contentString += this.makePhoneLink("Consenters Name", form.get("signatureName")!.value)
+    rows.push(["Signature Name", this.escapeHtml(form.get("signatureName")!.value)])
 
-    return this.htmlBegin + contentString + this.htmlEnd
+    return this.normalizedAdminEmail(
+      "Parade VIP Entry Request",
+      "New parade VIP entry",
+      "A new VIP entry request was submitted from the Spirit of the Fourth website.",
+      rows
+    )
   }
 
 
   static createCarEntryHTMLBody(form: FormGroup) {
-    let contentString = ""
-
-    contentString += this.makeField("Contact Name", [form.get("contactName")!.value])
-    contentString += this.makeField("Email", [form.get("email")!.value])
-    contentString += this.makePhoneLink("Phone", form.get("phone")!.value)
-    contentString += this.makeField("Address", [form.get("streetAddress")!.value, form.get("city")!.value + ",", form.get("state")!.value, form.get("zipcode")!.value])
-
-    contentString += this.makeField("Car Details", [form.get("year")!.value, form.get("make")!.value, form.get("model")!.value + ",", form.get("color")!.value])
-    contentString += this.makeField("Available VIP Seats", [form.get("availableSeats")!.value])
-    contentString += this.makeField("Special Information", [form.get("description")!.value])
-    contentString += this.makePhoneLink("Appreciation Gift?", form.get("wantGift")!.value)
-
-    contentString += this.makePhoneLink("Consenters Name", form.get("signatureName")!.value)
-
-
-    return this.htmlBegin + contentString + this.htmlEnd
+    return this.normalizedAdminEmail(
+      "Parade Car Entry Request",
+      "New parade car entry",
+      "A new parade car entry request was submitted from the Spirit of the Fourth website.",
+      [
+        ["Contact Name", this.escapeHtml(form.get("contactName")!.value)],
+        ["Email", this.emailLink(form.get("email")!.value)],
+        ["Phone", this.phoneLink(form.get("phone")!.value)],
+        ["Address", this.escapeHtml(this.formattedAddress(form))],
+        ["Car Details", this.escapeHtml(`${form.get("year")!.value} ${form.get("make")!.value} ${form.get("model")!.value}, ${form.get("color")!.value}`)],
+        ["Available VIP Seats", this.escapeHtml(form.get("availableSeats")!.value)],
+        ["Special Information", this.escapeHtml(form.get("description")!.value)],
+        ["Appreciation Gift", this.escapeHtml(form.get("wantGift")!.value)],
+        ["Signature Name", this.escapeHtml(form.get("signatureName")!.value)],
+      ]
+    )
   }
 
 
   static createParadeEntryHTMLBody(paradeEntryForm: FormGroup): string {
-    let contentString = ""
-
-    contentString += this.makeField("Name of Entry", [paradeEntryForm.get("entryName")!.value])
-
-    contentString += this.makeField("Contact Name", [paradeEntryForm.get("contactName")!.value])
-    contentString += this.makeField("Email", [paradeEntryForm.get("email")!.value])
-    contentString += this.makePhoneLink("Phone", paradeEntryForm.get("phone")!.value)
-    contentString += this.makeField("Address", [paradeEntryForm.get("streetAddress")!.value, paradeEntryForm.get("city")!.value + ",", paradeEntryForm.get("state")!.value, paradeEntryForm.get("zipcode")!.value])
-
-    contentString += this.makeField("Description", [paradeEntryForm.get("description")!.value])
-    contentString += this.makeField("Parade Announcement", [paradeEntryForm.get("paradeAnnouncement")!.value])
-    contentString += this.makePhoneLink("Appreciation Gift?", paradeEntryForm.get("wantGift")!.value)
-    contentString += this.makePhoneLink("Entry Type", paradeEntryForm.get("entryType")!.value)
-
-    contentString += this.makePhoneLink("Consenters Name", paradeEntryForm.get("signatureName")!.value)
-
-    return this.htmlBegin + contentString + this.htmlEnd
+    return this.normalizedAdminEmail(
+      "Parade Entry Request",
+      "New parade entry",
+      "A new parade entry request was submitted from the Spirit of the Fourth website.",
+      [
+        ["Name of Entry", this.escapeHtml(paradeEntryForm.get("entryName")!.value)],
+        ["Contact Name", this.escapeHtml(paradeEntryForm.get("contactName")!.value)],
+        ["Email", this.emailLink(paradeEntryForm.get("email")!.value)],
+        ["Phone", this.phoneLink(paradeEntryForm.get("phone")!.value)],
+        ["Address", this.escapeHtml(this.formattedAddress(paradeEntryForm))],
+        ["Description", this.escapeHtml(paradeEntryForm.get("description")!.value)],
+        ["Parade Announcement", this.escapeHtml(paradeEntryForm.get("paradeAnnouncement")!.value)],
+        ["Appreciation Gift", this.escapeHtml(paradeEntryForm.get("wantGift")!.value)],
+        ["Entry Type", this.escapeHtml(paradeEntryForm.get("entryType")!.value)],
+        ["Signature Name", this.escapeHtml(paradeEntryForm.get("signatureName")!.value)],
+      ]
+    )
   }
   static createSponsorshipHTMLBody(sponsorshipForm: FormGroup): string {
-
-    let contentString = ""
-
-    contentString += this.makeField("Contact Name", [sponsorshipForm.get("contactName")!.value])
-    contentString += this.makeField("Contact Title", [sponsorshipForm.get("contactTitle")!.value])
-    contentString += this.makeField("Company", [sponsorshipForm.get("companyName")!.value])
-    contentString += this.makeFieldLink("Website", sponsorshipForm.get("website")!.value)
-    contentString += this.makeField("Email", [sponsorshipForm.get("email")!.value])
-    contentString += this.makePhoneLink("Phone", sponsorshipForm.get("phone")!.value)
-    contentString += this.makeField("Address", [sponsorshipForm.get("streetAddress")!.value, sponsorshipForm.get("city")!.value + ",", sponsorshipForm.get("state")!.value, sponsorshipForm.get("zipcode")!.value])
-
-    return this.htmlBegin + contentString + this.htmlEnd
+    const website = this.escapeHtml(sponsorshipForm.get("website")!.value)
+    return this.normalizedAdminEmail(
+      "Sponsorship Submission",
+      "New sponsorship submission",
+      "A new sponsorship submission was received from the Spirit of the Fourth website.",
+      [
+        ["Contact Name", this.escapeHtml(sponsorshipForm.get("contactName")!.value)],
+        ["Contact Title", this.escapeHtml(sponsorshipForm.get("contactTitle")!.value)],
+        ["Company", this.escapeHtml(sponsorshipForm.get("companyName")!.value)],
+        ["Sponsorship Level", this.escapeHtml(sponsorshipForm.get("sponsorshipLevel")!.value)],
+        ["Website", `<a target="_blank" href="${website}" style="color: #1f5f9f; text-decoration: none; font-weight: 700;">${website}</a>`],
+        ["Email", this.emailLink(sponsorshipForm.get("email")!.value)],
+        ["Phone", this.phoneLink(sponsorshipForm.get("phone")!.value)],
+        ["Address", this.escapeHtml(this.formattedAddress(sponsorshipForm))],
+      ]
+    )
   }
 
   static createCarShowHTMLBody(carShowForm: FormGroup): string {
@@ -171,41 +226,26 @@ export class EmailUtlity {
     rows += this.volunteerSummaryRow("Availability", availability)
     rows += this.volunteerSummaryRow("Message", message)
 
-    return `<!doctype html>
-<html>
-  <body style="margin: 0; padding: 0; background: #f4f7fb; font-family: Georgia, 'Times New Roman', serif; color: #182536;">
-    <div style="max-width: 680px; margin: 0 auto; padding: 28px 16px;">
-      <div style="background: #ffffff; border: 1px solid #dce6f2; border-radius: 10px; overflow: hidden;">
-        <div style="background: #102b46; padding: 24px 28px;">
-          <div style="color: #f5c84c; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;">New volunteer signup</div>
-          <h1 style="margin: 8px 0 0; color: #ffffff; font-size: 28px; line-height: 1.2;">Volunteer Request</h1>
-        </div>
-        <div style="padding: 24px 28px 8px;">
-          <p style="margin: 0 0 18px; color: #526174; font-size: 16px; line-height: 1.55;">A new volunteer request was submitted from the Spirit of the Fourth website.</p>
-          <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; border: 1px solid #e7edf5; border-radius: 8px; overflow: hidden;">
-            ${rows}
-          </table>
-        </div>
-        <div style="padding: 16px 28px 24px; color: #7b8797; font-size: 13px; line-height: 1.5;">Reply directly to this email to contact the volunteer.</div>
-      </div>
-    </div>
-  </body>
-</html>`
+    return this.normalizedAdminEmail(
+      "Volunteer Request",
+      "New volunteer signup",
+      "A new volunteer request was submitted from the Spirit of the Fourth website.",
+      []
+    ).replace("</table>", `${rows}</table>`).replace("Reply directly to this email to contact the submitter.", "Reply directly to this email to contact the volunteer.")
   }
 
   static createArtistFormHTMLBody(artistForm: FormGroup): string {
-    let contentString = "";
-
-    contentString += this.makeField("Contact Name", [artistForm.get("contactName")!.value]);
-
-    if (artistForm.get("organizationName")?.value) {
-      contentString += this.makeField("Organization", [artistForm.get("organizationName")!.value]);
-    }
-
-    contentString += this.makeField("Email", [artistForm.get("email")!.value]);
-    contentString += this.makePhoneLink("Phone", artistForm.get("phone")!.value);
-    contentString += this.makeField("Message", [artistForm.get("message")?.value || ""]);
-
-    return this.htmlBegin + contentString + this.htmlEnd;
+    return this.normalizedAdminEmail(
+      "Artist Sign-Up",
+      "New artist sign-up",
+      "A new artist sign-up was submitted from the Spirit of the Fourth website.",
+      [
+        ["Contact Name", this.escapeHtml(artistForm.get("contactName")!.value)],
+        ["Organization", this.escapeHtml(artistForm.get("organizationName")?.value || "")],
+        ["Email", this.emailLink(artistForm.get("email")!.value)],
+        ["Phone", this.phoneLink(artistForm.get("phone")!.value)],
+        ["Message", this.escapeHtml(artistForm.get("message")?.value || "").replace(/\n/g, "<br>")],
+      ]
+    )
   }
 }

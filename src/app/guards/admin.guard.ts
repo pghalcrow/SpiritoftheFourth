@@ -9,13 +9,16 @@ export class AdminGuard implements CanActivate {
   constructor(private router: Router) {}
 
   canActivate(): boolean {
+    const token = sessionStorage.getItem('adminToken');
     if (!environment.production) {
-      sessionStorage.setItem('adminToken', 'cms-admin-token');
+      if (token !== 'cms-admin-token' && token !== 'cms-developer-token') {
+        sessionStorage.setItem('adminToken', 'cms-admin-token');
+        sessionStorage.setItem('adminRole', 'admin');
+      }
       return true;
     }
 
-    const token = sessionStorage.getItem('adminToken');
-    if (token === 'cms-admin-token') {
+    if (token === 'cms-admin-token' || token === 'cms-developer-token') {
       return true;
     }
     this.router.navigate(['/sign-in']);

@@ -2,7 +2,7 @@
   <header class="admin-toolbar">
     <div>
       <p class="eyebrow">CMS Editor</p>
-      <h1>Upcoming Events</h1>
+      <h1>{{ adminHeaderTitle }}</h1>
     </div>
 
     <div class="toolbar-actions">
@@ -11,6 +11,7 @@
           type="button"
           class="section-button"
           [class.active]="adminSection === 'events'"
+          data-testid="admin-section-events"
           (click)="selectAdminSection('events')"
         >
           Events
@@ -25,11 +26,40 @@
           Submissions
         </button>
       </div>
-      <button *ngIf="adminSection === 'events'" type="button" class="action-button secondary" (click)="addEvent()">Add Event</button>
-      <button *ngIf="adminSection === 'events'" type="button" class="action-button primary" (click)="saveEvents()">Save Changes</button>
       <button type="button" class="action-button ghost" (click)="logout()">Logout</button>
+      <div class="event-toolbar-actions">
+        <ng-container *ngIf="adminSection === 'events'">
+          <button type="button" class="action-button secondary" (click)="addEvent()">Add Event</button>
+          <button type="button" class="action-button primary" (click)="saveEvents()">Save Changes</button>
+        </ng-container>
+      </div>
     </div>
   </header>
+
+  <section *ngIf="isDeveloper" class="developer-panel" data-testid="developer-test-mode">
+    <div>
+      <p class="eyebrow">Developer Controls</p>
+      <h2>{{ testModeLabel }}</h2>
+      <p class="developer-panel-note">
+        <ng-container *ngIf="testModeLocalOnly; else liveTestModeCopy">
+          Localhost always runs in test mode. This control is available only on the live site.
+        </ng-container>
+        <ng-template #liveTestModeCopy>
+          Test mode routes outbound notification emails to pghalcrow@gmail.com and uses Stripe test keys.
+        </ng-template>
+      </p>
+    </div>
+    <label class="test-mode-toggle">
+      <span>Enable Test Mode</span>
+      <input
+        type="checkbox"
+        data-testid="toggle-test-mode"
+        [checked]="testMode"
+        [disabled]="testModeLoading || testModeLocalOnly"
+        (change)="toggleTestMode($any($event.target).checked)"
+      />
+    </label>
+  </section>
 
   <ng-container *ngIf="adminSection === 'events'">
     <nav *ngIf="events.length" class="event-tabs" aria-label="Events">
@@ -70,22 +100,34 @@
               [(ngModel)]="cmsEvent.title"
               (ngModelChange)="cmsEvent.type = toCamelCase($event)"
               placeholder="Event title"
+              required
             />
           </label>
 
           <div class="control-group span-full">
             <span>Flyer Image</span>
             <div class="upload-panel">
-              <img
-                *ngIf="cmsEvent.flyerUrl"
-                [src]="getFlyerSrc(cmsEvent.flyerUrl)"
-                alt="{{ cmsEvent.title }} flyer"
-                class="flyer-img"
-              />
+              <div *ngIf="hasEventImage(cmsEvent); else imagePicker" class="selected-image-panel">
+                <img
+                  [src]="getEventImagePreviewSrc(cmsEvent)"
+                  alt="{{ cmsEvent.title }} flyer"
+                  class="flyer-img"
+                />
+                <button
+                  type="button"
+                  class="action-button secondary"
+                  data-testid="remove-event-image"
+                  (click)="removeEventImage(cmsEvent)"
+                >
+                  Remove Image
+                </button>
+              </div>
+              <ng-template #imagePicker>
               <label class="file-picker">
                 <span>Choose Image</span>
-                <input type="file" (change)="onFileSelected($event, cmsEvent)" accept="image/*" />
+                <input type="file" (change)="onFileSelected($event, cmsEvent)" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" />
               </label>
+              </ng-template>
             </div>
           </div>
 
@@ -97,6 +139,16 @@
               placeholder="Event description"
               rows="4"
             ></textarea>
+          </label>
+
+          <label class="visibility-toggle span-full">
+            <input
+              type="checkbox"
+              data-testid="event-visible-toggle"
+              [checked]="cmsEvent.isVisible !== false"
+              (change)="cmsEvent.isVisible = $any($event.target).checked"
+            />
+            <span>Show this event on the Upcoming Events page</span>
           </label>
         </div>
       </section>
@@ -110,22 +162,55 @@
         <div class="control-grid two-column">
           <label class="control-group">
             <span>Date of Event</span>
-            <input class="admin-input" [(ngModel)]="cmsEvent.eventMeta.dateOfEvent" placeholder="Date" />
+            <input
+              class="admin-input"
+              type="date"
+              [value]="cmsEvent.eventMeta.dateOfEvent"
+              (input)="cmsEvent.eventMeta.dateOfEvent = getInputValue($event)"
+              placeholder="Date"
+              required
+            />
           </label>
 
           <label class="control-group">
             <span>Location</span>
-            <input class="admin-input" [(ngModel)]="cmsEvent.eventMeta.location" placeholder="Location" />
+            <input class="admin-input" [(ngModel)]="cmsEvent.eventMeta.location" placeholder="Location" required />
           </label>
 
-          <label class="control-group span-full">
-            <span>Contact Email</span>
-            <input
-              class="admin-input"
-              [(ngModel)]="cmsEvent.eventMeta.contactEmail"
-              placeholder="Contact email"
-            />
-          </label>
+          <div class="control-group span-full">
+            <span>Contact Emails</span>
+            <div class="contact-email-list">
+              <div
+                *ngFor="let contactEmail of cmsEvent.eventMeta.contactEmails; let emailIndex = index; trackBy: trackContactEmailByIndex"
+                class="contact-email-row"
+              >
+                <input
+                  class="admin-input"
+                  type="email"
+                  [value]="contactEmail"
+                  (input)="updateEventContactEmail(cmsEvent, emailIndex, getInputValue($event))"
+                  placeholder="Contact email"
+                  data-testid="event-contact-email"
+                />
+                <button
+                  type="button"
+                  class="action-button text-danger"
+                  [attr.data-testid]="'remove-event-contact-email-' + emailIndex"
+                  (click)="removeEventContactEmail(cmsEvent, emailIndex)"
+                >
+                  Remove
+                </button>
+              </div>
+              <button
+                type="button"
+                class="action-button secondary contact-email-add"
+                data-testid="add-event-contact-email"
+                (click)="addEventContactEmail(cmsEvent)"
+              >
+                Add Contact Email
+              </button>
+            </div>
+          </div>
 
           <label class="control-group span-full">
             <span>End Blurb</span>
@@ -237,35 +322,114 @@
             <h3>Pricing</h3>
             <p>Participant pricing and optional add-ons.</p>
           </div>
-          <button type="button" class="action-button secondary" (click)="addAddOn(cmsEvent)">Add Add-On</button>
+          <button
+            *ngIf="cmsEvent.pricing.pricingMode !== 'free'"
+            type="button"
+            class="action-button secondary"
+            (click)="addAddOn(cmsEvent)"
+          >
+            Add Add-On
+          </button>
         </div>
 
         <div class="control-grid pricing-grid">
-          <label class="control-group">
-            <span>Participant Field</span>
-            <select class="admin-select" [(ngModel)]="cmsEvent.pricing.basePlayerField">
-              <option value="N/A">N/A</option>
-              <ng-container *ngFor="let field of cmsEvent.formFields">
-                <option *ngIf="field.type === 'group'" [value]="field.name">{{ field.label }}</option>
-              </ng-container>
+          <label class="control-group span-full">
+            <span class="control-label">
+              Pricing Mode
+              <button type="button" class="help-toggle" [class.is-open]="activePricingHelp === 'mode'"
+                (click)="togglePricingHelp('mode', $event)" aria-label="About pricing mode">i</button>
+            </span>
+            <select
+              class="admin-select"
+              [ngModel]="cmsEvent.pricing.pricingMode"
+              (ngModelChange)="onPricingModeChange(cmsEvent, $event)"
+              data-testid="pricing-mode"
+            >
+              <option value="fixed">Fixed Price</option>
+              <option value="perParticipant">Per Participant</option>
+              <option value="free">Free</option>
             </select>
+            <p *ngIf="activePricingHelp === 'mode'" class="control-help">{{ pricingHelp.mode }}</p>
           </label>
 
-          <label class="control-group">
-            <span>Price per Player</span>
+          <label *ngIf="cmsEvent.pricing.pricingMode === 'fixed'" class="control-group" data-testid="pricing-fixed-price">
+            <span>Registration Price</span>
             <input
               class="admin-input"
               type="number"
               [(ngModel)]="cmsEvent.pricing.pricePerPlayer"
-              placeholder="Price per player"
+              placeholder="Registration price"
             />
           </label>
 
-          <label class="toggle-control pricing-toggle">
-            <input type="checkbox" [(ngModel)]="cmsEvent.pricing.includePrimaryPlayer" />
-            <span class="toggle-track"></span>
-            <span>Include Primary Player</span>
-          </label>
+          <ng-container *ngIf="cmsEvent.pricing.pricingMode === 'perParticipant'">
+            <div class="pricing-callout span-full" *ngIf="!hasGroupField(cmsEvent)" data-testid="pricing-group-callout">
+              <p>
+                <strong>Per-participant pricing counts people from a “Group” form field</strong> — but this event
+                doesn’t have one yet. Add a participant group so the price can multiply by the number of people
+                registered.
+              </p>
+              <button type="button" class="action-button secondary" (click)="addParticipantGroup(cmsEvent)">
+                Add Participant Group
+              </button>
+            </div>
+
+            <label class="control-group">
+              <span class="control-label">
+                Additional Participants Field
+                <button type="button" class="help-toggle" [class.is-open]="activePricingHelp === 'field'"
+                  (click)="togglePricingHelp('field', $event)" aria-label="About the participants field">i</button>
+              </span>
+              <select
+                class="admin-select"
+                [(ngModel)]="cmsEvent.pricing.basePlayerField"
+                data-testid="pricing-participant-field"
+              >
+                <option value="N/A">No additional participant group</option>
+                <ng-container *ngFor="let field of cmsEvent.formFields">
+                  <option *ngIf="field.type === 'group'" [value]="field.name">{{ field.label }}</option>
+                </ng-container>
+              </select>
+              <p *ngIf="activePricingHelp === 'field'" class="control-help">{{ pricingHelp.field }}</p>
+            </label>
+
+            <label class="control-group">
+              <span class="control-label">
+                Price per Participant
+                <button type="button" class="help-toggle" [class.is-open]="activePricingHelp === 'price'"
+                  (click)="togglePricingHelp('price', $event)" aria-label="About price per participant">i</button>
+              </span>
+              <input
+                class="admin-input"
+                type="number"
+                [(ngModel)]="cmsEvent.pricing.pricePerPlayer"
+                placeholder="Price per participant"
+              />
+              <p *ngIf="activePricingHelp === 'price'" class="control-help">{{ pricingHelp.price }}</p>
+            </label>
+
+            <div class="control-group pricing-toggle">
+              <label class="toggle-control">
+                <input type="checkbox" [(ngModel)]="cmsEvent.pricing.includePrimaryPlayer" />
+                <span class="toggle-track"></span>
+                <span class="control-label">
+                  Include Primary Participant
+                  <button type="button" class="help-toggle" [class.is-open]="activePricingHelp === 'primary'"
+                    (click)="togglePricingHelp('primary', $event)" aria-label="About including the primary participant">i</button>
+                </span>
+              </label>
+              <p *ngIf="activePricingHelp === 'primary'" class="control-help">{{ pricingHelp.primary }}</p>
+            </div>
+
+            <div class="pricing-preview span-full" data-testid="pricing-preview">
+              <span class="pricing-preview-label">How this is billed</span>
+              <p>{{ pricingPreview(cmsEvent) }}</p>
+            </div>
+          </ng-container>
+
+          <div *ngIf="cmsEvent.pricing.pricingMode === 'free'" class="pricing-note span-full">
+            No payment buttons will be shown for this event. Visitors will see a Sign Up button instead.
+          </div>
         </div>
 
         <div class="add-on-list">
@@ -286,6 +450,17 @@
           </div>
         </div>
       </section>
+
+      <div class="event-editor-footer">
+        <button
+          type="button"
+          class="action-button primary"
+          data-testid="event-editor-bottom-save"
+          (click)="saveEvents()"
+        >
+          Save Changes
+        </button>
+      </div>
       </article>
     </section>
 
@@ -314,10 +489,7 @@
             <th>Name</th>
             <th>Email</th>
             <th>Phone</th>
-            <th>Payment</th>
-            <th>Status</th>
-            <th>Assigned To</th>
-            <th>Notes</th>
+            <th>Details</th>
           </tr>
         </thead>
         <tbody>
@@ -327,14 +499,20 @@
             (click)="selectSubmission(submission)"
           >
             <td>{{ submission.submissionTitle }}</td>
-            <td>{{ submission.submittedAt }}</td>
+            <td>{{ formatSubmissionDate(submission.submittedAt) }}</td>
             <td>{{ submission.name }}</td>
             <td>{{ submission.email }}</td>
             <td>{{ submission.phone }}</td>
-            <td>{{ submission.paymentStatus }}</td>
-            <td>{{ submission.status }}</td>
-            <td>{{ submission.assignedTo }}</td>
-            <td>{{ submission.notes }}</td>
+            <td>
+              <button
+                type="button"
+                class="action-button secondary details-button"
+                [attr.data-testid]="'submission-details-' + submission.submissionId"
+                (click)="$event.stopPropagation(); selectSubmission(submission)"
+              >
+                Details
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -347,7 +525,7 @@
         <span class="event-index">Submission</span>
         <h2>{{ selectedSubmission.submissionTitle }}</h2>
       </div>
-      <button type="button" class="action-button ghost" (click)="selectedSubmission = undefined">Close</button>
+      <button type="button" class="action-button ghost" (click)="clearSelectedSubmission()">Close</button>
     </div>
 
     <div class="submission-contact">
@@ -370,8 +548,40 @@
       <span>Notes</span>
       <textarea class="admin-textarea" [(ngModel)]="selectedSubmission.notes" rows="5"></textarea>
     </label>
-    <pre class="submission-raw">{{ selectedSubmission.rawData | json }}</pre>
-    <button type="button" class="action-button primary" (click)="saveSelectedSubmission()">Save Submission</button>
+
+    <section class="submission-data">
+      <div class="submission-data-heading">
+        <h3>Submission Details</h3>
+      </div>
+      <dl *ngIf="selectedSubmissionDetailRows.length; else noSubmissionDetails" class="submission-detail-list">
+        <div *ngFor="let row of selectedSubmissionDetailRows" class="submission-detail-row">
+          <dt>{{ row.label }}</dt>
+          <dd>{{ row.value }}</dd>
+        </div>
+      </dl>
+      <ng-template #noSubmissionDetails>
+        <p class="submission-empty">No additional submitted details.</p>
+      </ng-template>
+    </section>
+
+    <section class="submission-data" *ngIf="selectedSubmissionAddOnRows.length">
+      <ng-container>
+        <div class="submission-data-heading">
+          <h3>Add-ons</h3>
+        </div>
+        <dl class="submission-detail-list">
+          <div *ngFor="let row of selectedSubmissionAddOnRows" class="submission-detail-row">
+            <dt>{{ row.label }}</dt>
+            <dd>{{ row.value }}</dd>
+          </div>
+        </dl>
+      </ng-container>
+    </section>
+
+    <div class="submission-actions">
+      <button type="button" class="action-button danger" data-testid="delete-submission-button" (click)="requestDeleteSelectedSubmission()">Delete Submission</button>
+      <button type="button" class="action-button primary" (click)="saveSelectedSubmission()">Save Submission</button>
+    </div>
   </aside>
 
   <div *ngIf="modal" class="admin-modal-backdrop" role="presentation">

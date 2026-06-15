@@ -11,6 +11,8 @@ interface UIEvent extends CmsEvent {
   fieldMap: { [key: string]: any };
 }
 
+type PricingMode = 'free' | 'fixed' | 'perParticipant';
+
 declare var Stripe: any;
 
 @Component({
@@ -61,7 +63,7 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
 
     this.cmsService.getEvents().subscribe({
       next: (data) => {
-        this.events = data.events.map(event => {
+        this.events = data.events.filter(event => this.isVisibleEvent(event)).map(event => {
           const fg = this.fb.group({});
 
           event.formFields.forEach(field => {
@@ -115,6 +117,43 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
     return this.cmsService.resolveAssetUrl(url);
   }
 
+  hasFlyer(event: CmsEvent): boolean {
+    return Boolean(event.flyerUrl?.trim());
+  }
+
+  isVisibleEvent(event: CmsEvent): boolean {
+    return event.isVisible !== false;
+  }
+
+  formatEventDate(event: CmsEvent): string {
+    const eventDate = this.parseEventDate(event.eventMeta?.dateOfEvent || '');
+    if (!eventDate) return event.eventMeta?.dateOfEvent || '';
+
+    return eventDate.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }
+
+  private parseEventDate(value: string): Date | null {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const isoDate = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+    if (isoDate) {
+      const [, year, month, day] = isoDate;
+      const date = new Date(Number(year), Number(month) - 1, Number(day));
+      date.setHours(0, 0, 0, 0);
+      return date;
+    }
+
+    const parsed = new Date(trimmed);
+    if (Number.isNaN(parsed.getTime())) return null;
+    parsed.setHours(0, 0, 0, 0);
+    return parsed;
+  }
+
   // TS helper to get teamMembers as FormArray
   getMembers(fg: FormGroup, fieldName: string): FormArray {
     return fg.get(fieldName) as FormArray;
@@ -156,6 +195,10 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
   // }
 
   collectAddOns(form: FormGroup, pricing: any) {
+    if (pricing.pricingMode === 'free') {
+      return [];
+    }
+
     const selected: any[] = [];
 
     pricing.addOns?.forEach((a: any) => {
@@ -170,21 +213,49 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
     return selected;
   }
 
+  getPricingMode(event: UIEvent): PricingMode {
+    const mode = event.pricing?.pricingMode;
+    if (mode === 'free' || mode === 'fixed' || mode === 'perParticipant') {
+      return mode;
+    }
+
+    const hasParticipantField = Boolean(event.pricing?.basePlayerField && event.pricing.basePlayerField !== 'N/A');
+    if (hasParticipantField || event.pricing?.includePrimaryPlayer) {
+      return 'perParticipant';
+    }
+
+    return Number(event.pricing?.pricePerPlayer || 0) > 0 ? 'fixed' : 'free';
+  }
+
+  calculatePlayers(event: UIEvent): number {
+    const mode = this.getPricingMode(event);
+    if (mode === 'free') return 0;
+    if (mode === 'fixed') return 1;
+
+    const pricing = event.pricing;
+    const group = event.formGroup.get(pricing.basePlayerField)?.value || [];
+    let players = Array.isArray(group) ? group.length : 0;
+
+    if (pricing.includePrimaryPlayer) players += 1;
+    return players;
+  }
+
   calculateTotal(event: UIEvent): number {
 
     if (!event.formGroup) return 0;
 
     const form = event.formGroup;
     const pricing = event.pricing;
+    const mode = this.getPricingMode(event);
 
     let total = 0;
 
-    const group = form.get(pricing.basePlayerField)?.value || [];
-    let players = group.length;
-
-    if (pricing.includePrimaryPlayer) players += 1;
-
-    total += players * pricing.pricePerPlayer;
+    if (mode === 'free') return 0;
+    if (mode === 'fixed') {
+      total += Number(pricing.pricePerPlayer || 0);
+    } else {
+      total += this.calculatePlayers(event) * pricing.pricePerPlayer;
+    }
 
     pricing.addOns?.forEach((addOn: any) => {
       if (form.get(addOn.field)?.value) {
@@ -193,6 +264,32 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
     });
 
     return total;
+  }
+
+  isFreeEvent(event: UIEvent): boolean {
+    return this.calculateTotal(event) === 0;
+  }
+
+  buildEventSubmissionPayload(eventData: UIEvent, paymentMethod: string) {
+    const form = eventData.formGroup;
+    const grandTotal = this.calculateTotal(eventData);
+    const pricing = eventData.pricing;
+    const addOns = this.collectAddOns(form, pricing);
+    const mode = this.getPricingMode(eventData);
+    const groupArray = mode === 'perParticipant' ? form.get(pricing.basePlayerField)?.value || [] : [];
+    const players = this.calculatePlayers(eventData);
+
+    return {
+      type: eventData.type,
+      ...form.value,
+      eventTitle: eventData.title,
+      paymentMethod,
+      addOns,
+      players,
+      pricing,
+      teamMembers: groupArray,
+      grandTotal
+    };
   }
 
   // submit data to Stripe
@@ -204,16 +301,6 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
   }
 
   const form = eventData.formGroup;
-  const grandTotal = this.calculateTotal(eventData);
-  const pricing = eventData.pricing;
-
-  const addOns = this.collectAddOns(form, pricing);
-
-  const group = form.get(pricing.basePlayerField)?.value || [];
-  let players = group.length;
-  
-
-  if (pricing.includePrimaryPlayer) players += 1;
 
   if (!form.valid) {
     console.log("form is invalid");
@@ -222,20 +309,15 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
     return;
   }
 
-  console.log("FORM VALUE:", form.value);
-  const groupArray = form.get(pricing.basePlayerField)?.value || [];
+  if (this.isFreeEvent(eventData)) {
+    this.onFreeEventSignup(eventData);
+    return;
+  }
 
+  console.log("FORM VALUE:", form.value);
   const formData = {
-    action: "createOrder",
-    type: eventData.type,
-    ...form.value,
-    eventTitle: eventData.title,
-    paymentMethod: this.paymentMethod,
-    addOns: addOns,
-    players: players,
-    pricing: pricing,
-    teamMembers: groupArray,
-    grandTotal: grandTotal
+    ...this.buildEventSubmissionPayload(eventData, this.paymentMethod),
+    action: "createOrder"
   };
 
   console.log('Submitting form data:', formData);
@@ -259,6 +341,29 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
       }
     });
   }
+}
+
+onFreeEventSignup(eventData: UIEvent) {
+  const form = eventData.formGroup;
+
+  if (!form.valid) {
+    form.markAllAsTouched();
+    alert('Please fill out all required fields before submitting.');
+    return;
+  }
+
+  const payload = this.buildEventSubmissionPayload(eventData, 'none');
+
+  this.orderService.processFreeEventSignup(payload).subscribe({
+    next: () => {
+      alert('Thank you for signing up.');
+      form.reset();
+    },
+    error: (err) => {
+      console.error('Free event signup failed:', err);
+      alert('There was an error submitting your signup. Please try again.');
+    }
+  });
 }
 sponsorPaymentMethod: string = 'paypal';
 
@@ -296,12 +401,6 @@ submitSponsor() {
 
 onStripeEvent(eventData: UIEvent, index: number) {
   const form = eventData.formGroup;
-  const grandTotal = this.calculateTotal(eventData);
-  const pricing = eventData.pricing;
-  const addOns = this.collectAddOns(form, pricing);
-  const groupArray = form.get(pricing.basePlayerField)?.value || [];
-  let players = groupArray.length;
-  if (pricing.includePrimaryPlayer) players += 1;
 
   if (!form.valid) {
     form.markAllAsTouched();
@@ -309,22 +408,13 @@ onStripeEvent(eventData: UIEvent, index: number) {
     return;
   }
 
-  const payload = {
-    type: eventData.type,
-    ...form.value,
-    eventTitle: eventData.title,
-    addOns,
-    players,
-    pricing,
-    teamMembers: groupArray,
-    grandTotal
-  };
+  const payload = this.buildEventSubmissionPayload(eventData, 'stripe');
 
   this.stripeIsLoading = true;
   this.orderService.createStripeEmbeddedSession(payload).subscribe({
     next: async (response) => {
       const clientSecret = response.client_secret;
-      const stripe = Stripe(environment.stripe.pk);
+      const stripe = Stripe(response.publishable_key || environment.stripe.pk);
       this.stripeCheckoutEventIndex = index;
       this.stripeIsLoading = false;
       await new Promise(r => setTimeout(r, 50));
@@ -358,7 +448,7 @@ onSponsorStripeClick() {
   this.orderService.createStripeEmbeddedSession(payload).subscribe({
     next: async (response) => {
       const clientSecret = response.client_secret;
-      const stripe = Stripe(environment.stripe.pk);
+      const stripe = Stripe(response.publishable_key || environment.stripe.pk);
       this.showSponsorStripeCheckout = true;
       this.stripeIsLoading = false;
       await new Promise(r => setTimeout(r, 50));

@@ -23,8 +23,16 @@ deploy_one() {
   local zip_path="/tmp/${function_name}.zip"
   local existing_env
   local merged_env
+  local credentials_file="aws-export/lambda/${function_name}/creds-sa.json"
 
-  backend/scripts/package_lambda.sh "${source_dir}" "${zip_path}" "${python_version}"
+  if [[ -n "${GOOGLE_SHEET_CREDENTIALS_FILE:-}" ]]; then
+    backend/scripts/package_lambda.sh "${source_dir}" "${zip_path}" "${python_version}"
+  elif [[ -f "${credentials_file}" ]]; then
+    GOOGLE_SHEET_CREDENTIALS_FILE="${credentials_file}" \
+      backend/scripts/package_lambda.sh "${source_dir}" "${zip_path}" "${python_version}"
+  else
+    backend/scripts/package_lambda.sh "${source_dir}" "${zip_path}" "${python_version}"
+  fi
   aws lambda update-function-code \
     --region "${REGION}" \
     --function-name "${function_name}" \
@@ -58,6 +66,24 @@ PY
   echo "Deployed ${function_name} with SUBMISSIONS_TABLE=${TABLE_NAME}"
 }
 
+configure_events_function_url_cors() {
+  local function_name="$1"
+
+  aws lambda update-function-url-config \
+    --region "${REGION}" \
+    --function-name "${function_name}" \
+    --cors '{
+      "AllowCredentials": false,
+      "AllowHeaders": ["content-type", "authorization", "cache-control", "pragma"],
+      "AllowMethods": ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+      "AllowOrigins": ["*"],
+      "ExposeHeaders": []
+    }' >/dev/null
+
+  echo "Updated ${function_name} Function URL CORS for admin methods"
+}
+
 deploy_one backend/lambdas/events_service "${EVENTS_FN}" "3.14"
+configure_events_function_url_cors "${EVENTS_FN}"
 deploy_one backend/lambdas/sotf_mailer "${MAILER_FN}" "3.9"
 deploy_one backend/lambdas/create_order "${ORDER_FN}" "3.10"

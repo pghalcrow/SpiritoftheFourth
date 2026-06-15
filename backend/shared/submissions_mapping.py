@@ -1,20 +1,21 @@
 import hashlib
 import json
 from datetime import datetime
-from zoneinfo import ZoneInfo
+from backend.shared.time_utils import PACIFIC_TZ, pacific_now_iso
 
 
-PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
 SHEET_DATETIME_FORMATS = (
     "%Y-%m-%d %H:%M",
     "%m/%d/%Y %H:%M:%S",
     "%m/%d/%Y %H:%M",
 )
 IMPORT_FALLBACK_SUBMITTED_AT = "1970-01-01T00:00:00-08:00"
+MOTOR_SHOW_SOURCES = {"motorShowOrder", "Motor Show Event"}
+MOTOR_SHOW_ADMIN_TITLE = "Motor Show Event Order"
 
 
 def now_iso():
-    return datetime.now(PACIFIC_TZ).replace(microsecond=0).isoformat()
+    return pacific_now_iso()
 
 
 def parse_sheet_datetime(value):
@@ -145,13 +146,14 @@ def map_live_submission(
     submitted_at=None,
 ):
     submitted_at = submitted_at or now_iso()
+    submission_title = MOTOR_SHOW_ADMIN_TITLE if source in MOTOR_SHOW_SOURCES else title
 
     return {
         "pk": "SUBMISSION",
         "sk": build_submission_sk(submitted_at, submission_id),
         "recordType": "submission",
         "submissionId": submission_id,
-        "submissionTitle": title,
+        "submissionTitle": submission_title,
         "submittedAt": submitted_at,
         "source": source,
         "name": name,

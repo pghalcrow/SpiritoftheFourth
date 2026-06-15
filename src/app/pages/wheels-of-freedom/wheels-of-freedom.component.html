@@ -318,12 +318,21 @@
               <div class="row">
                 <div class="col-12 col-md-6">
                   <div class="form-floating mb-3">
-                    <select class="form-select" formControlName="selectedShirt" (change)="updateCartTotal()">
+                    <select
+                      class="form-select"
+                      formControlName="selectedShirt"
+                      (change)="updateCartTotal()"
+                      [class.is-invalid]="motorShowForm.get('selectedShirt')?.invalid && (motorShowForm.get('selectedShirt')?.touched || motorShowForm.get('selectedShirt')?.dirty)"
+                    >
+                      <option [ngValue]="null" disabled selected>Select a size</option>
                       <option *ngFor="let shirtItem of tShirtSizes" [ngValue]="additionalShirtsItemsDict[shirtItem]">
                         {{ shirtItem }}
                       </option>
                     </select>
                     <label>T-Shirt Size (plaque included)</label>
+                    <div class="invalid-feedback" *ngIf="motorShowForm.get('selectedShirt')?.invalid && (motorShowForm.get('selectedShirt')?.touched || motorShowForm.get('selectedShirt')?.dirty)">
+                      Please select a t-shirt size.
+                    </div>
                   </div>
                 </div>
               </div>
