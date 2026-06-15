@@ -174,7 +174,7 @@ class DeployLambdasScriptTests(unittest.TestCase):
                         assert args[args.index("--function-name") + 1] == "dev_events_service"
                         assert "PATCH" in cors["AllowMethods"]
                         assert "DELETE" in cors["AllowMethods"]
-                        assert "OPTIONS" in cors["AllowMethods"]
+                        assert "OPTIONS" not in cors["AllowMethods"]
                         assert "cache-control" in cors["AllowHeaders"]
                         assert "pragma" in cors["AllowHeaders"]
                     else:

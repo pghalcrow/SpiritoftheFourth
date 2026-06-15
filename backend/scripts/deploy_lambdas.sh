@@ -75,7 +75,7 @@ configure_events_function_url_cors() {
     --cors '{
       "AllowCredentials": false,
       "AllowHeaders": ["content-type", "authorization", "cache-control", "pragma"],
-      "AllowMethods": ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+      "AllowMethods": ["GET", "POST", "PATCH", "DELETE"],
       "AllowOrigins": ["*"],
       "ExposeHeaders": []
     }' >/dev/null
