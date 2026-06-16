@@ -103,6 +103,36 @@ describe('WheelsOfFreedomComponent', () => {
     expect(receiptCall[1]).toContain('P.O. Box 270736');
     expect(receiptCall[1]).not.toContain('Reply directly to this email to contact the submitter.');
   });
+
+  it('sends a standardized admin notification email for pay by check entries', () => {
+    component.motorShowForm.patchValue({
+      ...validMotorShowForm(),
+      clubAffiliation: 'Fourth Club',
+    });
+    component.cartTotal = 25;
+
+    component.onPayByCheck();
+
+    expect(emailService.sendEmail).toHaveBeenCalledTimes(2);
+    const adminCall = emailService.sendEmail.calls.argsFor(0);
+    expect(adminCall[2]).toBe('New Motor Show Entry — Check Payment');
+    expect(adminCall[1]).toContain('Motor Show Check Payment Entry');
+    expect(adminCall[1]).toContain('New motor show check payment');
+    expect(adminCall[1]).toContain('border-collapse: collapse');
+    expect(adminCall[1]).toContain('mailto:pat@example.com');
+    expect(adminCall[1]).toContain('1967 Ford Mustang (Red)');
+    expect(adminCall[1]).toContain('Fourth Club');
+    expect(adminCall[1]).toContain('$25.00');
+    expect(adminCall[1]).not.toContain('New Motor Show Entry — Pay by Check\n\n');
+    expect(adminCall[7]).toEqual(jasmine.objectContaining({
+      formType: 'motorShowOrder',
+      paymentMethod: 'check',
+      streetAddress: '123 Main St',
+      year: '1967',
+      clubAffiliation: 'Fourth Club',
+      total: 25,
+    }));
+  });
 });
 
 function validMotorShowForm() {

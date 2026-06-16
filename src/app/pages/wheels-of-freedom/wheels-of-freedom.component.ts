@@ -469,30 +469,55 @@ export class WheelsOfFreedomComponent {
       ? `Yes — ${form.selectedShirt?.size ?? ''}`
       : 'No';
 
-    const adminBody =
-      `New Motor Show Entry — Pay by Check\n\n` +
-      `Name: ${form.firstName} ${form.lastName}\n` +
-      `Email: ${form.email}\n` +
-      `Phone: ${form.phone}\n` +
-      `Address: ${form.streetAddress}, ${form.city}, ${form.state} ${form.zipcode}\n\n` +
-      `Vehicle: ${form.year} ${form.make} ${form.model} (${form.color})\n` +
-      `Club Affiliation: ${form.clubAffiliation || 'N/A'}\n` +
-      `T-Shirt & Plaque Bundle: ${shirtLine}\n` +
-      `Total: $${this.cartTotal}.00\n\n` +
-      `Customer will mail check to: The Spirit of the Fourth, P.O. Box 270736, San Diego, CA 92198 by June 15.`;
+    const name = `${form.firstName} ${form.lastName}`;
+    const address = `${form.streetAddress}, ${form.city}, ${form.state} ${form.zipcode}`;
+    const vehicle = `${form.year} ${form.make} ${form.model} (${form.color})`;
+    const adminBody = EmailUtlity.createMotorShowCheckAdminHTMLBody({
+      name,
+      email: form.email,
+      phone: form.phone,
+      address,
+      vehicle,
+      clubAffiliation: form.clubAffiliation || 'N/A',
+      shirtBundle: shirtLine,
+      totalDue: this.cartTotal,
+    });
+    const adminFormData = {
+      formType: 'motorShowOrder',
+      paymentMethod: 'check',
+      firstName: form.firstName,
+      lastName: form.lastName,
+      email: form.email,
+      phone: form.phone,
+      streetAddress: form.streetAddress,
+      city: form.city,
+      state: form.state,
+      zipcode: form.zipcode,
+      year: form.year,
+      make: form.make,
+      model: form.model,
+      color: form.color,
+      clubAffiliation: form.clubAffiliation || '',
+      comboSize: shirtLine,
+      total: this.cartTotal,
+      grandTotal: this.cartTotal,
+      paymentReceived: false,
+    };
 
     this.emailService.sendEmail(
       environment.forms.carShow.toEamil,
       adminBody,
       'New Motor Show Entry — Check Payment',
       form.email,
-      `${form.firstName} ${form.lastName}`,
-      form.phone
+      name,
+      form.phone,
+      undefined,
+      adminFormData
     ).subscribe();
 
     const receiptBody = EmailUtlity.createMotorShowCheckConfirmationHTMLBody({
-      name: `${form.firstName} ${form.lastName}`,
-      vehicle: `${form.year} ${form.make} ${form.model} (${form.color})`,
+      name,
+      vehicle,
       shirtBundle: shirtLine,
       totalDue: this.cartTotal,
     });

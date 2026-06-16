@@ -240,6 +240,39 @@ export class EmailUtlity {
     )
   }
 
+  static createMotorShowCheckAdminHTMLBody(details: {
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+    vehicle: string;
+    clubAffiliation: string;
+    shirtBundle: string;
+    totalDue: number | string;
+  }): string {
+    const totalDue = typeof details.totalDue === "number"
+      ? `$${details.totalDue.toFixed(2)}`
+      : details.totalDue
+
+    return this.normalizedAdminEmail(
+      "Motor Show Check Payment Entry",
+      "New motor show check payment",
+      "A new Wheels of Freedom Motor Show entry was submitted with pay by check selected.",
+      [
+        ["Name", this.escapeHtml(details.name)],
+        ["Email", this.emailLink(details.email)],
+        ["Phone", this.phoneLink(details.phone)],
+        ["Address", this.escapeHtml(details.address)],
+        ["Vehicle", this.escapeHtml(details.vehicle)],
+        ["Club Affiliation", this.escapeHtml(details.clubAffiliation || "N/A")],
+        ["T-Shirt & Plaque Bundle", this.escapeHtml(details.shirtBundle)],
+        ["Total Due", this.escapeHtml(totalDue)],
+        ["Payment Method", "Pay by Check"],
+        ["Mail Check To", "The Spirit of the Fourth<br>P.O. Box 270736<br>San Diego, CA 92198"],
+      ]
+    )
+  }
+
   static createVolunteerFormHTMLBody(volunteerForm: FormGroup): string {
     const contactName = this.escapeHtml(volunteerForm.get("contactName")!.value)
     const organizationName = this.escapeHtml(volunteerForm.get("organizationName")?.value)

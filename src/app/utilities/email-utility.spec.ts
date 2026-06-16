@@ -162,4 +162,29 @@ describe('EmailUtlity', () => {
     expect(html).toContain('San Diego, CA 92198');
     expect(html).not.toContain('Reply directly to this email to contact the submitter.');
   });
+
+  it('formats motor show check admin emails as a normalized admin summary', () => {
+    const html = EmailUtlity.createMotorShowCheckAdminHTMLBody({
+      name: 'Pat Driver',
+      email: 'pat@example.com',
+      phone: '555-555-1212',
+      address: '123 Main St, San Diego, CA 92128',
+      vehicle: '1967 Ford Mustang (Red)',
+      clubAffiliation: 'Fourth Club',
+      shirtBundle: 'No',
+      totalDue: 25,
+    });
+
+    expect(html).toContain('Motor Show Check Payment Entry');
+    expect(html).toContain('New motor show check payment');
+    expect(html).toContain('border-collapse: collapse');
+    expect(html).toContain('Pat Driver');
+    expect(html).toContain('mailto:pat@example.com');
+    expect(html).toContain('tel:5555551212');
+    expect(html).toContain('123 Main St, San Diego, CA 92128');
+    expect(html).toContain('1967 Ford Mustang (Red)');
+    expect(html).toContain('Fourth Club');
+    expect(html).toContain('$25.00');
+    expect(html).toContain('Reply directly to this email to contact the submitter.');
+  });
 });
