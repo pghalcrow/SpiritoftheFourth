@@ -461,6 +461,33 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
         self.assertEqual(call_kwargs["raw_data"]["availability"], "Morning setup")
         self.assertIn("submission_id", call_kwargs["raw_data"])
 
+    def test_motor_show_check_receipt_email_is_not_recorded_as_submission(self):
+        mailer = import_sotf_mailer()
+        event = {
+            "body": json.dumps({
+                "toContact": "pat@example.com",
+                "subject": "Wheels of Freedom Motor Show — Entry Confirmation",
+                "replyTo": "cowge41@gmail.com, tim@shinn.com",
+                "name": "Spirit of the Fourth",
+                "phone": "",
+                "body": "Thank you for registering. Please mail your check.",
+            })
+        }
+
+        with patch.object(mailer, "send_email", return_value=True) as send_email, \
+            patch.object(mailer, "record_submission_parallel") as record_submission, \
+            patch.dict(mailer.os.environ, {
+                "USERNAME": "sender@example.com",
+                "PASSWORD": "password",
+                "SMTPHOST": "smtp.example.com",
+                "SMTPPORT": "587",
+            }):
+            response = mailer.lambda_handler(event, None)
+
+        self.assertEqual(response["statusCode"], 200)
+        send_email.assert_called_once()
+        record_submission.assert_not_called()
+
     def test_mailer_google_sheet_uses_local_environment_overrides(self):
         mailer = import_sotf_mailer()
         appended = []

@@ -76,6 +76,13 @@ def record_submission_parallel(form, name, email, phone, source, raw_data):
     )
 
 
+def should_record_submission(subject, event_body):
+    receipt_subjects = {
+        "Wheels of Freedom Motor Show — Entry Confirmation",
+    }
+    return subject not in receipt_subjects
+
+
 def get_pdf_bytes_with_pdfshift(html):
     url = "https://api.pdfshift.io/v3/convert/pdf"
     pdf_shift_api_key = os.environ['PDFSHIFTAPIKEY']
@@ -476,7 +483,7 @@ def lambda_handler(event, context):
                 attachments = event_body['attachments']
 
             success = send_email(host, port, username, password, subject, body, attachments, mail_to, username, reply_to)
-            if success:
+            if success and should_record_submission(subject, event_body):
                 record_submission_parallel(
                     form=subject,
                     name=contact_name,
