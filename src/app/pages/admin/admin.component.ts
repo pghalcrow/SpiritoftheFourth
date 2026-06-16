@@ -48,10 +48,10 @@ export class AdminComponent implements OnInit {
   selectedSubmissionAddOnRows: SubmissionDisplayRow[] = [];
   submissionSearch = '';
   selectedSubmissionGroup: SubmissionGroupKey = 'all';
+  submissionActionLoading: 'save' | 'delete' | null = null;
   submissionGroupTabs: SubmissionGroupTab[] = [
     { key: 'all', label: 'All' },
     { key: 'vendor', label: 'Vendors' },
-    { key: 'artist', label: 'Artists' },
     { key: 'sponsor', label: 'Sponsors' },
     { key: 'motorShow', label: 'Motor Show' },
     { key: 'parade', label: 'Parade' },
@@ -618,21 +618,24 @@ export class AdminComponent implements OnInit {
   }
 
   saveSelectedSubmission() {
-    if (!this.selectedSubmission) return;
+    if (!this.selectedSubmission || this.submissionActionLoading) return;
     const { submissionId, notes } = this.selectedSubmission;
     const update = this.isCheckPaymentSubmission(this.selectedSubmission)
       ? { notes, paymentReceived: this.selectedSubmission.paymentReceived === true }
       : { notes };
+    this.submissionActionLoading = 'save';
     this.cmsService.updateSubmissionAdminFields(submissionId, update).subscribe({
       next: updated => {
         this.submissions = this.submissions.map(row =>
           row.submissionId === updated.submissionId ? { ...row, ...updated } : row
         );
+        this.submissionActionLoading = null;
         this.clearSelectedSubmission();
         this.showModal('Submission saved', 'Admin fields have been updated.', 'success');
       },
       error: err => {
         console.error('Submission save failed', err);
+        this.submissionActionLoading = null;
         this.showModal('Save failed', 'Could not update the submission.', 'danger');
       }
     });
@@ -652,16 +655,19 @@ export class AdminComponent implements OnInit {
   }
 
   deleteSelectedSubmission() {
-    if (!this.selectedSubmission) return;
+    if (!this.selectedSubmission || this.submissionActionLoading) return;
     const submissionId = this.selectedSubmission.submissionId;
+    this.submissionActionLoading = 'delete';
     this.cmsService.deleteSubmission(submissionId).subscribe({
       next: () => {
         this.submissions = this.submissions.filter(row => row.submissionId !== submissionId);
+        this.submissionActionLoading = null;
         this.clearSelectedSubmission();
         this.showModal('Submission deleted', 'The submission has been deleted.', 'success');
       },
       error: err => {
         console.error('Submission delete failed', err);
+        this.submissionActionLoading = null;
         this.showModal('Delete failed', 'Could not delete the submission.', 'danger');
       }
     });

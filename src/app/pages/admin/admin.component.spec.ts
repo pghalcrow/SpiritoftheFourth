@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule } from '@angular/cdk/drag-drop';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { Router } from '@angular/router';
 import { AdminComponent } from './admin.component';
 import { CmsService } from 'src/app/services/cms.service';
@@ -112,6 +112,15 @@ describe('AdminComponent', () => {
     const sectionButtons = Array.from(nativeElement.querySelectorAll<HTMLButtonElement>('.section-switcher .section-button'));
 
     expect(sectionButtons.map(button => button.textContent?.trim())).toEqual(['Events', 'Submissions']);
+  });
+
+  it('does not show an artist submission group tab', () => {
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const tabLabels = Array.from(nativeElement.querySelectorAll<HTMLButtonElement>('.submission-group-tab'))
+      .map(button => button.textContent?.trim());
+
+    expect(tabLabels).not.toContain('Artists');
+    expect(nativeElement.querySelector('[data-testid="submission-group-artist"]')).toBeFalsy();
   });
 
   it('does not show test mode controls for normal admins', () => {
@@ -779,6 +788,88 @@ describe('AdminComponent', () => {
     expect(notesIndex).toBeGreaterThan(detailsIndex);
   });
 
+  it('shows saving feedback while a submission update is in progress', () => {
+    const saveResponse = new Subject<any>();
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 's1',
+        submissionTitle: 'Volunteer Request',
+        submittedAt: '2026-06-05T10:00:00-07:00',
+        name: 'Pat Halcrow',
+        email: 'pat@example.com',
+        phone: '555-1212',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { message: 'Available morning' },
+      }]
+    }));
+    cmsService.updateSubmissionAdminFields.and.returnValue(saveResponse.asObservable());
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-submissions"]')!.click();
+    fixture.detectChanges();
+    nativeElement.querySelector<HTMLTableRowElement>('[data-testid="submission-row-s1"]')!.click();
+    fixture.detectChanges();
+
+    component.selectedSubmission!.notes = 'Verified';
+    component.saveSelectedSubmission();
+    fixture.detectChanges();
+
+    const saveButton = nativeElement.querySelector<HTMLButtonElement>('[data-testid="save-submission-button"]')!;
+    expect(saveButton.disabled).toBeTrue();
+    expect(saveButton.textContent).toContain('Saving');
+    expect(saveButton.querySelector('.button-spinner')).toBeTruthy();
+
+    saveResponse.next({
+      submissionId: 's1',
+      submissionTitle: 'Volunteer Request',
+      status: 'New',
+      assignedTo: '',
+      notes: 'Verified',
+    });
+    saveResponse.complete();
+    fixture.detectChanges();
+
+    expect(component.selectedSubmission).toBeUndefined();
+    expect(component.submissionActionLoading).toBeNull();
+  });
+
+  it('closes the submission detail panel when clicking outside it', () => {
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 's1',
+        submissionTitle: 'Volunteer Request',
+        submittedAt: '2026-06-05T10:00:00-07:00',
+        name: 'Pat Halcrow',
+        email: 'pat@example.com',
+        phone: '555-1212',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { message: 'Available morning' },
+      }]
+    }));
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-submissions"]')!.click();
+    fixture.detectChanges();
+    nativeElement.querySelector<HTMLTableRowElement>('[data-testid="submission-row-s1"]')!.click();
+    fixture.detectChanges();
+
+    expect(component.selectedSubmission?.submissionId).toBe('s1');
+
+    nativeElement.querySelector<HTMLElement>('[data-testid="submission-detail-backdrop"]')!.click();
+    fixture.detectChanges();
+
+    expect(component.selectedSubmission).toBeUndefined();
+    expect(nativeElement.querySelector('.submission-detail-panel')).toBeFalsy();
+  });
+
   it('shows normalized motor show details for structured card purchases', () => {
     cmsService.getSubmissions.and.returnValue(of({
       items: [{
@@ -1119,6 +1210,50 @@ describe('AdminComponent', () => {
 
     expect(cmsService.deleteSubmission).toHaveBeenCalledWith('s1');
     expect(component.submissions.length).toBe(0);
+    expect(component.selectedSubmission).toBeUndefined();
+  });
+
+  it('shows deleting feedback while a confirmed submission delete is in progress', () => {
+    const deleteResponse = new Subject<any>();
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 's1',
+        submissionTitle: 'Volunteer Request',
+        submittedAt: '2026-06-05T10:00:00-07:00',
+        name: 'Pat Halcrow',
+        email: 'pat@example.com',
+        phone: '555-1212',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { message: 'Available morning' },
+      }]
+    }));
+    cmsService.deleteSubmission.and.returnValue(deleteResponse.asObservable());
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-submissions"]')!.click();
+    fixture.detectChanges();
+    nativeElement.querySelector<HTMLTableRowElement>('[data-testid="submission-row-s1"]')!.click();
+    fixture.detectChanges();
+
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="delete-submission-button"]')!.click();
+    fixture.detectChanges();
+    component.confirmModal();
+    fixture.detectChanges();
+
+    const deleteButton = nativeElement.querySelector<HTMLButtonElement>('[data-testid="delete-submission-button"]')!;
+    expect(deleteButton.disabled).toBeTrue();
+    expect(deleteButton.textContent).toContain('Deleting');
+    expect(deleteButton.querySelector('.button-spinner')).toBeTruthy();
+
+    deleteResponse.next({ success: true, submissionId: 's1' });
+    deleteResponse.complete();
+    fixture.detectChanges();
+
+    expect(component.submissionActionLoading).toBeNull();
     expect(component.selectedSubmission).toBeUndefined();
   });
 });

@@ -534,69 +534,94 @@
     </div>
   </section>
 
-  <aside *ngIf="selectedSubmission" class="submission-detail-panel">
-    <div class="submission-detail-header">
-      <div>
-        <span class="event-index">Submission</span>
-        <h2>{{ formatSubmissionTitle(selectedSubmission) }}</h2>
-      </div>
-      <button type="button" class="action-button ghost" (click)="clearSelectedSubmission()">Close</button>
-    </div>
-
-    <div class="submission-contact">
-      <p>{{ selectedSubmission.name }}</p>
-      <p>{{ selectedSubmission.email }}</p>
-      <p>{{ selectedSubmission.phone }}</p>
-    </div>
-
-    <section class="submission-data">
-      <div class="submission-data-heading">
-        <h3>Submission Details</h3>
-      </div>
-      <dl *ngIf="selectedSubmissionDetailRows.length; else noSubmissionDetails" class="submission-detail-list">
-        <div *ngFor="let row of selectedSubmissionDetailRows" class="submission-detail-row">
-          <dt>{{ row.label }}</dt>
-          <dd>{{ row.value }}</dd>
+  <div
+    *ngIf="selectedSubmission"
+    class="submission-detail-backdrop"
+    data-testid="submission-detail-backdrop"
+    (click)="clearSelectedSubmission()"
+  >
+    <aside class="submission-detail-panel" (click)="$event.stopPropagation()">
+      <div class="submission-detail-header">
+        <div>
+          <span class="event-index">Submission</span>
+          <h2>{{ formatSubmissionTitle(selectedSubmission) }}</h2>
         </div>
-      </dl>
-      <ng-template #noSubmissionDetails>
-        <p class="submission-empty">No additional submitted details.</p>
-      </ng-template>
-    </section>
+        <button type="button" class="action-button ghost" (click)="clearSelectedSubmission()">Close</button>
+      </div>
 
-    <section class="submission-data" *ngIf="selectedSubmissionAddOnRows.length">
-      <ng-container>
+      <div class="submission-contact">
+        <p>{{ selectedSubmission.name }}</p>
+        <p>{{ selectedSubmission.email }}</p>
+        <p>{{ selectedSubmission.phone }}</p>
+      </div>
+
+      <section class="submission-data">
         <div class="submission-data-heading">
-          <h3>Add-ons</h3>
+          <h3>Submission Details</h3>
         </div>
-        <dl class="submission-detail-list">
-          <div *ngFor="let row of selectedSubmissionAddOnRows" class="submission-detail-row">
+        <dl *ngIf="selectedSubmissionDetailRows.length; else noSubmissionDetails" class="submission-detail-list">
+          <div *ngFor="let row of selectedSubmissionDetailRows" class="submission-detail-row">
             <dt>{{ row.label }}</dt>
             <dd>{{ row.value }}</dd>
           </div>
         </dl>
-      </ng-container>
-    </section>
+        <ng-template #noSubmissionDetails>
+          <p class="submission-empty">No additional submitted details.</p>
+        </ng-template>
+      </section>
 
-    <label *ngIf="isCheckPaymentSubmission(selectedSubmission)" class="payment-received-toggle">
-      <input
-        type="checkbox"
-        data-testid="payment-received-checkbox"
-        [(ngModel)]="selectedSubmission.paymentReceived"
-      />
-      <span>Payment Received</span>
-    </label>
+      <section class="submission-data" *ngIf="selectedSubmissionAddOnRows.length">
+        <ng-container>
+          <div class="submission-data-heading">
+            <h3>Add-ons</h3>
+          </div>
+          <dl class="submission-detail-list">
+            <div *ngFor="let row of selectedSubmissionAddOnRows" class="submission-detail-row">
+              <dt>{{ row.label }}</dt>
+              <dd>{{ row.value }}</dd>
+            </div>
+          </dl>
+        </ng-container>
+      </section>
 
-    <label class="control-group">
-      <span>Notes</span>
-      <textarea class="admin-textarea" [(ngModel)]="selectedSubmission.notes" rows="5"></textarea>
-    </label>
+      <label *ngIf="isCheckPaymentSubmission(selectedSubmission)" class="payment-received-toggle">
+        <input
+          type="checkbox"
+          data-testid="payment-received-checkbox"
+          [(ngModel)]="selectedSubmission.paymentReceived"
+        />
+        <span>Payment Received</span>
+      </label>
 
-    <div class="submission-actions">
-      <button type="button" class="action-button danger" data-testid="delete-submission-button" (click)="requestDeleteSelectedSubmission()">Delete Submission</button>
-      <button type="button" class="action-button primary" (click)="saveSelectedSubmission()">Save Submission</button>
-    </div>
-  </aside>
+      <label class="control-group">
+        <span>Notes</span>
+        <textarea class="admin-textarea" [(ngModel)]="selectedSubmission.notes" rows="5"></textarea>
+      </label>
+
+      <div class="submission-actions">
+        <button
+          type="button"
+          class="action-button danger"
+          data-testid="delete-submission-button"
+          [disabled]="submissionActionLoading !== null"
+          (click)="requestDeleteSelectedSubmission()"
+        >
+          <span *ngIf="submissionActionLoading === 'delete'" class="button-spinner" aria-hidden="true"></span>
+          {{ submissionActionLoading === 'delete' ? 'Deleting...' : 'Delete Submission' }}
+        </button>
+        <button
+          type="button"
+          class="action-button primary"
+          data-testid="save-submission-button"
+          [disabled]="submissionActionLoading !== null"
+          (click)="saveSelectedSubmission()"
+        >
+          <span *ngIf="submissionActionLoading === 'save'" class="button-spinner" aria-hidden="true"></span>
+          {{ submissionActionLoading === 'save' ? 'Saving...' : 'Save Submission' }}
+        </button>
+      </div>
+    </aside>
+  </div>
 
   <div *ngIf="modal" class="admin-modal-backdrop" role="presentation">
     <section
