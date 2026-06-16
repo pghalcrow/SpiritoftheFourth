@@ -206,6 +206,35 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(updated["notes"], "Done")
         self.assertEqual(updated["updatedBy"], "admin")
 
+    def test_update_admin_fields_can_set_payment_received_without_overwriting_existing_fields(self):
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:00:00-07:00#s1",
+            "recordType": "submission",
+            "submissionId": "s1",
+            "submissionTitle": "New Motor Show Entry — Check Payment",
+            "name": "Pat",
+            "email": "pat@example.com",
+            "phone": "555",
+            "status": "In Review",
+            "assignedTo": "Patrick",
+            "notes": "Waiting for check",
+            "paymentReceived": False,
+        })
+
+        updated = self.repo.update_submission_admin_fields(
+            "s1",
+            notes="Check received",
+            payment_received=True,
+            updated_by="admin",
+        )
+
+        self.assertEqual(updated["status"], "In Review")
+        self.assertEqual(updated["assignedTo"], "Patrick")
+        self.assertEqual(updated["notes"], "Check received")
+        self.assertTrue(updated["paymentReceived"])
+        self.assertEqual(updated["updatedBy"], "admin")
+
     def test_list_submissions_collects_items_across_pages_up_to_limit(self):
         self.table.page_size = 2
         for index in range(5):

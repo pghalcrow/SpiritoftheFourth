@@ -196,6 +196,34 @@ h4 {
   flex: 1 1 320px;
 }
 
+.submission-group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.submission-group-tab {
+  appearance: none;
+  border: 1px solid #c9d5e3;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0a3161;
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 800;
+  padding: 9px 13px;
+}
+
+.submission-group-tab:hover {
+  background: #f2f6fa;
+}
+
+.submission-group-tab.active {
+  background: #0a3161;
+  border-color: #0a3161;
+  color: #ffffff;
+}
+
 .submissions-table-wrap {
   overflow: auto;
   background: #ffffff;
@@ -241,6 +269,18 @@ h4 {
 
 .submissions-table tbody tr:hover {
   background: #f7fafd;
+}
+
+.submissions-table tbody tr.check-payment-unreceived {
+  background: #fff1f1;
+}
+
+.submissions-table tbody tr.check-payment-unreceived:hover {
+  background: #ffe5e5;
+}
+
+.submissions-table tbody tr.check-payment-unreceived td:first-child {
+  border-left: 4px solid #b42318;
 }
 
 .details-button {
@@ -343,6 +383,21 @@ h4 {
 .submission-empty {
   color: #667789;
   font-size: 0.9rem;
+}
+
+.payment-received-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  color: #182230;
+  font-weight: 800;
+}
+
+.payment-received-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: #0a3161;
 }
 
 .submission-actions {

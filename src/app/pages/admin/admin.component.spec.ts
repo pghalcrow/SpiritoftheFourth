@@ -528,7 +528,169 @@ describe('AdminComponent', () => {
     expect(nativeElement.querySelector('.submission-detail-panel')?.textContent).toContain('Motor Show Event Order');
   });
 
-  it('opens a submission detail panel and saves admin fields', () => {
+  it('filters submissions by selectable group tabs with All selected by default', () => {
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [
+        {
+          submissionId: 'vendor-1',
+          submissionTitle: 'New Vendor Application Submission',
+          submittedAt: '2026-06-05T10:00:00-07:00',
+          name: 'Vendor Person',
+          email: 'vendor@example.com',
+          phone: '555-1000',
+          paymentStatus: 'none',
+          paymentProvider: 'none',
+          source: 'vendorApplication',
+          status: 'New',
+          assignedTo: '',
+          notes: '',
+          rawData: { formType: 'vendorApplicationForm' },
+        },
+        {
+          submissionId: 'motor-1',
+          submissionTitle: 'Motor Show Event Order',
+          submittedAt: '2026-06-05T10:00:00-07:00',
+          name: 'Motor Person',
+          email: 'motor@example.com',
+          phone: '555-2000',
+          paymentStatus: 'paid',
+          paymentProvider: 'stripe',
+          source: 'motorShowOrder',
+          status: 'New',
+          assignedTo: '',
+          notes: '',
+          rawData: { formType: 'motorShowOrder' },
+        },
+        {
+          submissionId: 'artist-1',
+          submissionTitle: 'New Artist Sign-Up',
+          submittedAt: '2026-06-05T10:00:00-07:00',
+          name: 'Artist Person',
+          email: 'artist@example.com',
+          phone: '555-2500',
+          paymentStatus: 'none',
+          paymentProvider: 'none',
+          source: 'artistSignUpForm',
+          status: 'New',
+          assignedTo: '',
+          notes: '',
+          rawData: { formType: 'artistSignUpForm' },
+        },
+        {
+          submissionId: 'sponsor-1',
+          submissionTitle: 'Sponsorship Submission',
+          submittedAt: '2026-06-05T10:00:00-07:00',
+          name: 'Sponsor Person',
+          email: 'sponsor@example.com',
+          phone: '555-2600',
+          paymentStatus: 'none',
+          paymentProvider: 'none',
+          source: 'sponsorshipForm',
+          status: 'New',
+          assignedTo: '',
+          notes: '',
+          rawData: { formType: 'sponsorshipForm' },
+        },
+        {
+          submissionId: 'parade-1',
+          submissionTitle: 'New Parade Entry Request - Parade',
+          submittedAt: '2026-06-05T10:00:00-07:00',
+          name: 'Parade Person',
+          email: 'parade@example.com',
+          phone: '555-3000',
+          paymentStatus: 'none',
+          paymentProvider: 'none',
+          source: 'paradeEntryForm',
+          status: 'New',
+          assignedTo: '',
+          notes: '',
+          rawData: { formType: 'paradeEntryForm' },
+        },
+        {
+          submissionId: 'volunteer-1',
+          submissionTitle: 'New Volunteer Request',
+          submittedAt: '2026-06-05T10:00:00-07:00',
+          name: 'Volunteer Person',
+          email: 'volunteer@example.com',
+          phone: '555-4000',
+          paymentStatus: 'none',
+          paymentProvider: 'none',
+          source: 'volunteerForm',
+          status: 'New',
+          assignedTo: '',
+          notes: '',
+          rawData: { formType: 'volunteerForm' },
+        },
+        {
+          submissionId: 'special-1',
+          submissionTitle: 'Community Picnic Signup',
+          submittedAt: '2026-06-05T10:00:00-07:00',
+          name: 'Special Person',
+          email: 'special@example.com',
+          phone: '555-5000',
+          paymentStatus: 'none',
+          paymentProvider: 'none',
+          source: 'communityPicnic',
+          status: 'New',
+          assignedTo: '',
+          notes: '',
+          rawData: { eventTitle: 'Community Picnic', pricing: { pricePerPlayer: 0 } },
+        },
+      ]
+    }));
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-submissions"]')!.click();
+    fixture.detectChanges();
+
+    let tableText = nativeElement.querySelector('.submissions-table')?.textContent || '';
+    expect(component.selectedSubmissionGroup).toBe('all');
+    expect(nativeElement.querySelectorAll('.submission-group-tab.active').length).toBe(1);
+    expect(nativeElement.querySelector('[data-testid="submission-group-all"]')?.classList).toContain('active');
+    expect(tableText).toContain('New Vendor Application Submission');
+    expect(tableText).toContain('Motor Show Event Order');
+    expect(tableText).toContain('New Artist Sign-Up');
+    expect(tableText).toContain('Sponsorship Submission');
+    expect(tableText).toContain('New Parade Entry Request - Parade');
+    expect(tableText).toContain('New Volunteer Request');
+    expect(tableText).toContain('Community Picnic Signup');
+
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="submission-group-vendor"]')!.click();
+    fixture.detectChanges();
+
+    tableText = nativeElement.querySelector('.submissions-table')?.textContent || '';
+    expect(component.selectedSubmissionGroup).toBe('vendor');
+    expect(nativeElement.querySelector('[data-testid="submission-group-vendor"]')?.classList).toContain('active');
+    expect(tableText).toContain('New Vendor Application Submission');
+    expect(tableText).not.toContain('Motor Show Event Order');
+    expect(tableText).not.toContain('New Artist Sign-Up');
+    expect(tableText).not.toContain('Sponsorship Submission');
+    expect(tableText).not.toContain('Community Picnic Signup');
+
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="submission-group-all"]')!.click();
+    fixture.detectChanges();
+
+    tableText = nativeElement.querySelector('.submissions-table')?.textContent || '';
+    expect(component.selectedSubmissionGroup).toBe('all');
+    expect(nativeElement.querySelector('[data-testid="submission-group-all"]')?.classList).toContain('active');
+    expect(tableText).toContain('Motor Show Event Order');
+    expect(tableText).toContain('Community Picnic Signup');
+
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="submission-group-specialEvents"]')!.click();
+    fixture.detectChanges();
+
+    tableText = nativeElement.querySelector('.submissions-table')?.textContent || '';
+    expect(component.selectedSubmissionGroup).toBe('specialEvents');
+    expect(tableText).toContain('Community Picnic Signup');
+    expect(tableText).not.toContain('New Vendor Application Submission');
+    expect(tableText).not.toContain('New Artist Sign-Up');
+    expect(tableText).not.toContain('Sponsorship Submission');
+    expect(tableText).not.toContain('Motor Show Event Order');
+    expect(tableText).not.toContain('New Parade Entry Request - Parade');
+    expect(tableText).not.toContain('New Volunteer Request');
+  });
+
+  it('opens a submission detail panel and saves notes without status or assigned fields', () => {
     cmsService.getSubmissions.and.returnValue(of({
       items: [{
         submissionId: 's1',
@@ -559,16 +721,21 @@ describe('AdminComponent', () => {
     nativeElement.querySelector<HTMLTableRowElement>('[data-testid="submission-row-s1"]')!.click();
     fixture.detectChanges();
 
-    component.selectedSubmission!.status = 'Complete';
-    component.selectedSubmission!.assignedTo = 'Patrick';
     component.selectedSubmission!.notes = 'Verified';
     component.saveSelectedSubmission();
 
     expect(cmsService.updateSubmissionAdminFields).toHaveBeenCalledWith('s1', {
-      status: 'Complete',
-      assignedTo: 'Patrick',
       notes: 'Verified',
     });
+
+    const detailPanel = nativeElement.querySelector('.submission-detail-panel')!;
+    const detailText = detailPanel.textContent || '';
+    const detailsIndex = detailText.indexOf('Submission Details');
+    const notesIndex = detailText.indexOf('Notes');
+
+    expect(detailPanel.querySelector('.admin-select')).toBeFalsy();
+    expect(detailText).not.toContain('Assigned To');
+    expect(notesIndex).toBeGreaterThan(detailsIndex);
   });
 
   it('shows normalized motor show details for structured card purchases', () => {
@@ -783,6 +950,96 @@ describe('AdminComponent', () => {
     expect(detailText).toContain('$25.00');
     expect(detailText).not.toContain('No additional submitted details.');
     expect(detailText).not.toContain('Customer will mail check');
+  });
+
+  it('marks unpaid check orders red and clears the detail panel after payment received is saved', () => {
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 'motor-check-1',
+        submissionTitle: 'New Motor Show Entry — Check Payment',
+        submittedAt: '2026-06-15T06:36:45-07:00',
+        name: 'Bill Adams',
+        email: 'thekoolguy@aol.com',
+        phone: '619-219-9630',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        paymentReceived: false,
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: {
+          subject: 'New Motor Show Entry — Check Payment',
+          body: 'Total: $25.00',
+        },
+      }]
+    }));
+    cmsService.updateSubmissionAdminFields.and.returnValue(of({
+      submissionId: 'motor-check-1',
+      submissionTitle: 'New Motor Show Entry — Check Payment',
+      status: 'New',
+      assignedTo: '',
+      notes: 'Check logged',
+      paymentReceived: true,
+    } as any));
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-submissions"]')!.click();
+    fixture.detectChanges();
+
+    const row = nativeElement.querySelector<HTMLTableRowElement>('[data-testid="submission-row-motor-check-1"]')!;
+    expect(row.classList).toContain('check-payment-unreceived');
+
+    row.click();
+    fixture.detectChanges();
+
+    const checkbox = nativeElement.querySelector<HTMLInputElement>('[data-testid="payment-received-checkbox"]')!;
+    expect(checkbox).toBeTruthy();
+    expect(checkbox.checked).toBeFalse();
+
+    checkbox.click();
+    component.selectedSubmission!.notes = 'Check logged';
+    component.saveSelectedSubmission();
+    fixture.detectChanges();
+
+    expect(cmsService.updateSubmissionAdminFields).toHaveBeenCalledWith('motor-check-1', {
+      notes: 'Check logged',
+      paymentReceived: true,
+    });
+    expect(component.submissions[0].paymentReceived).toBeTrue();
+    expect(component.selectedSubmission).toBeUndefined();
+    expect(nativeElement.querySelector('.submission-detail-panel')).toBeFalsy();
+  });
+
+  it('does not show payment received controls for card-paid submissions', () => {
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 'motor-card-1',
+        submissionTitle: 'Motor Show Event Order',
+        submittedAt: '2026-06-15T06:36:45-07:00',
+        name: 'Pat Halcrow',
+        email: 'pat@example.com',
+        phone: '555-1212',
+        paymentStatus: 'paid',
+        paymentProvider: 'stripe',
+        paymentReceived: false,
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { stripe_session_id: 'cs_test_123' },
+      }]
+    }));
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-submissions"]')!.click();
+    fixture.detectChanges();
+
+    const row = nativeElement.querySelector<HTMLTableRowElement>('[data-testid="submission-row-motor-card-1"]')!;
+    expect(row.classList).not.toContain('check-payment-unreceived');
+
+    row.click();
+    fixture.detectChanges();
+
+    expect(nativeElement.querySelector('[data-testid="payment-received-checkbox"]')).toBeFalsy();
   });
 
   it('uses a modal confirmation before deleting a submission row', () => {

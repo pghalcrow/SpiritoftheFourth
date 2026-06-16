@@ -9,6 +9,7 @@ import { tap } from 'rxjs/operators';
 
 type AdminModalVariant = 'success' | 'danger' | 'warning';
 type PricingMode = 'free' | 'fixed' | 'perParticipant';
+type SubmissionGroupKey = 'all' | 'vendor' | 'artist' | 'sponsor' | 'motorShow' | 'parade' | 'volunteer' | 'specialEvents';
 const ALLOWED_EVENT_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
 
 interface AdminModal {
@@ -23,6 +24,11 @@ interface AdminModal {
 interface SubmissionDisplayRow {
   label: string;
   value: string;
+}
+
+interface SubmissionGroupTab {
+  key: SubmissionGroupKey;
+  label: string;
 }
 
 @Component({
@@ -41,6 +47,17 @@ export class AdminComponent implements OnInit {
   selectedSubmissionDetailRows: SubmissionDisplayRow[] = [];
   selectedSubmissionAddOnRows: SubmissionDisplayRow[] = [];
   submissionSearch = '';
+  selectedSubmissionGroup: SubmissionGroupKey = 'all';
+  submissionGroupTabs: SubmissionGroupTab[] = [
+    { key: 'all', label: 'All' },
+    { key: 'vendor', label: 'Vendors' },
+    { key: 'artist', label: 'Artists' },
+    { key: 'sponsor', label: 'Sponsors' },
+    { key: 'motorShow', label: 'Motor Show' },
+    { key: 'parade', label: 'Parade' },
+    { key: 'volunteer', label: 'Volunteers' },
+    { key: 'specialEvents', label: 'Special Events' },
+  ];
   submissionStatuses = ['New', 'In Review', 'Follow Up', 'Complete', 'Archived'];
   testMode = false;
   testModeLocalOnly = false;
@@ -204,17 +221,95 @@ export class AdminComponent implements OnInit {
   }
 
   get filteredSubmissions(): AdminSubmission[] {
+    const groupedSubmissions = this.selectedSubmissionGroup !== 'all'
+      ? this.submissions.filter(row => this.submissionMatchesGroup(row, this.selectedSubmissionGroup))
+      : this.submissions;
     const query = this.submissionSearch.trim().toLowerCase();
-    if (!query) return this.submissions;
-    return this.submissions.filter(row =>
+    if (!query) return groupedSubmissions;
+    return groupedSubmissions.filter(row =>
       [row.submissionTitle, row.name, row.email, row.phone, row.status, row.assignedTo, row.notes]
         .filter(Boolean)
         .some(value => String(value).toLowerCase().includes(query))
     );
   }
 
+  toggleSubmissionGroup(group: SubmissionGroupKey) {
+    this.selectedSubmissionGroup = this.selectedSubmissionGroup === group ? 'all' : group;
+    this.clearSelectedSubmission();
+  }
+
+  private submissionMatchesGroup(submission: AdminSubmission, group: SubmissionGroupKey): boolean {
+    if (group === 'all') return true;
+
+    const text = this.getSubmissionGroupText(submission);
+
+    if (group === 'vendor') {
+      return text.includes('vendor') || text.includes('vendorapplication');
+    }
+    if (group === 'artist') {
+      return text.includes('artist') || text.includes('artistsignup');
+    }
+    if (group === 'sponsor') {
+      return text.includes('sponsor') || text.includes('sponsorship');
+    }
+    if (group === 'motorShow') {
+      return text.includes('motor show') || text.includes('motorshow') || text.includes('car show');
+    }
+    if (group === 'parade') {
+      return text.includes('parade') || text.includes('paradeentry') || text.includes('paradecar') || text.includes('paradevip');
+    }
+    if (group === 'volunteer') {
+      return text.includes('volunteer');
+    }
+
+    return this.isSpecialEventSubmission(submission);
+  }
+
+  private isSpecialEventSubmission(submission: AdminSubmission): boolean {
+    if (
+      this.submissionMatchesGroup(submission, 'vendor') ||
+      this.submissionMatchesGroup(submission, 'artist') ||
+      this.submissionMatchesGroup(submission, 'sponsor') ||
+      this.submissionMatchesGroup(submission, 'motorShow') ||
+      this.submissionMatchesGroup(submission, 'parade') ||
+      this.submissionMatchesGroup(submission, 'volunteer')
+    ) {
+      return false;
+    }
+
+    const rawData = submission.rawData || {};
+    return Boolean(
+      rawData.eventTitle ||
+      rawData.eventType ||
+      rawData.pricing ||
+      rawData.addOns ||
+      rawData.players ||
+      rawData.teamMembers ||
+      submission.paymentProvider === 'stripe' ||
+      submission.paymentProvider === 'paypal'
+    );
+  }
+
+  private getSubmissionGroupText(submission: AdminSubmission): string {
+    const rawData = submission.rawData || {};
+    return [
+      submission.source,
+      submission.submissionTitle,
+      rawData.formType,
+      rawData.eventTitle,
+      rawData.eventType,
+      rawData.type,
+    ]
+      .filter(Boolean)
+      .map(value => String(value).toLowerCase())
+      .join(' ');
+  }
+
   selectSubmission(submission: AdminSubmission) {
-    this.selectedSubmission = { ...submission };
+    this.selectedSubmission = {
+      ...submission,
+      paymentReceived: this.isCheckPaymentSubmission(submission) ? submission.paymentReceived === true : submission.paymentReceived,
+    };
     this.selectedSubmissionDetailRows = this.getSubmissionDetailRows(this.selectedSubmission);
     this.selectedSubmissionAddOnRows = this.getSubmissionAddOns(this.selectedSubmission);
   }
@@ -333,6 +428,25 @@ export class AdminComponent implements OnInit {
       rawData?.type,
       rawData?.subject,
     ].some(value => typeof value === 'string' && /motor show|motorshoworder/i.test(value));
+  }
+
+  isCheckPaymentSubmission(submission?: AdminSubmission): boolean {
+    const rawData = submission?.rawData || {};
+    const paymentMethod = typeof rawData.paymentMethod === 'string' ? rawData.paymentMethod : '';
+    if (/^(check|paybycheck|pay_by_check|pay-by-check)$/i.test(paymentMethod.replace(/\s+/g, ''))) {
+      return true;
+    }
+
+    return [
+      submission?.submissionTitle,
+      submission?.paymentProvider,
+      rawData.subject,
+      rawData.body,
+    ].some(value => typeof value === 'string' && /check payment|pay by check|mail check/i.test(value));
+  }
+
+  isCheckPaymentUnreceived(submission?: AdminSubmission): boolean {
+    return this.isCheckPaymentSubmission(submission) && submission?.paymentReceived !== true;
   }
 
   private getMotorShowDetailRows(rawData: any): SubmissionDisplayRow[] {
@@ -496,15 +610,16 @@ export class AdminComponent implements OnInit {
 
   saveSelectedSubmission() {
     if (!this.selectedSubmission) return;
-    const { submissionId, status, assignedTo, notes } = this.selectedSubmission;
-    this.cmsService.updateSubmissionAdminFields(submissionId, { status, assignedTo, notes }).subscribe({
+    const { submissionId, notes } = this.selectedSubmission;
+    const update = this.isCheckPaymentSubmission(this.selectedSubmission)
+      ? { notes, paymentReceived: this.selectedSubmission.paymentReceived === true }
+      : { notes };
+    this.cmsService.updateSubmissionAdminFields(submissionId, update).subscribe({
       next: updated => {
         this.submissions = this.submissions.map(row =>
           row.submissionId === updated.submissionId ? { ...row, ...updated } : row
         );
-        this.selectedSubmission = { ...this.selectedSubmission!, ...updated };
-        this.selectedSubmissionDetailRows = this.getSubmissionDetailRows(this.selectedSubmission);
-        this.selectedSubmissionAddOnRows = this.getSubmissionAddOns(this.selectedSubmission);
+        this.clearSelectedSubmission();
         this.showModal('Submission saved', 'Admin fields have been updated.', 'success');
       },
       error: err => {

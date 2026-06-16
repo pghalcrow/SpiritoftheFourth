@@ -205,17 +205,18 @@ def list_submissions(event):
 
 def update_submission_admin_fields(submission_id, body):
     allowed_statuses = {"New", "In Review", "Follow Up", "Complete", "Archived"}
-    status = body.get("status", "New")
-    if status not in allowed_statuses:
+    status = body.get("status") if "status" in body else None
+    if status is not None and status not in allowed_statuses:
         return json_response(400, {"error": "Invalid status"})
 
     try:
         updated = get_submissions_repository().update_submission_admin_fields(
             submission_id=submission_id,
             status=status,
-            assigned_to=body.get("assignedTo", ""),
-            notes=body.get("notes", ""),
+            assigned_to=body.get("assignedTo") if "assignedTo" in body else None,
+            notes=body.get("notes") if "notes" in body else None,
             updated_by="admin",
+            payment_received=bool(body.get("paymentReceived")) if "paymentReceived" in body else None,
         )
         return json_response(200, updated)
     except KeyError as e:

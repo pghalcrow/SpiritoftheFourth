@@ -480,6 +480,20 @@
       <button type="button" class="action-button secondary" (click)="loadSubmissions()">Refresh</button>
     </div>
 
+    <div class="submission-group-tabs" aria-label="Submission groups">
+      <button
+        *ngFor="let tab of submissionGroupTabs"
+        type="button"
+        class="submission-group-tab"
+        [class.active]="selectedSubmissionGroup === tab.key"
+        [attr.aria-pressed]="selectedSubmissionGroup === tab.key"
+        [attr.data-testid]="'submission-group-' + tab.key"
+        (click)="toggleSubmissionGroup(tab.key)"
+      >
+        {{ tab.label }}
+      </button>
+    </div>
+
     <div class="submissions-table-wrap">
       <table class="submissions-table">
         <thead>
@@ -496,6 +510,7 @@
           <tr
             *ngFor="let submission of filteredSubmissions"
             [attr.data-testid]="'submission-row-' + submission.submissionId"
+            [class.check-payment-unreceived]="isCheckPaymentUnreceived(submission)"
             (click)="selectSubmission(submission)"
           >
             <td>{{ submission.submissionTitle }}</td>
@@ -534,21 +549,6 @@
       <p>{{ selectedSubmission.phone }}</p>
     </div>
 
-    <label class="control-group">
-      <span>Status</span>
-      <select class="admin-select" [(ngModel)]="selectedSubmission.status">
-        <option *ngFor="let status of submissionStatuses" [value]="status">{{ status }}</option>
-      </select>
-    </label>
-    <label class="control-group">
-      <span>Assigned To</span>
-      <input class="admin-input" [(ngModel)]="selectedSubmission.assignedTo" />
-    </label>
-    <label class="control-group">
-      <span>Notes</span>
-      <textarea class="admin-textarea" [(ngModel)]="selectedSubmission.notes" rows="5"></textarea>
-    </label>
-
     <section class="submission-data">
       <div class="submission-data-heading">
         <h3>Submission Details</h3>
@@ -577,6 +577,20 @@
         </dl>
       </ng-container>
     </section>
+
+    <label *ngIf="isCheckPaymentSubmission(selectedSubmission)" class="payment-received-toggle">
+      <input
+        type="checkbox"
+        data-testid="payment-received-checkbox"
+        [(ngModel)]="selectedSubmission.paymentReceived"
+      />
+      <span>Payment Received</span>
+    </label>
+
+    <label class="control-group">
+      <span>Notes</span>
+      <textarea class="admin-textarea" [(ngModel)]="selectedSubmission.notes" rows="5"></textarea>
+    </label>
 
     <div class="submission-actions">
       <button type="button" class="action-button danger" data-testid="delete-submission-button" (click)="requestDeleteSelectedSubmission()">Delete Submission</button>

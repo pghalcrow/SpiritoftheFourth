@@ -26,6 +26,31 @@ class LocalSubmissionsRepositoryTests(unittest.TestCase):
             self.assertEqual(updated["assignedTo"], "Patrick")
             self.assertEqual(updated["notes"], "Verified")
 
+    def test_updates_payment_received_without_overwriting_existing_admin_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = LocalSubmissionsRepository(Path(tmp) / "submissions.json")
+            repo.create_submission({
+                "submissionId": "s1",
+                "submissionTitle": "New Motor Show Entry — Check Payment",
+                "submittedAt": "2026-06-05T10:00:00-07:00",
+                "status": "In Review",
+                "assignedTo": "Patrick",
+                "notes": "Waiting for check",
+                "paymentReceived": False,
+            })
+
+            updated = repo.update_submission_admin_fields(
+                "s1",
+                notes="Check received",
+                payment_received=True,
+                updated_by="admin",
+            )
+
+            self.assertEqual(updated["status"], "In Review")
+            self.assertEqual(updated["assignedTo"], "Patrick")
+            self.assertEqual(updated["notes"], "Check received")
+            self.assertTrue(updated["paymentReceived"])
+
 
 if __name__ == "__main__":
     unittest.main()

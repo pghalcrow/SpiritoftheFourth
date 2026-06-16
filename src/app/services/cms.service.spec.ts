@@ -67,8 +67,6 @@ describe('CmsService', () => {
     sessionStorage.setItem('adminToken', 'cms-admin-token');
 
     service.updateSubmissionAdminFields('s1', {
-      status: 'Complete',
-      assignedTo: 'Patrick',
       notes: 'Verified',
     }).subscribe(res => {
       expect(res.status).toBe('Complete');
@@ -76,8 +74,24 @@ describe('CmsService', () => {
 
     const req = httpMock.expectOne(`${environment.cms.baseUrl}${environment.cms.routes.submissions}/s1`);
     expect(req.request.method).toBe('PATCH');
-    expect(req.request.body.status).toBe('Complete');
+    expect(req.request.body).toEqual({ notes: 'Verified' });
     req.flush({ submissionId: 's1', status: 'Complete', assignedTo: 'Patrick', notes: 'Verified' });
+  });
+
+  it('updates check payment received status for admin submissions', () => {
+    sessionStorage.setItem('adminToken', 'cms-admin-token');
+
+    service.updateSubmissionAdminFields('s1', {
+      notes: 'Check received',
+      paymentReceived: true,
+    }).subscribe(res => {
+      expect(res.paymentReceived).toBeTrue();
+    });
+
+    const req = httpMock.expectOne(`${environment.cms.baseUrl}${environment.cms.routes.submissions}/s1`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ notes: 'Check received', paymentReceived: true });
+    req.flush({ submissionId: 's1', status: 'New', assignedTo: '', notes: 'Check received', paymentReceived: true });
   });
 
   it('deletes an admin submission', () => {

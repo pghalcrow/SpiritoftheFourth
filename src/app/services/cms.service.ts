@@ -57,6 +57,7 @@ export interface AdminSubmission {
   phone?: string;
   paymentStatus?: string;
   paymentProvider?: string;
+  paymentReceived?: boolean;
   amount?: number;
   currency?: string;
   source?: string;
@@ -71,9 +72,10 @@ export interface AdminSubmissionListResponse {
 }
 
 export interface AdminSubmissionUpdate {
-  status: string;
-  assignedTo: string;
-  notes: string;
+  status?: string;
+  assignedTo?: string;
+  notes?: string;
+  paymentReceived?: boolean;
 }
 
 export interface AdminSubmissionDeleteResponse {

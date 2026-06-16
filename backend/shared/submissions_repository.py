@@ -198,32 +198,47 @@ class SubmissionsRepository:
 
         return {"items": items, "lastEvaluatedKey": last_key}
 
-    def update_submission_admin_fields(self, submission_id, status, assigned_to, notes, updated_by):
+    def update_submission_admin_fields(
+        self,
+        submission_id,
+        status=None,
+        assigned_to=None,
+        notes=None,
+        updated_by=None,
+        payment_received=None,
+    ):
         submission = self._find_submission_by_id(submission_id)
         if submission is None:
             raise KeyError(f"Submission not found: {submission_id}")
 
+        update_fields = {
+            "#updatedAt": ("updatedAt", ":updatedAt", _now_iso()),
+            "#updatedBy": ("updatedBy", ":updatedBy", updated_by),
+        }
+        if status is not None:
+            update_fields["#status"] = ("status", ":status", status)
+        if assigned_to is not None:
+            update_fields["#assignedTo"] = ("assignedTo", ":assignedTo", assigned_to)
+        if notes is not None:
+            update_fields["#notes"] = ("notes", ":notes", notes)
+        if payment_received is not None:
+            update_fields["#paymentReceived"] = ("paymentReceived", ":paymentReceived", bool(payment_received))
+
         try:
             result = self.table.update_item(
                 Key={"pk": submission["pk"], "sk": submission["sk"]},
-                UpdateExpression=(
-                    "SET #status = :status, #assignedTo = :assignedTo, "
-                    "#notes = :notes, #updatedAt = :updatedAt, #updatedBy = :updatedBy"
+                UpdateExpression="SET " + ", ".join(
+                    f"{name_placeholder} = {value_placeholder}"
+                    for name_placeholder, (_, value_placeholder, _) in update_fields.items()
                 ),
                 ConditionExpression="attribute_exists(pk) AND attribute_exists(sk)",
                 ExpressionAttributeNames={
-                    "#status": "status",
-                    "#assignedTo": "assignedTo",
-                    "#notes": "notes",
-                    "#updatedAt": "updatedAt",
-                    "#updatedBy": "updatedBy",
+                    name_placeholder: field_name
+                    for name_placeholder, (field_name, _, _) in update_fields.items()
                 },
                 ExpressionAttributeValues={
-                    ":status": status,
-                    ":assignedTo": assigned_to,
-                    ":notes": notes,
-                    ":updatedAt": _now_iso(),
-                    ":updatedBy": updated_by,
+                    value_placeholder: value
+                    for _, value_placeholder, value in update_fields.values()
                 },
                 ReturnValues="ALL_NEW",
             )

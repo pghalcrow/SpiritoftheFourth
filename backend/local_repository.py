@@ -52,18 +52,31 @@ class LocalSubmissionsRepository:
                 return item
         raise KeyError(f"Submission not found: {submission_id}")
 
-    def update_submission_admin_fields(self, submission_id, status, assigned_to, notes, updated_by):
+    def update_submission_admin_fields(
+        self,
+        submission_id,
+        status=None,
+        assigned_to=None,
+        notes=None,
+        updated_by=None,
+        payment_received=None,
+    ):
         items = self._read()
         for index, item in enumerate(items):
             if item.get("submissionId") == submission_id:
                 updated = {
                     **item,
-                    "status": status,
-                    "assignedTo": assigned_to,
-                    "notes": notes,
                     "updatedAt": now_iso(),
                     "updatedBy": updated_by,
                 }
+                if status is not None:
+                    updated["status"] = status
+                if assigned_to is not None:
+                    updated["assignedTo"] = assigned_to
+                if notes is not None:
+                    updated["notes"] = notes
+                if payment_received is not None:
+                    updated["paymentReceived"] = bool(payment_received)
                 items[index] = updated
                 self._write(items)
                 return updated

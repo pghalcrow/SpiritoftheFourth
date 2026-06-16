@@ -29,13 +29,14 @@ class FakeRepo:
     def list_submissions(self, limit=100):
         return {"items": [{"submissionId": "s1", "submissionTitle": "Volunteer", "status": "New"}]}
 
-    def update_submission_admin_fields(self, submission_id, status, assigned_to, notes, updated_by):
+    def update_submission_admin_fields(self, submission_id, status=None, assigned_to=None, notes=None, updated_by=None, payment_received=None):
         return {
             "submissionId": submission_id,
-            "status": status,
-            "assignedTo": assigned_to,
-            "notes": notes,
+            "status": status if status is not None else "New",
+            "assignedTo": assigned_to if assigned_to is not None else "",
+            "notes": notes if notes is not None else "",
             "updatedBy": updated_by,
+            "paymentReceived": payment_received,
         }
 
     def delete_submission(self, submission_id):
@@ -167,6 +168,23 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         self.assertEqual(body["status"], "Complete")
         self.assertEqual(body["assignedTo"], "Patrick")
         self.assertEqual(body["notes"], "Verified")
+
+    @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
+    def test_authorized_admin_can_patch_check_payment_received_without_status_fields(self, _repo):
+        response = events_service.lambda_handler(
+            make_event(
+                "PATCH",
+                "/admin/submissions/s1",
+                {"notes": "Check received", "paymentReceived": True},
+            ),
+            None,
+        )
+
+        self.assertEqual(response["statusCode"], 200)
+        body = json.loads(response["body"])
+        self.assertEqual(body["submissionId"], "s1")
+        self.assertEqual(body["notes"], "Check received")
+        self.assertTrue(body["paymentReceived"])
 
     @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
     def test_authorized_admin_can_delete_submission(self, _repo):
