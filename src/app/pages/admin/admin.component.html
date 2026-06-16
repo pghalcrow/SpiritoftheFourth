@@ -513,7 +513,7 @@
             [class.check-payment-unreceived]="isCheckPaymentUnreceived(submission)"
             (click)="selectSubmission(submission)"
           >
-            <td>{{ submission.submissionTitle }}</td>
+            <td>{{ formatSubmissionTitle(submission) }}</td>
             <td>{{ formatSubmissionDate(submission.submittedAt) }}</td>
             <td>{{ submission.name }}</td>
             <td>{{ submission.email }}</td>
@@ -538,7 +538,7 @@
     <div class="submission-detail-header">
       <div>
         <span class="event-index">Submission</span>
-        <h2>{{ selectedSubmission.submissionTitle }}</h2>
+        <h2>{{ formatSubmissionTitle(selectedSubmission) }}</h2>
       </div>
       <button type="button" class="action-button ghost" (click)="clearSelectedSubmission()">Close</button>
     </div>

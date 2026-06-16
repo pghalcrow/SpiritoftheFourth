@@ -528,6 +528,47 @@ describe('AdminComponent', () => {
     expect(nativeElement.querySelector('.submission-detail-panel')?.textContent).toContain('Motor Show Event Order');
   });
 
+  it('displays imported motor show order titles as readable labels in the table details and search', () => {
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 'motor-import-1',
+        submissionTitle: 'motorShowOrder Order',
+        submittedAt: '2026-06-05T10:07:00-07:00',
+        name: 'Pat Halcrow',
+        email: 'pat@example.com',
+        phone: '555-1212',
+        paymentStatus: 'unknown',
+        paymentProvider: 'unknown',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { values: ['motorShowOrder Order'] },
+      }]
+    }));
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-submissions"]')!.click();
+    fixture.detectChanges();
+
+    let tableText = nativeElement.querySelector('.submissions-table')?.textContent || '';
+    expect(tableText).toContain('Motor Show Event Order');
+    expect(tableText).not.toContain('motorShowOrder Order');
+
+    nativeElement.querySelector<HTMLTableRowElement>('[data-testid="submission-row-motor-import-1"]')!.click();
+    fixture.detectChanges();
+
+    const detailText = nativeElement.querySelector('.submission-detail-panel')?.textContent || '';
+    expect(detailText).toContain('Motor Show Event Order');
+    expect(detailText).not.toContain('motorShowOrder Order');
+
+    component.clearSelectedSubmission();
+    component.submissionSearch = 'Motor Show Event Order';
+    fixture.detectChanges();
+
+    tableText = nativeElement.querySelector('.submissions-table')?.textContent || '';
+    expect(tableText).toContain('Pat Halcrow');
+  });
+
   it('filters submissions by selectable group tabs with All selected by default', () => {
     cmsService.getSubmissions.and.returnValue(of({
       items: [

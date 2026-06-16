@@ -227,7 +227,7 @@ export class AdminComponent implements OnInit {
     const query = this.submissionSearch.trim().toLowerCase();
     if (!query) return groupedSubmissions;
     return groupedSubmissions.filter(row =>
-      [row.submissionTitle, row.name, row.email, row.phone, row.status, row.assignedTo, row.notes]
+      [this.formatSubmissionTitle(row), row.submissionTitle, row.name, row.email, row.phone, row.status, row.assignedTo, row.notes]
         .filter(Boolean)
         .some(value => String(value).toLowerCase().includes(query))
     );
@@ -548,7 +548,16 @@ export class AdminComponent implements OnInit {
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
     if (Array.isArray(value)) return value.map(item => this.formatSubmissionFieldValue(item)).join(', ');
     if (value && typeof value === 'object') return JSON.stringify(value);
+    if (value === 'motorShowOrder Order') return 'Motor Show Event Order';
     return String(value);
+  }
+
+  formatSubmissionTitle(submission?: AdminSubmission): string {
+    const title = submission?.submissionTitle || '';
+    if (title === 'motorShowOrder Order') {
+      return 'Motor Show Event Order';
+    }
+    return title;
   }
 
   private formatFormTypeValue(value: string): string {
