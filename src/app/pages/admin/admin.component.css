@@ -196,6 +196,21 @@ h4 {
   flex: 1 1 320px;
 }
 
+.admin-loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 132px;
+  padding: 22px;
+  background: #ffffff;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+  box-shadow: 0 14px 38px rgba(16, 35, 61, 0.08);
+  color: #0a3161;
+  font-weight: 800;
+}
+
 .submission-group-tabs {
   display: flex;
   flex-wrap: wrap;

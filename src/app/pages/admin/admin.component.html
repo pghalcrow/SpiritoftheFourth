@@ -61,6 +61,11 @@
   </section>
 
   <ng-container *ngIf="adminSection === 'events'">
+    <div *ngIf="eventsLoading" class="admin-loading-state" data-testid="events-loading-state">
+      <span class="button-spinner" aria-hidden="true"></span>
+      <span>Loading events...</span>
+    </div>
+
     <nav *ngIf="events.length" class="event-tabs" aria-label="Events">
       <button
         *ngFor="let cmsEvent of events; let i = index"
@@ -463,7 +468,7 @@
       </article>
     </section>
 
-    <section *ngIf="!events.length" class="empty-events">
+    <section *ngIf="!eventsLoading && !events.length" class="empty-events">
       <h2>No Events Yet</h2>
       <p>Add an event to start editing.</p>
       <button type="button" class="action-button primary" (click)="addEvent()">Add Event</button>
@@ -476,7 +481,16 @@
         <span>Search</span>
         <input class="admin-input" [(ngModel)]="submissionSearch" placeholder="Search submissions" />
       </label>
-      <button type="button" class="action-button secondary" (click)="loadSubmissions()">Refresh</button>
+      <button
+        type="button"
+        class="action-button secondary"
+        data-testid="refresh-submissions-button"
+        [disabled]="submissionsLoading"
+        (click)="loadSubmissions()"
+      >
+        <span *ngIf="submissionsLoading" class="button-spinner" aria-hidden="true"></span>
+        {{ submissionsLoading ? 'Refreshing...' : 'Refresh' }}
+      </button>
     </div>
 
     <div class="submission-group-tabs" aria-label="Submission groups">
@@ -493,7 +507,12 @@
       </button>
     </div>
 
-    <div class="submissions-table-wrap">
+    <div *ngIf="submissionsLoading" class="admin-loading-state" data-testid="submissions-loading-state">
+      <span class="button-spinner" aria-hidden="true"></span>
+      <span>Loading submissions...</span>
+    </div>
+
+    <div *ngIf="!submissionsLoading" class="submissions-table-wrap">
       <table class="submissions-table">
         <thead>
           <tr>

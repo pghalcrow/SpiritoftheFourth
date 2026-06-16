@@ -5,7 +5,7 @@ import { CmsService, CmsEvent, AdminSubmission } from 'src/app/services/cms.serv
 import { environment } from 'src/environments/environment';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { Observable, forkJoin } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import { finalize, tap } from 'rxjs/operators';
 
 type AdminModalVariant = 'success' | 'danger' | 'warning';
 type PricingMode = 'free' | 'fixed' | 'perParticipant';
@@ -49,6 +49,8 @@ export class AdminComponent implements OnInit {
   submissionSearch = '';
   selectedSubmissionGroup: SubmissionGroupKey = 'all';
   submissionActionLoading: 'save' | 'delete' | null = null;
+  eventsLoading = false;
+  submissionsLoading = false;
   submissionGroupTabs: SubmissionGroupTab[] = [
     { key: 'all', label: 'All' },
     { key: 'vendor', label: 'Vendors' },
@@ -74,12 +76,25 @@ export class AdminComponent implements OnInit {
   constructor(private cmsService: CmsService, private router: Router, private sanitizer: DomSanitizer) {}
 
   ngOnInit() {
-    this.cmsService.getEvents().subscribe(res => {
-      this.events = (res.events || []).map(event => this.normalizeEventForEditor(event));
-      this.activeEventIndex = this.events.length ? 0 : 0;
-    });
+    this.loadEvents();
     this.loadSubmissions();
     this.loadTestMode();
+  }
+
+  loadEvents() {
+    this.eventsLoading = true;
+    this.cmsService.getEvents()
+      .pipe(finalize(() => this.eventsLoading = false))
+      .subscribe({
+        next: res => {
+          this.events = (res.events || []).map(event => this.normalizeEventForEditor(event));
+          this.activeEventIndex = this.events.length ? 0 : 0;
+        },
+        error: err => {
+          console.error('Events load failed', err);
+          this.showModal('Events unavailable', 'Could not load events.', 'danger');
+        }
+      });
   }
 
   get activeEvent(): CmsEvent | undefined {
@@ -211,7 +226,8 @@ export class AdminComponent implements OnInit {
   }
 
   loadSubmissions() {
-    this.cmsService.getSubmissions().subscribe({
+    this.submissionsLoading = true;
+    this.cmsService.getSubmissions().pipe(finalize(() => this.submissionsLoading = false)).subscribe({
       next: res => this.submissions = res.items || [],
       error: err => {
         console.error('Submissions load failed', err);

@@ -107,6 +107,29 @@ describe('AdminComponent', () => {
     expect(nativeElement.querySelector('.admin-toolbar h1')?.textContent).toContain('Upcoming Events');
   });
 
+  it('shows an events loading state instead of the empty state while events are loading', () => {
+    const loadingResponse = new Subject<any>();
+    cmsService.getEvents.and.returnValue(loadingResponse.asObservable());
+    component.events = [];
+    component.selectAdminSection('events');
+    component.loadEvents();
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+
+    expect(component.eventsLoading).toBeTrue();
+    expect(nativeElement.querySelector('[data-testid="events-loading-state"]')?.textContent).toContain('Loading events...');
+    expect(nativeElement.querySelector('.empty-events')).toBeFalsy();
+
+    loadingResponse.next({ events: [] });
+    loadingResponse.complete();
+    fixture.detectChanges();
+
+    expect(component.eventsLoading).toBeFalse();
+    expect(nativeElement.querySelector('[data-testid="events-loading-state"]')).toBeFalsy();
+    expect(nativeElement.querySelector('.empty-events')).toBeTruthy();
+  });
+
   it('shows events before submissions in the admin section selector', () => {
     const nativeElement = fixture.nativeElement as HTMLElement;
     const sectionButtons = Array.from(nativeElement.querySelectorAll<HTMLButtonElement>('.section-switcher .section-button'));
@@ -496,6 +519,35 @@ describe('AdminComponent', () => {
     expect(cmsService.getSubmissions).toHaveBeenCalled();
     expect(nativeElement.querySelector('.submissions-table')?.textContent).toContain('Volunteer Request');
     expect(nativeElement.querySelector('.submissions-table')?.textContent).toContain('Pat Halcrow');
+  });
+
+  it('shows a submissions loading state while submissions are loading', () => {
+    const loadingResponse = new Subject<any>();
+    cmsService.getSubmissions.and.returnValue(loadingResponse.asObservable());
+
+    component.loadSubmissions();
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const loadingState = nativeElement.querySelector('[data-testid="submissions-loading-state"]');
+    const refreshButton = nativeElement.querySelector<HTMLButtonElement>('[data-testid="refresh-submissions-button"]')!;
+
+    expect(component.submissionsLoading).toBeTrue();
+    expect(loadingState?.textContent).toContain('Loading submissions...');
+    expect(nativeElement.querySelector('.submissions-table')).toBeFalsy();
+    expect(refreshButton.disabled).toBeTrue();
+    expect(refreshButton.querySelector('.button-spinner')).toBeTruthy();
+    expect(refreshButton.textContent).toContain('Refreshing...');
+
+    loadingResponse.next({ items: [] });
+    loadingResponse.complete();
+    fixture.detectChanges();
+
+    expect(component.submissionsLoading).toBeFalse();
+    expect(nativeElement.querySelector('[data-testid="submissions-loading-state"]')).toBeFalsy();
+    expect(nativeElement.querySelector('.submissions-table')).toBeTruthy();
+    expect(refreshButton.disabled).toBeFalse();
+    expect(refreshButton.textContent).toContain('Refresh');
   });
 
   it('renders the simplified submissions table with Google Sheet style dates and details buttons', () => {
