@@ -244,6 +244,11 @@ export class AdminComponent implements OnInit {
       return [];
     }
 
+    if (this.isMotorShowSubmission(submission)) {
+      const motorShowRows = this.getMotorShowDetailRows(rawData);
+      if (motorShowRows.length) return motorShowRows;
+    }
+
     const excludedFields = new Set([
       'action',
       'type',
@@ -320,6 +325,48 @@ export class AdminComponent implements OnInit {
     return this.parseSubmissionBodyRows(rawData.body);
   }
 
+  private isMotorShowSubmission(submission?: AdminSubmission): boolean {
+    const rawData = submission?.rawData;
+    return [
+      submission?.source,
+      submission?.submissionTitle,
+      rawData?.type,
+      rawData?.subject,
+    ].some(value => typeof value === 'string' && /motor show|motorshoworder/i.test(value));
+  }
+
+  private getMotorShowDetailRows(rawData: any): SubmissionDisplayRow[] {
+    const rows: SubmissionDisplayRow[] = [];
+    const cityStateZip = [
+      rawData.city,
+      [rawData.state, rawData.zipcode].filter(value => this.hasDisplayValue(value)).join(' '),
+    ].filter(value => this.hasDisplayValue(value)).join(', ');
+    const addressParts = [rawData.streetAddress, cityStateZip].filter(value => this.hasDisplayValue(value));
+    if (addressParts.length) {
+      rows.push({ label: 'Address', value: addressParts.join(', ') });
+    }
+
+    const vehicleParts = [rawData.year, rawData.make, rawData.model].filter(value => this.hasDisplayValue(value));
+    if (vehicleParts.length) {
+      const color = this.hasDisplayValue(rawData.color) ? ` (${rawData.color})` : '';
+      rows.push({ label: 'Vehicle', value: `${vehicleParts.join(' ')}${color}` });
+    }
+
+    if (this.hasDisplayValue(rawData.clubAffiliation)) {
+      rows.push({ label: 'Club Affiliation', value: String(rawData.clubAffiliation) });
+    }
+    if (this.hasDisplayValue(rawData.comboSize)) {
+      rows.push({ label: 'T-Shirt & Plaque Bundle', value: String(rawData.comboSize) });
+    }
+
+    const total = this.hasDisplayValue(rawData.grandTotal) ? rawData.grandTotal : rawData.total;
+    if (this.hasDisplayValue(total)) {
+      rows.push({ label: 'Total', value: this.formatCurrencyValue(total) });
+    }
+
+    return rows;
+  }
+
   getSubmissionAddOns(submission?: AdminSubmission): SubmissionDisplayRow[] {
     const rawData = submission?.rawData;
     if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) {
@@ -327,7 +374,7 @@ export class AdminComponent implements OnInit {
     }
 
     const rows: SubmissionDisplayRow[] = [];
-    if (this.hasDisplayValue(rawData.comboSize)) {
+    if (!this.isMotorShowSubmission(submission) && this.hasDisplayValue(rawData.comboSize)) {
       rows.push({ label: 'T-Shirt & Plaque Bundle', value: String(rawData.comboSize) });
     }
 
@@ -385,6 +432,17 @@ export class AdminComponent implements OnInit {
     if (Array.isArray(value)) return value.map(item => this.formatSubmissionFieldValue(item)).join(', ');
     if (value && typeof value === 'object') return JSON.stringify(value);
     return String(value);
+  }
+
+  private formatCurrencyValue(value: any): string {
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) return String(value);
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
   }
 
   private parseSubmissionBodyRows(body: any): SubmissionDisplayRow[] {

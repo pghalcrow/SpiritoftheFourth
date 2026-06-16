@@ -571,7 +571,7 @@ describe('AdminComponent', () => {
     });
   });
 
-  it('shows readable submission details instead of raw JSON output', () => {
+  it('shows normalized motor show details for structured card purchases', () => {
     cmsService.getSubmissions.and.returnValue(of({
       items: [{
         submissionId: 's1',
@@ -600,6 +600,8 @@ describe('AdminComponent', () => {
           color: 'Blue',
           clubAffiliation: 'Fourth Club',
           comboSize: 'Large',
+          grandTotal: 89,
+          total: 89,
           additionalPlaques: 2,
           additionalSmall: 1,
           additionalMedium: 0,
@@ -622,14 +624,23 @@ describe('AdminComponent', () => {
     const detailText = detailPanel.textContent || '';
 
     expect(detailPanel.querySelector('.submission-raw')).toBeFalsy();
-    expect(detailText).toContain('Vehicle Year');
-    expect(detailText).toContain('1969');
-    expect(detailText).toContain('Make');
-    expect(detailText).toContain('Chevrolet');
+    expect(detailText).toContain('Address');
+    expect(detailText).toContain('123 Main St, Pittsburgh, PA 15201');
+    expect(detailText).toContain('Vehicle');
+    expect(detailText).toContain('1969 Chevrolet Camaro (Blue)');
+    expect(detailText).toContain('Club Affiliation');
+    expect(detailText).toContain('Fourth Club');
     expect(detailText).toContain('T-Shirt & Plaque Bundle');
     expect(detailText).toContain('Large');
+    expect(detailText).toContain('Total');
+    expect(detailText).toContain('$89.00');
     expect(detailText).toContain('Additional Plaque');
     expect(detailText).toContain('2');
+    expect(detailText).not.toContain('Street Address');
+    expect(detailText).not.toContain('Vehicle Year');
+    expect(detailText).not.toContain('Make');
+    expect(detailText).not.toContain('Model');
+    expect(detailText).not.toContain('Color');
     expect(detailText).not.toContain('"firstName"');
     expect(detailText).not.toContain('cs_test_123');
   });
