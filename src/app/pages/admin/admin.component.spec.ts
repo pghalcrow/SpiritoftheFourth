@@ -691,6 +691,42 @@ describe('AdminComponent', () => {
     expect(detailText).not.toContain('5409e288');
   });
 
+  it('shows readable form type values in submission details', () => {
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 'volunteer-1',
+        submissionTitle: 'New Volunteer Request',
+        submittedAt: '2026-06-15T17:30:00-07:00',
+        name: 'Pat Volunteer',
+        email: 'volunteer@example.com',
+        phone: '555-1212',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: {
+          formType: 'volunteerForm',
+          organizationName: 'Spirit Testers',
+          availability: 'Morning setup',
+          message: 'Happy to help',
+        },
+      }]
+    }));
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-submissions"]')!.click();
+    fixture.detectChanges();
+    nativeElement.querySelector<HTMLTableRowElement>('[data-testid="submission-row-volunteer-1"]')!.click();
+    fixture.detectChanges();
+
+    const detailText = nativeElement.querySelector('.submission-detail-panel')?.textContent || '';
+
+    expect(detailText).toContain('Form Type');
+    expect(detailText).toContain('Volunteer Request');
+    expect(detailText).not.toContain('volunteerForm');
+  });
+
   it('shows details from mailer-only motor show check payment submissions', () => {
     cmsService.getSubmissions.and.returnValue(of({
       items: [{

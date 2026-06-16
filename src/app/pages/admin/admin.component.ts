@@ -318,7 +318,7 @@ export class AdminComponent implements OnInit {
 
     const rows = keys.map(key => ({
       label: this.formatSubmissionFieldLabel(key),
-      value: this.formatSubmissionFieldValue(rawData[key]),
+      value: this.formatSubmissionFieldValue(rawData[key], key),
     }));
     if (rows.length) return rows;
 
@@ -427,11 +427,29 @@ export class AdminComponent implements OnInit {
       .replace(/\b\w/g, char => char.toUpperCase());
   }
 
-  private formatSubmissionFieldValue(value: any): string {
+  private formatSubmissionFieldValue(value: any, key = ''): string {
+    if (key === 'formType' && typeof value === 'string') {
+      return this.formatFormTypeValue(value);
+    }
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
     if (Array.isArray(value)) return value.map(item => this.formatSubmissionFieldValue(item)).join(', ');
     if (value && typeof value === 'object') return JSON.stringify(value);
     return String(value);
+  }
+
+  private formatFormTypeValue(value: string): string {
+    const labels: Record<string, string> = {
+      volunteerForm: 'Volunteer Request',
+      sponsorshipForm: 'Sponsorship Submission',
+      vendorApplicationForm: 'Vendor Application',
+      artistSignUpForm: 'Artist Sign-Up',
+      paradeEntryForm: 'Parade Entry',
+      carEntryForm: 'Parade Car Entry',
+      vipEntryForm: 'VIP Parade Entry',
+      motorShowOrder: 'Motor Show Event Order',
+    };
+
+    return labels[value] || this.formatSubmissionFieldLabel(value);
   }
 
   private formatCurrencyValue(value: any): string {
