@@ -6,8 +6,12 @@ import { WheelsOfFreedomComponent } from './wheels-of-freedom.component';
 describe('WheelsOfFreedomComponent', () => {
   let component: WheelsOfFreedomComponent;
   let orderService: any;
+  let emailService: any;
 
   beforeEach(() => {
+    emailService = {
+      sendEmail: jasmine.createSpy('sendEmail').and.returnValue(of({ status: true }))
+    };
     orderService = {
       createStripeEmbeddedSession: jasmine.createSpy('createStripeEmbeddedSession').and.returnValue(
         of({ client_secret: 'cs_test_preloaded' })
@@ -17,7 +21,7 @@ describe('WheelsOfFreedomComponent', () => {
 
     component = new WheelsOfFreedomComponent(
       new FormBuilder(),
-      { sendEmail: jasmine.createSpy('sendEmail').and.returnValue(of({ status: true })) } as any,
+      emailService as any,
       orderService,
       { renderDonationButton: jasmine.createSpy('renderDonationButton') } as any,
       { queryParams: of({}) } as any
@@ -80,6 +84,25 @@ describe('WheelsOfFreedomComponent', () => {
     expect(component.showStripeCheckout).toBeTrue();
     expect(component.stripeIsLoading).toBeFalse();
   }));
+
+  it('sends a standardized customer confirmation email for pay by check entries', () => {
+    component.motorShowForm.patchValue(validMotorShowForm());
+    component.cartTotal = 25;
+
+    component.onPayByCheck();
+
+    expect(emailService.sendEmail).toHaveBeenCalledTimes(2);
+    const receiptCall = emailService.sendEmail.calls.argsFor(1);
+    expect(receiptCall[0]).toBe('pat@example.com');
+    expect(receiptCall[2]).toBe('Wheels of Freedom Motor Show — Entry Confirmation');
+    expect(receiptCall[1]).toContain('Wheels of Freedom Motor Show Entry Confirmation');
+    expect(receiptCall[1]).toContain('Pay by check confirmation');
+    expect(receiptCall[1]).toContain('border-collapse: collapse');
+    expect(receiptCall[1]).toContain('1967 Ford Mustang (Red)');
+    expect(receiptCall[1]).toContain('$25.00');
+    expect(receiptCall[1]).toContain('P.O. Box 270736');
+    expect(receiptCall[1]).not.toContain('Reply directly to this email to contact the submitter.');
+  });
 });
 
 function validMotorShowForm() {

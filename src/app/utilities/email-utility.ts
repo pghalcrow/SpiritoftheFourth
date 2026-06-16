@@ -55,7 +55,7 @@ export class EmailUtlity {
       form.get("zipcode")?.value,
     ].filter(Boolean).join(", ").replace(", CA, ", ", CA ")
   }
-  static normalizedAdminEmail(title: string, eyebrow: string, intro: string, rows: Array<[string, any]>): string {
+  static normalizedEmail(title: string, eyebrow: string, intro: string, rows: Array<[string, any]>, footer: string): string {
     const rowHtml = rows
       .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
       .map(([label, value]) => this.adminSummaryRow(label, value))
@@ -76,11 +76,14 @@ export class EmailUtlity {
             ${rowHtml}
           </table>
         </div>
-        <div style="padding: 16px 28px 24px; color: #7b8797; font-size: 13px; line-height: 1.5;">Reply directly to this email to contact the submitter.</div>
+        <div style="padding: 16px 28px 24px; color: #7b8797; font-size: 13px; line-height: 1.5;">${this.escapeHtml(footer)}</div>
       </div>
     </div>
   </body>
 </html>`
+  }
+  static normalizedAdminEmail(title: string, eyebrow: string, intro: string, rows: Array<[string, any]>): string {
+    return this.normalizedEmail(title, eyebrow, intro, rows, "Reply directly to this email to contact the submitter.")
   }
 
   static createVendorApplicationHTMLBody(vendorApplicationForm: FormGroup): string {
@@ -205,6 +208,36 @@ export class EmailUtlity {
     }
 
     return this.htmlBegin + contentString + this.htmlEnd
+  }
+
+  static createMotorShowCheckConfirmationHTMLBody(details: {
+    name: string;
+    vehicle: string;
+    shirtBundle: string;
+    totalDue: number | string;
+  }): string {
+    const totalDue = typeof details.totalDue === "number"
+      ? `$${details.totalDue.toFixed(2)}`
+      : details.totalDue
+    const mailTo = [
+      this.escapeHtml("The Spirit of the Fourth"),
+      this.escapeHtml("P.O. Box 270736"),
+      this.escapeHtml("San Diego, CA 92198"),
+    ].join("<br>")
+
+    return this.normalizedEmail(
+      "Wheels of Freedom Motor Show Entry Confirmation",
+      "Pay by check confirmation",
+      "Your entry has been received. Please mail your check by June 15 to the address below.",
+      [
+        ["Name", this.escapeHtml(details.name)],
+        ["Vehicle", this.escapeHtml(details.vehicle)],
+        ["T-Shirt & Plaque Bundle", this.escapeHtml(details.shirtBundle)],
+        ["Total Due", this.escapeHtml(totalDue)],
+        ["Mail Check To", mailTo],
+      ],
+      "Thank you for registering for the Wheels of Freedom Motor Show."
+    )
   }
 
   static createVolunteerFormHTMLBody(volunteerForm: FormGroup): string {

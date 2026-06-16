@@ -9,6 +9,7 @@ import { ActivatedRoute } from '@angular/router';
 import { OrderService } from 'src/app/services/order.service';
 import { PaypalDonationService } from 'src/app/services/paypal-donation.service';
 import { debounceTime, Subscription } from 'rxjs';
+import { EmailUtlity } from 'src/app/utilities/email-utility';
 
 declare var bootstrap: any;
 declare var Stripe: any;
@@ -489,16 +490,12 @@ export class WheelsOfFreedomComponent {
       form.phone
     ).subscribe();
 
-    const receiptBody =
-      `Thank you for registering for the Wheels of Freedom Motor Show!\n\n` +
-      `Your entry has been received. Please mail your check for $${this.cartTotal}.00 ` +
-      `by June 15 to:\n\n` +
-      `  The Spirit of the Fourth\n  P.O. Box 270736\n  San Diego, CA 92198\n\n` +
-      `Entry Details:\n` +
-      `  Name: ${form.firstName} ${form.lastName}\n` +
-      `  Vehicle: ${form.year} ${form.make} ${form.model} (${form.color})\n` +
-      `  T-Shirt & Plaque Bundle: ${shirtLine}\n` +
-      `  Total Due: $${this.cartTotal}.00`;
+    const receiptBody = EmailUtlity.createMotorShowCheckConfirmationHTMLBody({
+      name: `${form.firstName} ${form.lastName}`,
+      vehicle: `${form.year} ${form.make} ${form.model} (${form.color})`,
+      shirtBundle: shirtLine,
+      totalDue: this.cartTotal,
+    });
 
     this.emailService.sendEmail(
       form.email,

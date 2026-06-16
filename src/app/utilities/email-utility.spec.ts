@@ -139,4 +139,27 @@ describe('EmailUtlity', () => {
     expect(html).toContain('platinum');
     expect(html).toContain('https://example.com');
   });
+
+  it('formats motor show check confirmation emails as a standardized customer summary', () => {
+    const html = EmailUtlity.createMotorShowCheckConfirmationHTMLBody({
+      name: 'Pat Driver',
+      vehicle: '1967 Ford Mustang (Red)',
+      shirtBundle: 'Yes - Large',
+      totalDue: 60,
+    });
+
+    expect(html).toContain('Wheels of Freedom Motor Show Entry Confirmation');
+    expect(html).toContain('Pay by check confirmation');
+    expect(html).toContain('border-collapse: collapse');
+    expect(html).toContain('Your entry has been received.');
+    expect(html).toContain('Pat Driver');
+    expect(html).toContain('1967 Ford Mustang (Red)');
+    expect(html).toContain('T-Shirt &amp; Plaque Bundle');
+    expect(html).toContain('Yes - Large');
+    expect(html).toContain('$60.00');
+    expect(html).toContain('The Spirit of the Fourth');
+    expect(html).toContain('P.O. Box 270736');
+    expect(html).toContain('San Diego, CA 92198');
+    expect(html).not.toContain('Reply directly to this email to contact the submitter.');
+  });
 });
