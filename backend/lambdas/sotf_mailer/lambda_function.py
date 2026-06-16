@@ -31,6 +31,12 @@ def cors_headers(event=None):
     }
 
 
+def response_headers():
+    return {
+        "Content-Type": "application/json",
+    }
+
+
 def update_google_sheet(form, name, email, phone):
     import gspread
 
@@ -309,7 +315,7 @@ def lambda_handler(event, context):
     event_body = json.loads(event['body'])
     response = {
         "isBase64Encoded": False,
-        "headers": cors_headers(event),
+        "headers": response_headers(),
     }
     if 'getSignedURLs' in event_body and event_body['getSignedURLs']:
         s3_client = boto3.client('s3')

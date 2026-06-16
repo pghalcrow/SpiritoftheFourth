@@ -56,6 +56,34 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
         self.assertEqual(response["headers"]["Access-Control-Allow-Origin"], "http://localhost:4200")
         self.assertIn("POST", response["headers"]["Access-Control-Allow-Methods"])
 
+    def test_mailer_post_response_does_not_duplicate_function_url_cors_headers(self):
+        mailer = import_sotf_mailer()
+        event = {
+            "headers": {"Origin": "https://spiritofthefourth.org"},
+            "body": json.dumps({
+                "toContact": "pghalcrow@gmail.com",
+                "subject": "New Volunteer Request",
+                "replyTo": "pat@example.com",
+                "name": "Pat Halcrow",
+                "phone": "555-1212",
+                "body": "<html>Volunteer details</html>",
+                "formType": "volunteerForm",
+            })
+        }
+
+        with patch.object(mailer, "send_email", return_value=True), \
+            patch.object(mailer, "record_submission_parallel"), \
+            patch.dict(mailer.os.environ, {
+                "USERNAME": "sender@example.com",
+                "PASSWORD": "password",
+                "SMTPHOST": "smtp.example.com",
+                "SMTPPORT": "587",
+            }):
+            response = mailer.lambda_handler(event, None)
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(response["headers"], {"Content-Type": "application/json"})
+
     def test_mailer_test_mode_routes_admin_email_to_test_recipient(self):
         mailer = import_sotf_mailer()
 
