@@ -33,6 +33,11 @@ export class OrderComponent implements OnInit {
         this.eventDate = '06/29/2025';
         this.emailContact = 'pool49@hotmail.com';
         break;
+      case 'freedom_club_donation':
+      case 'freedomClubDonation':
+        this.eventDate = '';
+        this.emailContact = 'dave.spiritofthefourth@gmail.com';
+        break;
       default:
         this.eventDate = 'the event date';
         this.emailContact = 'dave.spiritofthefourth@gmail.com';
@@ -73,7 +78,7 @@ export class OrderComponent implements OnInit {
     if (!environment.production) {
       this.orderService.processLocalStripeSession(sessionId).subscribe(
         () => {
-          this.message = `Thank you for your order. Your merchandise will be available for pick up at the event registration table on ${this.eventDate}`;
+          this.message = this.getSuccessMessage();
         },
         error => {
           this.message = `Your payment succeeded, but local processing failed. Please contact us at ${this.emailContact}. Error: ${error.message}`;
@@ -82,18 +87,26 @@ export class OrderComponent implements OnInit {
       return;
     }
 
-    this.message = `Thank you for your order. Your merchandise will be available for pick up at the event registration table on ${this.eventDate}`;
+    this.message = this.getSuccessMessage();
   }
 
   // Handle PayPal payment confirmation
   private handlePayPalPayment(token: string) {
     this.orderService.captureOrder(token).subscribe(
       results => {
-        this.message = `Thank you for your order. Feel free to contact us if you have any questions at ${this.emailContact}`;
+        this.message = this.getSuccessMessage();
       },
       error => {
         this.message = `An error occurred while confirming your PayPal payment. Please contact us at ${this.emailContact}. Token: ${token}. Error: ${error.message}`;
       }
     );
+  }
+
+  private getSuccessMessage(): string {
+    if (this.orderType === 'freedom_club_donation' || this.orderType === 'freedomClubDonation') {
+      return `Thank you for sponsoring Spirit of the Fourth. Your donation helps fund the parade, fireworks, family activities, and community celebration. Feel free to contact us if you have any questions at ${this.emailContact}`;
+    }
+
+    return `Thank you for your order. Your merchandise will be available for pick up at the event registration table on ${this.eventDate}`;
   }
 }

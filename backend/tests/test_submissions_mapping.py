@@ -5,6 +5,7 @@ from backend.shared.submissions_mapping import (
     map_processed_payment_row,
     map_payment_hold_row,
     map_live_submission,
+    normalize_submission_title,
     IMPORT_FALLBACK_SUBMITTED_AT,
     parse_sheet_datetime,
 )
@@ -55,7 +56,7 @@ class SubmissionsMappingTest(unittest.TestCase):
             values=["Golf Fundraiser Order", "2026-03-16 21:12", "Resa Coopat", "resacoopat15@gmail.com", "6194176739"],
         )
 
-        self.assertEqual(record["submissionTitle"], "Golf Fundraiser Order")
+        self.assertEqual(record["submissionTitle"], "Golf Fundraiser")
         self.assertEqual(record["submittedAt"], "2026-03-16T21:12:00-07:00")
         self.assertEqual(record["source"], "Event Submissions")
         self.assertTrue(record["submissionId"].startswith("import-event-submissions-8-"))
@@ -177,7 +178,7 @@ class SubmissionsMappingTest(unittest.TestCase):
         self.assertEqual(record["submittedAt"], "2026-06-05T10:00:00-07:00")
         self.assertEqual(record["sk"], "2026-06-05T10:00:00-07:00#live-1")
 
-    def test_maps_motor_show_live_submission_to_admin_order_label(self):
+    def test_maps_motor_show_live_submission_to_admin_event_label(self):
         record = map_live_submission(
             submission_id="motor-1",
             title="Payment received for Motor Show Event",
@@ -188,7 +189,12 @@ class SubmissionsMappingTest(unittest.TestCase):
             raw_data={"type": "motorShowOrder"},
         )
 
-        self.assertEqual(record["submissionTitle"], "Motor Show Event Order")
+        self.assertEqual(record["submissionTitle"], "Motor Show Event")
+
+    def test_normalizes_paid_event_order_titles_for_admin_storage(self):
+        self.assertEqual(normalize_submission_title("Freedom Club Donation Order"), "Freedom Club Donation")
+        self.assertEqual(normalize_submission_title("Motor Show Event Order"), "Motor Show Event")
+        self.assertEqual(normalize_submission_title("Golf Fundraiser Order"), "Golf Fundraiser")
 
 
 if __name__ == "__main__":

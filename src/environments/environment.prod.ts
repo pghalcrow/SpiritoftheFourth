@@ -41,6 +41,10 @@ export const environment = {
       toEamil: " marla.spiritofthefourth@gmail.com",
       subject: "New Vendor Application Submission"
     },
+    freedomClubDonation: {
+      toEamil: "dave.spiritofthefourth@gmail.com, lynn.spiritofthefourth@gmail.com, marla.spiritofthefourth@gmail.com, treasurer.spiritofthefourth@gmail.com",
+      subject: "Freedom Club Donation"
+    },
     artistSignUpForm: {
       toEamil: "laura.barish@gmail.com , lynn.spiritofthefourth@gmail.com",
       subject: "New Artist Sign-Up"

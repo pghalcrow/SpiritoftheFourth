@@ -181,6 +181,36 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
         self.assertEqual(body["client_secret"], "cs_test_secret")
         self.assertEqual(body["publishable_key"], "pk_test_real")
 
+    def test_freedom_club_donation_builds_payment_line_item(self):
+        app = import_create_order_app()
+
+        items = app.build_stripe_line_items({
+            "type": "freedomClubDonation",
+            "grandTotal": 150,
+        })
+
+        self.assertEqual(items, [{
+            "price_data": {
+                "currency": "usd",
+                "product_data": {"name": "Freedom Club Donation"},
+                "unit_amount": 15000,
+            },
+            "quantity": 1,
+        }])
+
+    def test_freedom_club_donation_meta_uses_officer_recipients_from_payload(self):
+        app = import_create_order_app()
+
+        event_meta = app.get_event_meta(
+            "freedomClubDonation",
+            {},
+            {"toContact": "dave@example.com, myrna@example.com"},
+            "resa@example.com",
+        )
+
+        self.assertEqual(event_meta["event_title"], "Freedom Club Donation")
+        self.assertEqual(event_meta["contact_emails"], ["dave@example.com", "myrna@example.com"])
+
     def test_lookup_dynamic_submission_falls_back_to_google_sheet(self):
         app = import_create_order_app()
 

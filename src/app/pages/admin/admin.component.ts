@@ -548,14 +548,21 @@ export class AdminComponent implements OnInit {
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
     if (Array.isArray(value)) return value.map(item => this.formatSubmissionFieldValue(item)).join(', ');
     if (value && typeof value === 'object') return JSON.stringify(value);
-    if (value === 'motorShowOrder Order') return 'Motor Show Event Order';
+    if (value === 'motorShowOrder Order' || value === 'Motor Show Event Order') return 'Motor Show Event';
+    if (value === 'Freedom Club Donation Order') return 'Freedom Club Donation';
     return String(value);
   }
 
   formatSubmissionTitle(submission?: AdminSubmission): string {
     const title = submission?.submissionTitle || '';
-    if (title === 'motorShowOrder Order') {
-      return 'Motor Show Event Order';
+    if (title === 'motorShowOrder Order' || title === 'Motor Show Event Order') {
+      return 'Motor Show Event';
+    }
+    if (title === 'Freedom Club Donation Order') {
+      return 'Freedom Club Donation';
+    }
+    if (title.endsWith(' Order')) {
+      return title.slice(0, -' Order'.length);
     }
     return title;
   }
@@ -569,7 +576,7 @@ export class AdminComponent implements OnInit {
       paradeEntryForm: 'Parade Entry',
       carEntryForm: 'Parade Car Entry',
       vipEntryForm: 'VIP Parade Entry',
-      motorShowOrder: 'Motor Show Event Order',
+      motorShowOrder: 'Motor Show Event',
     };
 
     return labels[value] || this.formatSubmissionFieldLabel(value);

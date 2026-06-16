@@ -1,20 +1,147 @@
 <div class="header-image-container">
-    <img src="assets/balloons_sky.jpg">
+  <img src="assets/balloons_sky.jpg">
 </div>
 
 <h1 class="page-header font-oswald text-center mt-5">Freedom Club</h1>
-<div class="container">
-    <div class="row">
-        <div class="col-12 col-lg-8 mx-auto">
-            <p>Support San Diego's oldest and largest Independence Day celebration by joining the Freedom Club today.
-                This patriotic event is organized year-round by an entirely all-volunteer, community supported nonprofit
-                organization.</p>
-        </div>
-        <div class="col-12 col-lg-8 mx-auto">
-            <p>Donations of $150.00 and over secure membership in our Freedom Club, with preferential parking and
-                seating for the parade and fireworks, tickets to our VIP Reception on July 4th, as well as, invitations
-                to any Freedom Club events.</p>
-                <div class="text-center" id="paypal-donate-button-container-freedom-club"></div>
-        </div>
+
+<section class="freedom-club-page">
+  <div class="freedom-club-intro">
+    <p>
+      Support San Diego's oldest and largest Independence Day celebration by joining the Freedom Club today.
+      This patriotic event is organized year-round by an entirely all-volunteer, community supported nonprofit
+      organization.
+    </p>
+    <p>
+      Donations of $150.00 and over secure membership in our Freedom Club, with preferential parking and
+      seating for the parade and fireworks, tickets to our VIP Reception on July 4th, as well as invitations
+      to Freedom Club events.
+    </p>
+
+    <div class="donate-launch-row">
+      <button type="button" class="link-div shadow donate-launch-button" (click)="openDonationForm()">
+        Donate
+      </button>
     </div>
-</div>
+  </div>
+
+  <div
+    *ngIf="isDonationFormOpen"
+    #donationFormSection
+    class="donation-panel"
+    data-testid="freedom-club-donation-form"
+  >
+    <div class="donation-message">
+      <p class="eyebrow">Thank you for sponsoring Spirit of the Fourth</p>
+      <h2>Your donation keeps the celebration moving.</h2>
+      <p>
+        Freedom Club gifts help fund the parade, fireworks, entertainment, veterans events, family activities,
+        and the behind-the-scenes work needed to keep Rancho Bernardo's Fourth of July celebration free and
+        welcoming for the community.
+      </p>
+    </div>
+
+    <form [formGroup]="donationForm" class="donation-form">
+      <div class="amount-section">
+        <label>Donation amount</label>
+        <div class="amount-grid">
+          <button
+            *ngFor="let amount of presetAmounts"
+            type="button"
+            class="amount-button"
+            [class.selected]="selectedAmount === amount"
+            (click)="selectAmount(amount)"
+          >
+            {{ amount | currency:'USD':'symbol':'1.0-0' }}
+          </button>
+          <button
+            type="button"
+            class="amount-button custom-toggle"
+            [class.selected]="selectedAmount === null"
+            (click)="selectCustomAmount()"
+          >
+            Custom
+          </button>
+        </div>
+
+        <div class="custom-amount-row" *ngIf="selectedAmount === null">
+          <span>$</span>
+          <input
+            class="form-control"
+            type="number"
+            min="1"
+            step="1"
+            formControlName="customAmount"
+            placeholder="Enter amount"
+          >
+        </div>
+      </div>
+
+      <div class="donor-grid">
+        <div class="form-field">
+          <label for="freedomFullName">Name*</label>
+          <input
+            class="form-control"
+            id="freedomFullName"
+            type="text"
+            formControlName="fullName"
+            [class.invalid]="donationForm.get('fullName')?.invalid && donationForm.get('fullName')?.touched"
+          >
+        </div>
+        <div class="form-field">
+          <label for="freedomEmail">Email*</label>
+          <input
+            class="form-control"
+            id="freedomEmail"
+            type="email"
+            formControlName="email"
+            [class.invalid]="donationForm.get('email')?.invalid && donationForm.get('email')?.touched"
+          >
+        </div>
+        <div class="form-field">
+          <label for="freedomPhone">Phone*</label>
+          <input
+            class="form-control"
+            id="freedomPhone"
+            type="tel"
+            formControlName="phone"
+            [class.invalid]="donationForm.get('phone')?.invalid && donationForm.get('phone')?.touched"
+          >
+        </div>
+      </div>
+
+      <div class="payment-summary">
+        <span>Donation total</span>
+        <strong>{{ currentAmount | currency:'USD':'symbol':'1.0-0' }}</strong>
+      </div>
+
+      <div class="payment-actions">
+        <button
+          type="button"
+          class="payment-btn card-btn"
+          [disabled]="stripeIsLoading || paypalIsLoading"
+          (click)="submitStripeDonation()"
+        >
+          <span *ngIf="stripeIsLoading" class="spinner-border spinner-border-sm" role="status"></span>
+          <i *ngIf="!stripeIsLoading" class="fa-regular fa-credit-card"></i>
+          {{ stripeIsLoading ? 'Starting card payment...' : 'Pay by Credit Card' }}
+        </button>
+        <button
+          type="button"
+          class="payment-btn paypal-btn"
+          [disabled]="stripeIsLoading || paypalIsLoading"
+          (click)="submitPayPalDonation()"
+        >
+          <span *ngIf="paypalIsLoading" class="spinner-border spinner-border-sm" role="status"></span>
+          <i *ngIf="!paypalIsLoading" class="fa-brands fa-paypal"></i>
+          {{ paypalIsLoading ? 'Starting PayPal...' : 'PayPal' }}
+        </button>
+      </div>
+
+      <p class="payment-error" *ngIf="paymentError">{{ paymentError }}</p>
+    </form>
+
+    <div class="stripe-checkout-shell" *ngIf="showStripeCheckout">
+      <div id="stripe-checkout-freedom-club"></div>
+    </div>
+  </div>
+</section>

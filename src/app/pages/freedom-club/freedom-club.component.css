@@ -1,25 +1,215 @@
-.page-header{
-    color: var(--dark-blue-color);
-    font-size: 2rem;
-    font-weight: bold;
+.page-header {
+  color: var(--dark-blue-color);
+  font-size: 2rem;
+  font-weight: bold;
 }
 
-
-
-@media (max-width: 1199.98px) {
-
+.freedom-club-page {
+  max-width: 960px;
+  margin: 0 auto 60px;
+  padding: 0 15px;
 }
 
-@media (max-width: 991.98px) {
+.freedom-club-intro {
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: left;
+}
 
+.donate-launch-button {
+  margin-top: 10px;
+}
+
+.donate-launch-row {
+  text-align: center;
+}
+
+.donation-panel {
+  max-width: 820px;
+  margin: 35px auto 0;
+  padding: 24px;
+  border: 2px solid var(--red-color);
+  background-color: #ffffff;
+}
+
+.donation-message {
+  margin-bottom: 22px;
+  text-align: center;
+}
+
+.donation-message .eyebrow {
+  margin-bottom: 5px;
+  color: var(--red-color);
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.donation-message h2 {
+  color: var(--dark-blue-color);
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.8rem;
+  font-weight: bold;
+}
+
+.donation-message p {
+  max-width: 680px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.amount-section {
+  margin-bottom: 20px;
+}
+
+.amount-section label,
+.form-field label {
+  color: var(--dark-blue-color);
+  font-weight: bold;
+}
+
+.amount-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.amount-button {
+  min-width: 92px;
+  padding: 8px 14px;
+  border: 3px solid var(--dark-blue-color);
+  background-color: #ffffff;
+  color: var(--dark-blue-color);
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.amount-button:hover,
+.amount-button:focus,
+.amount-button.selected {
+  background-color: var(--dark-blue-color);
+  color: #ffffff;
+}
+
+.custom-amount-row {
+  display: flex;
+  align-items: center;
+  max-width: 260px;
+  margin-top: 12px;
+}
+
+.custom-amount-row span {
+  padding-right: 8px;
+  color: var(--dark-blue-color);
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.donor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.form-field input.invalid {
+  border-color: red;
+}
+
+.payment-summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 24px 0 16px;
+  color: var(--dark-blue-color);
+  font-size: 1.25rem;
+}
+
+.payment-summary strong {
+  font-size: 1.5rem;
+}
+
+.payment-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.payment-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 190px;
+  height: 66px;
+  font-size: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  margin: 0;
+}
+
+.paypal-btn {
+  background-color: #003087;
+  color: #ffffff;
+}
+
+.card-btn {
+  background-color: #1f6f8b;
+  color: #ffffff;
+  font-size: 1rem;
+  gap: 8px;
+  line-height: 1.15;
+  width: 220px;
+}
+
+.payment-btn:hover {
+  border: 3px solid #ffffff !important;
+  color: #ffffff;
+  filter: brightness(0.92);
+}
+
+.card-btn:hover,
+.paypal-btn:hover {
+  color: #ffffff;
+}
+
+.payment-btn:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.payment-error {
+  margin-top: 14px;
+  padding: 8px;
+  background-color: var(--red-color);
+  color: #ffffff;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.stripe-checkout-shell {
+  margin-top: 20px;
 }
 
 @media (max-width: 767.98px) {
+  .donation-panel {
+    padding: 16px;
+  }
 
+  .donor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .amount-button {
+    flex: 1 1 calc(50% - 8px);
+  }
 }
 
 @media (max-width: 575.98px) {
-  
-    
- 
+  .payment-btn,
+  .card-btn {
+    width: 100%;
+  }
 }

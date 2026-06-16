@@ -150,9 +150,21 @@ def get_event_seller_recipients(event_meta, resa_email):
 
 def get_event_meta(event_type, event_config, form_data, resa_email):
     event_meta = event_config.get("eventMeta", {})
-    contact_emails = get_contact_emails(event_meta, resa_email)
+    if event_type == "freedomClubDonation" and form_data.get("toContact"):
+        contact_emails = [
+            email.strip()
+            for email in str(form_data.get("toContact", "")).split(",")
+            if email.strip()
+        ]
+    else:
+        contact_emails = get_contact_emails(event_meta, resa_email)
+
+    fallback_titles = {
+        "freedomClubDonation": "Freedom Club Donation",
+    }
+    event_title = event_config.get("title") or form_data.get("eventTitle") or fallback_titles.get(event_type, event_type)
     return {
-        "event_title": event_config.get("title", event_type),
+        "event_title": event_title,
         "date_of_event": event_meta.get("dateOfEvent", ""),
         "location_of_event": event_meta.get("location", ""),
         "end_blurb": event_meta.get("endBlurb", ""),
@@ -595,6 +607,17 @@ def build_stripe_line_items(event):
             },
             "quantity": 1
         })
+    elif event_type == "freedomClubDonation":
+        amount = float(event.get("grandTotal", 0))
+        if amount > 0:
+            items.append({
+                "price_data": {
+                    "currency": "usd",
+                    "product_data": {"name": "Freedom Club Donation"},
+                    "unit_amount": int(amount * 100)
+                },
+                "quantity": 1
+            })
     else:
         pricing = event.get("pricing", {})
         players = int(event.get("players", 1))
@@ -1089,6 +1112,42 @@ def lambda_handler(event, context):
                     order_type="dynamic_event"
                 )
 
+            elif event.get('type') == 'freedomClubDonation':
+
+                print("🔥 freedom club donation received")
+
+                submission_id = uuid.uuid4().hex[:12]
+
+                store_dynamic_submission(event, submission_id)
+
+                amount = f"{float(event.get('grandTotal', 0)):.2f}"
+
+                items = [
+                    {
+                        "name": "Freedom Club Donation",
+                        "quantity": "1",
+                        "category": "DONATION",
+                        "unit_amount": {
+                            "currency_code": "USD",
+                            "value": amount
+                        }
+                    }
+                ]
+
+                custom_id = json.dumps({
+                    "type": "freedomClubDonation",
+                    "submission_id": submission_id
+                })
+
+                order_details = paypalOrderService.modular_create_order(
+                    items,
+                    return_url,
+                    None,
+                    None,
+                    custom_id=custom_id,
+                    order_type="freedom_club_donation"
+                )
+
             elif event.get('type') == 'vendorApplication':
                 print("🔥 vendor application order received")
 
@@ -1195,7 +1254,8 @@ def lambda_handler(event, context):
             cancel_paths = {
                 "vendorApplication": "/vendors",
                 "motorShowOrder": "/wheelsoffreedom",
-                "sponsor": "/upcomingevents"
+                "sponsor": "/upcomingevents",
+                "freedomClubDonation": "/freedom-club"
             }
             cancel_path = cancel_paths.get(event_type, "/upcomingevents")
 

@@ -502,7 +502,7 @@ describe('AdminComponent', () => {
     cmsService.getSubmissions.and.returnValue(of({
       items: [{
         submissionId: 's1',
-        submissionTitle: 'Motor Show Event Order',
+        submissionTitle: 'Motor Show Event',
         submittedAt: '2026-06-05T10:07:00-07:00',
         name: 'Pat Halcrow',
         email: 'pat@example.com',
@@ -534,7 +534,7 @@ describe('AdminComponent', () => {
     fixture.detectChanges();
 
     expect(component.selectedSubmission?.submissionId).toBe('s1');
-    expect(nativeElement.querySelector('.submission-detail-panel')?.textContent).toContain('Motor Show Event Order');
+    expect(nativeElement.querySelector('.submission-detail-panel')?.textContent).toContain('Motor Show Event');
   });
 
   it('displays imported motor show order titles as readable labels in the table details and search', () => {
@@ -560,18 +560,18 @@ describe('AdminComponent', () => {
     fixture.detectChanges();
 
     let tableText = nativeElement.querySelector('.submissions-table')?.textContent || '';
-    expect(tableText).toContain('Motor Show Event Order');
+    expect(tableText).toContain('Motor Show Event');
     expect(tableText).not.toContain('motorShowOrder Order');
 
     nativeElement.querySelector<HTMLTableRowElement>('[data-testid="submission-row-motor-import-1"]')!.click();
     fixture.detectChanges();
 
     const detailText = nativeElement.querySelector('.submission-detail-panel')?.textContent || '';
-    expect(detailText).toContain('Motor Show Event Order');
+    expect(detailText).toContain('Motor Show Event');
     expect(detailText).not.toContain('motorShowOrder Order');
 
     component.clearSelectedSubmission();
-    component.submissionSearch = 'Motor Show Event Order';
+    component.submissionSearch = 'Motor Show Event';
     fixture.detectChanges();
 
     tableText = nativeElement.querySelector('.submissions-table')?.textContent || '';
@@ -598,7 +598,7 @@ describe('AdminComponent', () => {
         },
         {
           submissionId: 'motor-1',
-          submissionTitle: 'Motor Show Event Order',
+          submissionTitle: 'Motor Show Event',
           submittedAt: '2026-06-05T10:00:00-07:00',
           name: 'Motor Person',
           email: 'motor@example.com',
@@ -698,7 +698,7 @@ describe('AdminComponent', () => {
     expect(nativeElement.querySelectorAll('.submission-group-tab.active').length).toBe(1);
     expect(nativeElement.querySelector('[data-testid="submission-group-all"]')?.classList).toContain('active');
     expect(tableText).toContain('New Vendor Application Submission');
-    expect(tableText).toContain('Motor Show Event Order');
+    expect(tableText).toContain('Motor Show Event');
     expect(tableText).toContain('New Artist Sign-Up');
     expect(tableText).toContain('Sponsorship Submission');
     expect(tableText).toContain('New Parade Entry Request - Parade');
@@ -712,7 +712,7 @@ describe('AdminComponent', () => {
     expect(component.selectedSubmissionGroup).toBe('vendor');
     expect(nativeElement.querySelector('[data-testid="submission-group-vendor"]')?.classList).toContain('active');
     expect(tableText).toContain('New Vendor Application Submission');
-    expect(tableText).not.toContain('Motor Show Event Order');
+    expect(tableText).not.toContain('Motor Show Event');
     expect(tableText).not.toContain('New Artist Sign-Up');
     expect(tableText).not.toContain('Sponsorship Submission');
     expect(tableText).not.toContain('Community Picnic Signup');
@@ -723,7 +723,7 @@ describe('AdminComponent', () => {
     tableText = nativeElement.querySelector('.submissions-table')?.textContent || '';
     expect(component.selectedSubmissionGroup).toBe('all');
     expect(nativeElement.querySelector('[data-testid="submission-group-all"]')?.classList).toContain('active');
-    expect(tableText).toContain('Motor Show Event Order');
+    expect(tableText).toContain('Motor Show Event');
     expect(tableText).toContain('Community Picnic Signup');
 
     nativeElement.querySelector<HTMLButtonElement>('[data-testid="submission-group-specialEvents"]')!.click();
@@ -735,7 +735,7 @@ describe('AdminComponent', () => {
     expect(tableText).not.toContain('New Vendor Application Submission');
     expect(tableText).not.toContain('New Artist Sign-Up');
     expect(tableText).not.toContain('Sponsorship Submission');
-    expect(tableText).not.toContain('Motor Show Event Order');
+    expect(tableText).not.toContain('Motor Show Event');
     expect(tableText).not.toContain('New Parade Entry Request - Parade');
     expect(tableText).not.toContain('New Volunteer Request');
   });
@@ -874,7 +874,7 @@ describe('AdminComponent', () => {
     cmsService.getSubmissions.and.returnValue(of({
       items: [{
         submissionId: 's1',
-        submissionTitle: 'Motor Show Event Order',
+        submissionTitle: 'Motor Show Event',
         submittedAt: '2026-06-05T10:00:00-07:00',
         name: 'Pat Halcrow',
         email: 'pat@example.com',
@@ -1146,7 +1146,7 @@ describe('AdminComponent', () => {
     cmsService.getSubmissions.and.returnValue(of({
       items: [{
         submissionId: 'motor-card-1',
-        submissionTitle: 'Motor Show Event Order',
+        submissionTitle: 'Motor Show Event',
         submittedAt: '2026-06-15T06:36:45-07:00',
         name: 'Pat Halcrow',
         email: 'pat@example.com',

@@ -11,7 +11,12 @@ SHEET_DATETIME_FORMATS = (
 )
 IMPORT_FALLBACK_SUBMITTED_AT = "1970-01-01T00:00:00-08:00"
 MOTOR_SHOW_SOURCES = {"motorShowOrder", "Motor Show Event"}
-MOTOR_SHOW_ADMIN_TITLE = "Motor Show Event Order"
+MOTOR_SHOW_ADMIN_TITLE = "Motor Show Event"
+EXACT_SUBMISSION_TITLE_REPLACEMENTS = {
+    "motorShowOrder Order": MOTOR_SHOW_ADMIN_TITLE,
+    "Motor Show Event Order": MOTOR_SHOW_ADMIN_TITLE,
+    "Freedom Club Donation Order": "Freedom Club Donation",
+}
 
 
 def now_iso():
@@ -46,6 +51,15 @@ def build_submission_sk(submitted_at, submission_id):
     return f"{submitted_at}#{submission_id}"
 
 
+def normalize_submission_title(title):
+    cleaned_title = str(title or "").strip()
+    if cleaned_title in EXACT_SUBMISSION_TITLE_REPLACEMENTS:
+        return EXACT_SUBMISSION_TITLE_REPLACEMENTS[cleaned_title]
+    if cleaned_title.endswith(" Order"):
+        return cleaned_title[: -len(" Order")]
+    return cleaned_title
+
+
 def map_sheet_submission_row(worksheet, row_number, headers, values):
     row = dict(zip(headers, values))
     raw_submitted_at = row.get("SubmittedDate") or row.get("Date")
@@ -62,7 +76,7 @@ def map_sheet_submission_row(worksheet, row_number, headers, values):
         "sk": build_submission_sk(submitted_at, submission_id),
         "recordType": "submission",
         "submissionId": submission_id,
-        "submissionTitle": row.get("Form") or row.get("Submissions") or "",
+        "submissionTitle": normalize_submission_title(row.get("Form") or row.get("Submissions") or ""),
         "submittedAt": submitted_at,
         "source": worksheet,
         "name": row.get("Name", ""),
@@ -146,7 +160,7 @@ def map_live_submission(
     submitted_at=None,
 ):
     submitted_at = submitted_at or now_iso()
-    submission_title = MOTOR_SHOW_ADMIN_TITLE if source in MOTOR_SHOW_SOURCES else title
+    submission_title = MOTOR_SHOW_ADMIN_TITLE if source in MOTOR_SHOW_SOURCES else normalize_submission_title(title)
 
     return {
         "pk": "SUBMISSION",

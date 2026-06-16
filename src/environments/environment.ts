@@ -40,6 +40,10 @@ export const environment = {
       toEamil: "mykejonez53@gmail.com",
       subject: "New Vendor Application Submission"
     },
+    freedomClubDonation: {
+      toEamil: "dave.spiritofthefourth@gmail.com",
+      subject: "Freedom Club Donation"
+    },
     artistSignUpForm: {
       toEamil: "cal.code.97@gmail.com",
       subject: "New Artist Sign-Up"
