@@ -321,6 +321,33 @@ h4 {
   border-bottom: 1px solid #e2e8ef;
 }
 
+.submission-close-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 14px;
+  background: #ffffff;
+  border: 1px solid #9fb3c8;
+  border-radius: 8px;
+  color: #0a3161;
+  font-weight: 800;
+  line-height: 1.1;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.submission-close-button:hover {
+  background: #edf4fb;
+  border-color: #6f8faa;
+  transform: translateY(-1px);
+}
+
+.submission-close-button:focus-visible {
+  outline: 3px solid rgba(10, 106, 166, 0.2);
+  outline-offset: 2px;
+}
+
 .submission-contact {
   display: grid;
   gap: 4px;

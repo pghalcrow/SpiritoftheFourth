@@ -534,7 +534,10 @@ describe('AdminComponent', () => {
     fixture.detectChanges();
 
     expect(component.selectedSubmission?.submissionId).toBe('s1');
-    expect(nativeElement.querySelector('.submission-detail-panel')?.textContent).toContain('Motor Show Event');
+    const detailPanel = nativeElement.querySelector('.submission-detail-panel')!;
+    expect(detailPanel.textContent).toContain('Motor Show Event');
+    expect(detailPanel.querySelector('.event-index')).toBeFalsy();
+    expect(detailPanel.querySelector('.submission-close-button')?.textContent?.trim()).toBe('Close');
   });
 
   it('displays imported motor show order titles as readable labels in the table details and search', () => {
@@ -1024,6 +1027,41 @@ describe('AdminComponent', () => {
     expect(detailText).toContain('Form Type');
     expect(detailText).toContain('Volunteer Request');
     expect(detailText).not.toContain('volunteerForm');
+  });
+
+  it('shows Freedom Club donation amounts as currency in submission details', () => {
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 'donation-1',
+        submissionTitle: 'Freedom Club Donation',
+        submittedAt: '2026-06-16T12:00:00-07:00',
+        name: 'Pat Donor',
+        email: 'donor@example.com',
+        phone: '555-1212',
+        paymentStatus: 'paid',
+        paymentProvider: 'stripe',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: {
+          formType: 'freedomClubDonation',
+          donationAmount: 150,
+          grandTotal: 150,
+        },
+      }]
+    }));
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-submissions"]')!.click();
+    fixture.detectChanges();
+    nativeElement.querySelector<HTMLTableRowElement>('[data-testid="submission-row-donation-1"]')!.click();
+    fixture.detectChanges();
+
+    const detailText = nativeElement.querySelector('.submission-detail-panel')?.textContent || '';
+
+    expect(detailText).toContain('Donation Amount');
+    expect(detailText).toContain('$150');
+    expect(detailText).not.toContain('Donation Amount150');
   });
 
   it('shows details from mailer-only motor show check payment submissions', () => {

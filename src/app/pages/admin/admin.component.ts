@@ -389,6 +389,7 @@ export class AdminComponent implements OnInit {
       'model',
       'color',
       'clubAffiliation',
+      'donationAmount',
       'message',
       'availability',
       'vendorStatus',
@@ -529,6 +530,7 @@ export class AdminComponent implements OnInit {
       model: 'Model',
       color: 'Color',
       clubAffiliation: 'Club Affiliation',
+      donationAmount: 'Donation Amount',
       availability: 'Availability',
       message: 'Message',
     };
@@ -545,12 +547,19 @@ export class AdminComponent implements OnInit {
     if (key === 'formType' && typeof value === 'string') {
       return this.formatFormTypeValue(value);
     }
+    if (this.isCurrencySubmissionField(key) && this.hasDisplayValue(value)) {
+      return this.formatCurrencyValue(value);
+    }
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
     if (Array.isArray(value)) return value.map(item => this.formatSubmissionFieldValue(item)).join(', ');
     if (value && typeof value === 'object') return JSON.stringify(value);
     if (value === 'motorShowOrder Order' || value === 'Motor Show Event Order') return 'Motor Show Event';
     if (value === 'Freedom Club Donation Order') return 'Freedom Club Donation';
     return String(value);
+  }
+
+  private isCurrencySubmissionField(key: string): boolean {
+    return ['donationAmount', 'grandTotal', 'total', 'amount'].includes(key);
   }
 
   formatSubmissionTitle(submission?: AdminSubmission): string {

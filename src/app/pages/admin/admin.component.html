@@ -1,7 +1,6 @@
 <main class="admin-shell">
   <header class="admin-toolbar">
     <div>
-      <p class="eyebrow">CMS Editor</p>
       <h1>{{ adminHeaderTitle }}</h1>
     </div>
 
@@ -543,10 +542,9 @@
     <aside class="submission-detail-panel" (click)="$event.stopPropagation()">
       <div class="submission-detail-header">
         <div>
-          <span class="event-index">Submission</span>
           <h2>{{ formatSubmissionTitle(selectedSubmission) }}</h2>
         </div>
-        <button type="button" class="action-button ghost" (click)="clearSelectedSubmission()">Close</button>
+        <button type="button" class="submission-close-button" (click)="clearSelectedSubmission()">Close</button>
       </div>
 
       <div class="submission-contact">
