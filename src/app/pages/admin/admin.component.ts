@@ -311,10 +311,13 @@ export class AdminComponent implements OnInit {
         return this.formatSubmissionFieldLabel(a).localeCompare(this.formatSubmissionFieldLabel(b));
       });
 
-    return keys.map(key => ({
+    const rows = keys.map(key => ({
       label: this.formatSubmissionFieldLabel(key),
       value: this.formatSubmissionFieldValue(rawData[key]),
     }));
+    if (rows.length) return rows;
+
+    return this.parseSubmissionBodyRows(rawData.body);
   }
 
   getSubmissionAddOns(submission?: AdminSubmission): SubmissionDisplayRow[] {
@@ -382,6 +385,37 @@ export class AdminComponent implements OnInit {
     if (Array.isArray(value)) return value.map(item => this.formatSubmissionFieldValue(item)).join(', ');
     if (value && typeof value === 'object') return JSON.stringify(value);
     return String(value);
+  }
+
+  private parseSubmissionBodyRows(body: any): SubmissionDisplayRow[] {
+    if (typeof body !== 'string' || !body.trim()) return [];
+
+    const excludedLabels = new Set([
+      'name',
+      'email',
+      'phone',
+    ]);
+    const allowedLabels = new Set([
+      'address',
+      'vehicle',
+      'club affiliation',
+      't-shirt & plaque bundle',
+      'total',
+    ]);
+
+    return body
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .map(line => {
+        const match = line.match(/^([^:]+):\s*(.+)$/);
+        if (!match) return undefined;
+        const label = match[1].trim();
+        const value = match[2].trim();
+        const normalizedLabel = label.toLowerCase();
+        if (excludedLabels.has(normalizedLabel) || !allowedLabels.has(normalizedLabel)) return undefined;
+        return { label, value };
+      })
+      .filter((row): row is SubmissionDisplayRow => Boolean(row));
   }
 
   saveSelectedSubmission() {

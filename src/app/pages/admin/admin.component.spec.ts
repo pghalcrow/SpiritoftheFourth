@@ -680,6 +680,64 @@ describe('AdminComponent', () => {
     expect(detailText).not.toContain('5409e288');
   });
 
+  it('shows details from mailer-only motor show check payment submissions', () => {
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 'motor-check-1',
+        submissionTitle: 'New Motor Show Entry — Check Payment',
+        submittedAt: '2026-06-15T06:36:45-07:00',
+        name: 'Bill Adams',
+        email: 'thekoolguy@aol.com',
+        phone: '619-219-9630',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: {
+          subject: 'New Motor Show Entry — Check Payment',
+          body: [
+            'New Motor Show Entry — Pay by Check',
+            '',
+            'Name: Bill Adams',
+            'Email: thekoolguy@aol.com',
+            'Phone: 619-219-9630',
+            'Address: 13502 Appaloosa Dr, Lakeside, CA 92040',
+            '',
+            'Vehicle: 1932 Ford Coupe (Orange)',
+            'Club Affiliation: East County Cruisers',
+            'T-Shirt & Plaque Bundle: No',
+            'Total: $25.00',
+            '',
+            'Customer will mail check to: The Spirit of the Fourth, P.O. Box 270736, San Diego, CA 92198 by June 15.',
+          ].join('\n'),
+        },
+      }]
+    }));
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-submissions"]')!.click();
+    fixture.detectChanges();
+    nativeElement.querySelector<HTMLTableRowElement>('[data-testid="submission-row-motor-check-1"]')!.click();
+    fixture.detectChanges();
+
+    const detailPanel = nativeElement.querySelector('.submission-detail-panel')!;
+    const detailText = detailPanel.textContent || '';
+
+    expect(detailText).toContain('Address');
+    expect(detailText).toContain('13502 Appaloosa Dr, Lakeside, CA 92040');
+    expect(detailText).toContain('Vehicle');
+    expect(detailText).toContain('1932 Ford Coupe (Orange)');
+    expect(detailText).toContain('Club Affiliation');
+    expect(detailText).toContain('East County Cruisers');
+    expect(detailText).toContain('T-Shirt & Plaque Bundle');
+    expect(detailText).toContain('No');
+    expect(detailText).toContain('Total');
+    expect(detailText).toContain('$25.00');
+    expect(detailText).not.toContain('No additional submitted details.');
+    expect(detailText).not.toContain('Customer will mail check');
+  });
+
   it('uses a modal confirmation before deleting a submission row', () => {
     cmsService.getSubmissions.and.returnValue(of({
       items: [{
