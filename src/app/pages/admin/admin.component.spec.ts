@@ -521,11 +521,11 @@ describe('AdminComponent', () => {
     expect(nativeElement.querySelector('.submissions-table')?.textContent).toContain('Pat Halcrow');
   });
 
-  it('shows a submissions loading state while submissions are loading', () => {
+  it('shows a submissions loading state without spinning refresh while submissions initially load', () => {
     const loadingResponse = new Subject<any>();
     cmsService.getSubmissions.and.returnValue(loadingResponse.asObservable());
 
-    component.loadSubmissions();
+    component.loadSubmissions('initial');
     fixture.detectChanges();
 
     const nativeElement = fixture.nativeElement as HTMLElement;
@@ -533,11 +533,12 @@ describe('AdminComponent', () => {
     const refreshButton = nativeElement.querySelector<HTMLButtonElement>('[data-testid="refresh-submissions-button"]')!;
 
     expect(component.submissionsLoading).toBeTrue();
+    expect(component.submissionsRefreshing).toBeFalse();
     expect(loadingState?.textContent).toContain('Loading submissions...');
     expect(nativeElement.querySelector('.submissions-table')).toBeFalsy();
     expect(refreshButton.disabled).toBeTrue();
-    expect(refreshButton.querySelector('.button-spinner')).toBeTruthy();
-    expect(refreshButton.textContent).toContain('Refreshing...');
+    expect(refreshButton.querySelector('.button-spinner')).toBeFalsy();
+    expect(refreshButton.textContent).toContain('Refresh');
 
     loadingResponse.next({ items: [] });
     loadingResponse.complete();
@@ -546,6 +547,64 @@ describe('AdminComponent', () => {
     expect(component.submissionsLoading).toBeFalse();
     expect(nativeElement.querySelector('[data-testid="submissions-loading-state"]')).toBeFalsy();
     expect(nativeElement.querySelector('.submissions-table')).toBeTruthy();
+    expect(refreshButton.disabled).toBeFalse();
+    expect(refreshButton.textContent).toContain('Refresh');
+  });
+
+  it('keeps current submission rows visible and spins only refresh during manual refresh', () => {
+    component.submissions = [{
+      submissionId: 'existing-1',
+      submissionTitle: 'Existing Submission',
+      submittedAt: '2026-06-05T10:00:00-07:00',
+      name: 'Existing Person',
+      email: 'existing@example.com',
+      phone: '555-1212',
+      paymentStatus: 'none',
+      paymentProvider: 'none',
+      status: 'New',
+      assignedTo: '',
+      notes: '',
+      rawData: {},
+    }];
+    const loadingResponse = new Subject<any>();
+    cmsService.getSubmissions.and.returnValue(loadingResponse.asObservable());
+
+    component.refreshSubmissions();
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const refreshButton = nativeElement.querySelector<HTMLButtonElement>('[data-testid="refresh-submissions-button"]')!;
+
+    expect(component.submissionsLoading).toBeFalse();
+    expect(component.submissionsRefreshing).toBeTrue();
+    expect(nativeElement.querySelector('[data-testid="submissions-loading-state"]')).toBeFalsy();
+    expect(nativeElement.querySelector('.submissions-table')?.textContent).toContain('Existing Submission');
+    expect(refreshButton.disabled).toBeTrue();
+    expect(refreshButton.querySelector('.button-spinner')).toBeTruthy();
+    expect(refreshButton.textContent).toContain('Refreshing...');
+
+    loadingResponse.next({
+      items: [{
+        submissionId: 'new-1',
+        submissionTitle: 'New Submission',
+        submittedAt: '2026-06-05T11:00:00-07:00',
+        name: 'New Person',
+        email: 'new@example.com',
+        phone: '555-3434',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: {},
+      }]
+    });
+    loadingResponse.complete();
+    fixture.detectChanges();
+
+    expect(component.submissionsRefreshing).toBeFalse();
+    expect(nativeElement.querySelector('.submissions-table')?.textContent).not.toContain('Existing Submission');
+    expect(nativeElement.querySelector('.submissions-table')?.textContent).toContain('New Submission');
     expect(refreshButton.disabled).toBeFalse();
     expect(refreshButton.textContent).toContain('Refresh');
   });

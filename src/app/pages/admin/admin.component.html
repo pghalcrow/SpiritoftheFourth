@@ -485,11 +485,11 @@
         type="button"
         class="action-button secondary"
         data-testid="refresh-submissions-button"
-        [disabled]="submissionsLoading"
-        (click)="loadSubmissions()"
+        [disabled]="submissionsLoading || submissionsRefreshing"
+        (click)="refreshSubmissions()"
       >
-        <span *ngIf="submissionsLoading" class="button-spinner" aria-hidden="true"></span>
-        {{ submissionsLoading ? 'Refreshing...' : 'Refresh' }}
+        <span *ngIf="submissionsRefreshing" class="button-spinner" aria-hidden="true"></span>
+        {{ submissionsRefreshing ? 'Refreshing...' : 'Refresh' }}
       </button>
     </div>
 
@@ -512,7 +512,7 @@
       <span>Loading submissions...</span>
     </div>
 
-    <div *ngIf="!submissionsLoading" class="submissions-table-wrap">
+    <div *ngIf="!submissionsLoading || submissionsRefreshing" class="submissions-table-wrap">
       <table class="submissions-table">
         <thead>
           <tr>

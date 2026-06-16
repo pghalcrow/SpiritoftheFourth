@@ -51,6 +51,7 @@ export class AdminComponent implements OnInit {
   submissionActionLoading: 'save' | 'delete' | null = null;
   eventsLoading = false;
   submissionsLoading = false;
+  submissionsRefreshing = false;
   submissionGroupTabs: SubmissionGroupTab[] = [
     { key: 'all', label: 'All' },
     { key: 'vendor', label: 'Vendors' },
@@ -221,13 +222,28 @@ export class AdminComponent implements OnInit {
   selectAdminSection(section: 'events' | 'submissions') {
     this.adminSection = section;
     if (section === 'submissions' && !this.submissions.length) {
-      this.loadSubmissions();
+      this.loadSubmissions('initial');
     }
   }
 
-  loadSubmissions() {
-    this.submissionsLoading = true;
-    this.cmsService.getSubmissions().pipe(finalize(() => this.submissionsLoading = false)).subscribe({
+  refreshSubmissions() {
+    this.loadSubmissions('refresh');
+  }
+
+  loadSubmissions(mode: 'initial' | 'refresh' = 'initial') {
+    const isRefresh = mode === 'refresh';
+    if (isRefresh) {
+      this.submissionsRefreshing = true;
+    } else {
+      this.submissionsLoading = true;
+    }
+    this.cmsService.getSubmissions().pipe(finalize(() => {
+      if (isRefresh) {
+        this.submissionsRefreshing = false;
+      } else {
+        this.submissionsLoading = false;
+      }
+    })).subscribe({
       next: res => this.submissions = res.items || [],
       error: err => {
         console.error('Submissions load failed', err);
