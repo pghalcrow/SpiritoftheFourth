@@ -192,19 +192,30 @@ export class ParadeComponent {
       let formType = ''
       if(formKey == "VIP"){
         toAddress =  environment.forms.vipEntryForm.toEamil
-        subject = environment.forms.vipEntryForm.subject
+        subject = this.buildSubject('New Parade VIP Entry Request', [
+          ['Name', this.vipEntryForm.get('vipName')!.value],
+          ['Contact', this.vipEntryForm.get('contactName')!.value],
+          ['Email', this.vipEntryForm.get('email')!.value],
+        ], ': ')
         body = EmailUtlity.createVIPEntryHTMLBody(form!)
         replyTo = this.vipEntryForm.get('email')!.value
         formType = 'vipEntryForm'
       }else if (formKey == "PARADE"){
         toAddress =  environment.forms.paradeEntryForm.toEamil
-        subject = environment.forms.paradeEntryForm.subject
+        subject = this.buildSubject('New Parade Entry Request', [
+          ['Name', this.paradeEntryForm.get('entryName')!.value],
+          ['Contact', this.paradeEntryForm.get('contactName')!.value],
+          ['Email', this.paradeEntryForm.get('email')!.value],
+        ])
         body = EmailUtlity.createParadeEntryHTMLBody(form!)
         replyTo = this.paradeEntryForm.get('email')!.value
         formType = 'paradeEntryForm'
       }else if(formKey == "CAR"){
         toAddress =  environment.forms.carEntryForm.toEamil
-        subject = environment.forms.carEntryForm.subject
+        subject = this.buildSubject('New Parade Car Entry Request', [
+          ['Name', this.carEntryForm.get('contactName')!.value],
+          ['Email', this.carEntryForm.get('email')!.value],
+        ])
         body = EmailUtlity.createCarEntryHTMLBody(form!)
         replyTo = this.carEntryForm.get('email')!.value
         formType = 'carEntryForm'
@@ -229,5 +240,11 @@ export class ParadeComponent {
         }
       })
     }
+  }
+
+  private buildSubject(baseSubject: string, details: [string, string][], separator = ' - '): string {
+    return `${baseSubject}${separator}${details
+      .map(([label, value]) => `${label}: ${String(value || '').trim()}`)
+      .join(' | ')}`;
   }
 }
