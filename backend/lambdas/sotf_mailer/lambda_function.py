@@ -76,6 +76,15 @@ def record_submission_parallel(form, name, email, phone, source, raw_data):
     )
 
 
+def storage_form_title(subject, form_type):
+    parade_titles = {
+        "paradeEntryForm": "New Parade Entry Request - Parade",
+        "carEntryForm": "New Parade Entry Request - Car",
+        "vipEntryForm": "New Parade Entry Request - VIP",
+    }
+    return parade_titles.get(form_type, subject)
+
+
 def should_record_submission(subject, event_body):
     receipt_subjects = {
         "Wheels of Freedom Motor Show — Entry Confirmation",
@@ -484,12 +493,13 @@ def lambda_handler(event, context):
 
             success = send_email(host, port, username, password, subject, body, attachments, mail_to, username, reply_to)
             if success and should_record_submission(subject, event_body):
+                form_type = event_body.get("formType", "mailer")
                 record_submission_parallel(
-                    form=subject,
+                    form=storage_form_title(subject, form_type),
                     name=contact_name,
                     email=reply_to,
                     phone=contact_phone,
-                    source=event_body.get("formType", "mailer"),
+                    source=form_type,
                     raw_data={**event_body, "submission_id": str(uuid.uuid4())},
                 )
 

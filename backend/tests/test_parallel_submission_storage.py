@@ -491,6 +491,56 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
         self.assertEqual(call_kwargs["raw_data"]["availability"], "Morning setup")
         self.assertIn("submission_id", call_kwargs["raw_data"])
 
+    def test_parade_mailer_request_records_stable_admin_title_not_email_subject(self):
+        mailer = import_sotf_mailer()
+        cases = [
+            (
+                "paradeEntryForm",
+                "New Parade Entry Request - Name: Rancho Float | Contact: Pat Halcrow | Email: pat@example.com",
+                "New Parade Entry Request - Parade",
+            ),
+            (
+                "carEntryForm",
+                "New Parade Car Entry Request - Name: Pat Driver | Email: driver@example.com",
+                "New Parade Entry Request - Car",
+            ),
+            (
+                "vipEntryForm",
+                "New Parade VIP Entry Request: Name: Council Member Smith | Contact: Pat VIP | Email: vip@example.com",
+                "New Parade Entry Request - VIP",
+            ),
+        ]
+
+        for form_type, detailed_subject, expected_title in cases:
+            with self.subTest(form_type=form_type):
+                event = {
+                    "body": json.dumps({
+                        "toContact": "RBparadeSOTF@hotmail.com",
+                        "subject": detailed_subject,
+                        "replyTo": "pat@example.com",
+                        "name": "Pat Halcrow",
+                        "phone": "555-1212",
+                        "body": "<html>Parade details</html>",
+                        "formType": form_type,
+                    })
+                }
+
+                with patch.object(mailer, "send_email", return_value=True), \
+                    patch.object(mailer, "record_submission_parallel") as record_submission, \
+                    patch.dict(mailer.os.environ, {
+                        "USERNAME": "sender@example.com",
+                        "PASSWORD": "password",
+                        "SMTPHOST": "smtp.example.com",
+                        "SMTPPORT": "587",
+                    }):
+                    response = mailer.lambda_handler(event, None)
+
+                self.assertEqual(response["statusCode"], 200)
+                record_submission.assert_called_once()
+                call_kwargs = record_submission.call_args.kwargs
+                self.assertEqual(call_kwargs["form"], expected_title)
+                self.assertEqual(call_kwargs["raw_data"]["subject"], detailed_subject)
+
     def test_motor_show_check_receipt_email_is_not_recorded_as_submission(self):
         mailer = import_sotf_mailer()
         event = {
