@@ -65,13 +65,21 @@ export class SponsorsComponent implements OnInit {
         formType: 'sponsorshipForm',
         ...this.sponsorForm.getRawValue()
       }
-      this.emailService.sendEmail(toAddress, body, subject, replyTo, this.sponsorForm!.get("contactName")!.value, this.sponsorForm!.get("phone")!.value, undefined, formData).subscribe(result => {
-        this.isLoading = false
-        if (result.status) {
-          this.showSuccess = true
-          this.showError = false
-
-        } else {
+      this.emailService.sendEmail(toAddress, body, subject, replyTo, this.sponsorForm!.get("contactName")!.value, this.sponsorForm!.get("phone")!.value, undefined, formData).subscribe({
+        next: result => {
+          this.isLoading = false
+          if (result.status) {
+            this.showSuccess = true
+            this.showError = false
+          } else {
+            this.showSuccess = false
+            this.showError = true
+            this.sponsorForm.enable()
+          }
+        },
+        error: err => {
+          console.error('Sponsor form submission failed', err)
+          this.isLoading = false
           this.showSuccess = false
           this.showError = true
           this.sponsorForm.enable()

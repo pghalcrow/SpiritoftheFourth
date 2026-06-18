@@ -186,12 +186,21 @@ export class VendorsComponent {
         body = EmailUtlity.createArtistFormHTMLBody(this.artistForm);
 
         // Send artist email
-        this.emailService.sendEmail(toAddress, body, subject, replyTo, name, phone, undefined, formData).subscribe(result => {
-          this.isLoading = false;
-          if (result.status) {
-            this.showSuccess = true;
-            this.showError = false;
-          } else {
+        this.emailService.sendEmail(toAddress, body, subject, replyTo, name, phone, undefined, formData).subscribe({
+          next: result => {
+            this.isLoading = false;
+            if (result.status) {
+              this.showSuccess = true;
+              this.showError = false;
+            } else {
+              this.showSuccess = false;
+              this.showError = true;
+              this.artistForm.enable();
+            }
+          },
+          error: err => {
+            console.error('Artist form submission failed', err)
+            this.isLoading = false;
             this.showSuccess = false;
             this.showError = true;
             this.artistForm.enable();

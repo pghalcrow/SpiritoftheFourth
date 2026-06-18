@@ -194,7 +194,15 @@
       About
     </a>
 
-    <div class="text-center" id="paypal-donate-button-container-1"></div>
+    <a
+      class="nav-item nav-link"
+      routerLink="/freedom-club"
+      [queryParams]="{ donate: 'true' }"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      Donate
+    </a>
 
     <div class="social-links-container text-center mt-3">
       <a href="https://www.instagram.com/ranchobernardo/" target="_blank">

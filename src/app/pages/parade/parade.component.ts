@@ -226,12 +226,23 @@ export class ParadeComponent {
         ...form!.getRawValue()
       }
 
-      this.emailService.sendEmail(toAddress, body, subject, replyTo, form!.get("contactName")!.value, form!.get("phone")!.value, undefined, formData).subscribe(result =>{
-        this.isLoading = false
-        if(result.status){
-          this.showSuccess = true
-          this.showError = false
-        }else{
+      this.emailService.sendEmail(toAddress, body, subject, replyTo, form!.get("contactName")!.value, form!.get("phone")!.value, undefined, formData).subscribe({
+        next: result => {
+          this.isLoading = false
+          if(result.status){
+            this.showSuccess = true
+            this.showError = false
+          }else{
+            this.showSuccess = false
+            this.showError = true
+            this.carEntryForm.enable()
+            this.vipEntryForm.enable()
+            this.paradeEntryForm.enable()
+          }
+        },
+        error: err => {
+          console.error('Form submission failed', err)
+          this.isLoading = false
           this.showSuccess = false
           this.showError = true
           this.carEntryForm.enable()

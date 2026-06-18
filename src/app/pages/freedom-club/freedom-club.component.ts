@@ -1,5 +1,6 @@
-import { Component, ElementRef, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { AbstractControl, FormBuilder, FormGroup, ValidationErrors, Validators } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { OrderService } from 'src/app/services/order.service';
 import { environment } from 'src/environments/environment';
 
@@ -10,7 +11,7 @@ declare var Stripe: any;
   templateUrl: './freedom-club.component.html',
   styleUrls: ['./freedom-club.component.css']
 })
-export class FreedomClubComponent {
+export class FreedomClubComponent implements OnInit {
   readonly presetAmounts = [25, 50, 100, 150, 200, 300, 500];
   readonly donationTitle = 'Freedom Club Donation';
   readonly officerRecipients = environment.forms.freedomClubDonation.toEamil;
@@ -28,7 +29,8 @@ export class FreedomClubComponent {
 
   constructor(
     private fb: FormBuilder,
-    private orderService: OrderService
+    private orderService: OrderService,
+    private route: ActivatedRoute
   ) {
     this.donationForm = this.fb.group({
       fullName: ['', Validators.required],
@@ -36,6 +38,12 @@ export class FreedomClubComponent {
       phone: ['', Validators.required],
       customAmount: [''],
     }, { validators: [this.donationAmountValidator.bind(this)] });
+  }
+
+  ngOnInit(): void {
+    if (this.route.snapshot.queryParamMap.get('donate') === 'true') {
+      this.openDonationForm();
+    }
   }
 
   get currentAmount(): number {
