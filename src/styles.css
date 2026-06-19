@@ -81,11 +81,25 @@ p {
 }
 
 .modal-close-btn {
-    background-color: transparent;
-    border: unset;
     position: absolute;
-    top: 5px;
-    right: 5px;
+    top: 8px;
+    right: 8px;
+    z-index: 10;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background-color: var(--dark-blue-color);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: bold;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    flex-shrink: 0;
 }
 
 .modal-headline{
