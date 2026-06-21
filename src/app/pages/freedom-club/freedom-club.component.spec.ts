@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
+import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of } from 'rxjs';
 import { OrderService } from 'src/app/services/order.service';
 import { FreedomClubComponent } from './freedom-club.component';
@@ -18,7 +19,10 @@ describe('FreedomClubComponent', () => {
     await TestBed.configureTestingModule({
       declarations: [FreedomClubComponent],
       imports: [ReactiveFormsModule],
-      providers: [{ provide: OrderService, useValue: orderService }],
+      providers: [
+        { provide: OrderService, useValue: orderService },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(FreedomClubComponent);

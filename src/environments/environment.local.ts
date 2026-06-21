@@ -70,7 +70,10 @@ export const environment = {
       adminEvents: "/admin/events",
       submissions: "/admin/submissions",
       upload: "/admin/upload",
-      testMode: "/admin/test-mode"
+      testMode: "/admin/test-mode",
+      adminUsers: "/admin/users",
+      passwordReset: "/admin/password-reset",
+      passwordResetConfirm: "/admin/password-reset/confirm"
     }
   }
 };

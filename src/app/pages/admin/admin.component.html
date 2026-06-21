@@ -5,8 +5,9 @@
     </div>
 
     <div class="toolbar-actions">
-      <div class="section-switcher" aria-label="Admin section">
+      <div *ngIf="showAdminSectionSwitcher" class="section-switcher" aria-label="Admin section">
         <button
+          *ngIf="canAccessEvents"
           type="button"
           class="section-button"
           [class.active]="adminSection === 'events'"
@@ -24,10 +25,20 @@
         >
           Submissions
         </button>
+        <button
+          *ngIf="canManageUsers"
+          type="button"
+          class="section-button"
+          [class.active]="adminSection === 'users'"
+          data-testid="admin-section-users"
+          (click)="selectAdminSection('users')"
+        >
+          Users
+        </button>
       </div>
       <button type="button" class="action-button ghost" (click)="logout()">Logout</button>
       <div class="event-toolbar-actions">
-        <ng-container *ngIf="adminSection === 'events'">
+        <ng-container *ngIf="adminSection === 'events' && canEditBackend">
           <button type="button" class="action-button secondary" (click)="addEvent()">Add Event</button>
           <button type="button" class="action-button primary" (click)="saveEvents()">Save Changes</button>
         </ng-container>
@@ -39,14 +50,6 @@
     <div>
       <p class="eyebrow">Developer Controls</p>
       <h2>{{ testModeLabel }}</h2>
-      <p class="developer-panel-note">
-        <ng-container *ngIf="testModeLocalOnly; else liveTestModeCopy">
-          Localhost always runs in test mode. This control is available only on the live site.
-        </ng-container>
-        <ng-template #liveTestModeCopy>
-          Test mode routes outbound notification emails to pghalcrow@gmail.com and uses Stripe test keys.
-        </ng-template>
-      </p>
     </div>
     <label class="test-mode-toggle">
       <span>Enable Test Mode</span>
@@ -54,7 +57,7 @@
         type="checkbox"
         data-testid="toggle-test-mode"
         [checked]="testMode"
-        [disabled]="testModeLoading || testModeLocalOnly"
+        [disabled]="testModeLoading"
         (change)="toggleTestMode($any($event.target).checked)"
       />
     </label>
@@ -87,7 +90,7 @@
           <h2>{{ cmsEvent.title || 'Untitled Event' }}</h2>
         </div>
 
-        <button type="button" class="action-button danger" (click)="deleteEvent(activeEventIndex)">Delete Event</button>
+        <button *ngIf="canEditBackend" type="button" class="action-button danger" (click)="deleteEvent(activeEventIndex)">Delete Event</button>
       </div>
 
       <section class="editor-section">
@@ -118,6 +121,7 @@
                   class="flyer-img"
                 />
                 <button
+                  *ngIf="canEditBackend"
                   type="button"
                   class="action-button secondary"
                   data-testid="remove-event-image"
@@ -127,7 +131,7 @@
                 </button>
               </div>
               <ng-template #imagePicker>
-              <label class="file-picker">
+              <label *ngIf="canEditBackend" class="file-picker">
                 <span>Choose Image</span>
                 <input type="file" (change)="onFileSelected($event, cmsEvent)" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" />
               </label>
@@ -196,9 +200,10 @@
                   placeholder="Contact email"
                   data-testid="event-contact-email"
                 />
-                <button
-                  type="button"
-                  class="action-button text-danger"
+              <button
+                *ngIf="canEditBackend"
+                type="button"
+                class="action-button text-danger"
                   [attr.data-testid]="'remove-event-contact-email-' + emailIndex"
                   (click)="removeEventContactEmail(cmsEvent, emailIndex)"
                 >
@@ -206,6 +211,7 @@
                 </button>
               </div>
               <button
+                *ngIf="canEditBackend"
                 type="button"
                 class="action-button secondary contact-email-add"
                 data-testid="add-event-contact-email"
@@ -234,7 +240,7 @@
             <h3>Form Fields</h3>
             <p>Drag fields to set their order on the public form.</p>
           </div>
-          <button type="button" class="action-button secondary" (click)="addFormField(cmsEvent)">Add Field</button>
+          <button *ngIf="canEditBackend" type="button" class="action-button secondary" (click)="addFormField(cmsEvent)">Add Field</button>
         </div>
 
         <div cdkDropList (cdkDropListDropped)="dropField($event, cmsEvent.formFields)" class="field-list">
@@ -242,7 +248,7 @@
             <div class="field-card-header">
               <button type="button" class="drag-handle" cdkDragHandle>Drag</button>
               <strong>{{ field.label || 'New Field' }}</strong>
-              <button type="button" class="action-button text-danger" (click)="removeFormField(cmsEvent, k)">
+              <button *ngIf="canEditBackend" type="button" class="action-button text-danger" (click)="removeFormField(cmsEvent, k)">
                 Remove
               </button>
             </div>
@@ -314,7 +320,7 @@
                 </label>
               </div>
 
-              <button type="button" class="action-button secondary" (click)="addSubField(field)">Add Subfield</button>
+              <button *ngIf="canEditBackend" type="button" class="action-button secondary" (click)="addSubField(field)">Add Subfield</button>
             </div>
           </div>
         </div>
@@ -448,14 +454,14 @@
               <input class="admin-input" type="number" [(ngModel)]="addOn.price" placeholder="Price" />
             </label>
 
-            <button type="button" class="action-button text-danger" (click)="removeAddOn(cmsEvent, j)">
+            <button *ngIf="canEditBackend" type="button" class="action-button text-danger" (click)="removeAddOn(cmsEvent, j)">
               Remove
             </button>
           </div>
         </div>
       </section>
 
-      <div class="event-editor-footer">
+      <div *ngIf="canEditBackend" class="event-editor-footer">
         <button
           type="button"
           class="action-button primary"
@@ -471,9 +477,147 @@
     <section *ngIf="!eventsLoading && !events.length" class="empty-events">
       <h2>No Events Yet</h2>
       <p>Add an event to start editing.</p>
-      <button type="button" class="action-button primary" (click)="addEvent()">Add Event</button>
+      <button *ngIf="canEditBackend" type="button" class="action-button primary" (click)="addEvent()">Add Event</button>
     </section>
   </ng-container>
+
+  <section *ngIf="adminSection === 'users' && canManageUsers" class="users-workspace">
+    <section class="current-admin-panel" data-testid="current-admin-user">
+      <div>
+        <p class="eyebrow">Signed In As</p>
+        <h3>{{ currentEmail || 'Unknown email' }}</h3>
+      </div>
+      <span class="role-badge">{{ currentRoleLabel }}</span>
+    </section>
+
+    <section class="user-management-panel">
+      <div class="section-heading with-action">
+        <div>
+          <h3>Create User</h3>
+          <p>New users receive a password reset email and set their own password.</p>
+        </div>
+        <button type="button" class="action-button secondary" data-testid="user-role-help" (click)="showRoleHelp()">
+          Role Help
+        </button>
+      </div>
+      <div class="user-create-row">
+        <label class="control-group">
+          <span>Email</span>
+          <input
+            class="admin-input"
+            type="email"
+            [(ngModel)]="newUserEmail"
+            placeholder="name@example.com"
+            [attr.aria-invalid]="newUserEmailError ? 'true' : null"
+            aria-describedby="new-user-email-error"
+            (ngModelChange)="onNewUserEmailChange()"
+          />
+          <small *ngIf="newUserEmailError" id="new-user-email-error" class="field-error" data-testid="new-user-email-error">
+            {{ newUserEmailError }}
+          </small>
+        </label>
+        <label class="control-group">
+          <span>Role</span>
+          <select class="admin-select" data-testid="new-user-role" [(ngModel)]="newUserRole">
+            <option *ngFor="let role of creatableRoles" [value]="role">{{ formatRole(role) }}</option>
+          </select>
+        </label>
+        <button type="button" class="action-button primary user-create-button" [disabled]="userActionLoading" (click)="createAdminUser()">
+          <span *ngIf="userActionLoading" class="button-spinner" aria-hidden="true"></span>
+          Create User
+        </button>
+      </div>
+    </section>
+
+    <div *ngIf="usersLoading" class="admin-loading-state">
+      <span class="button-spinner" aria-hidden="true"></span>
+      <span>Loading users...</span>
+    </div>
+
+    <div *ngIf="!usersLoading" class="submissions-table-wrap">
+      <table class="submissions-table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Role</th>
+            <th data-testid="account-status-header">
+              Account Status
+              <span class="status-help">
+                <button
+                  type="button"
+                  class="status-help-button"
+                  data-testid="account-status-help"
+                  aria-label="Account status help"
+                  aria-describedby="account-status-tooltip">
+                  ?
+                </button>
+                <span
+                  id="account-status-tooltip"
+                  class="status-help-tooltip"
+                  data-testid="account-status-tooltip"
+                  role="tooltip">
+                  Active users can sign in. Password setup needed means the user still needs to set or reset their password. Password change required means a temporary password must be changed at sign-in. Not confirmed means setup has not been completed.
+                </span>
+              </span>
+            </th>
+            <th>Enabled</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let user of adminUsers">
+            <td>{{ user.email }}</td>
+            <td>
+              <select
+                *ngIf="canChangeAdminUserRole(user); else readOnlyRole"
+                class="admin-select compact-select"
+                [disabled]="userUpdateLoadingEmail === user.email"
+                [attr.data-testid]="'user-role-select-' + user.email"
+                (change)="updateAdminUserRole(user, $any($event.target).value)"
+              >
+                <option
+                  *ngFor="let role of getRoleOptionsForUser(user)"
+                  [value]="role"
+                  [selected]="role === user.role"
+                >
+                  {{ formatRole(role) }}
+                </option>
+              </select>
+              <ng-template #readOnlyRole>{{ formatRole(user.role) }}</ng-template>
+            </td>
+            <td>{{ formatAccountStatus(user.status) }}</td>
+            <td>
+              <label
+                *ngIf="canToggleAdminUserEnabled(user); else readOnlyEnabled"
+                class="enabled-status-control"
+                [attr.data-testid]="'user-enabled-control-' + user.email"
+              >
+                <input
+                  type="checkbox"
+                  [checked]="user.enabled !== false"
+                  [disabled]="userUpdateLoadingEmail === user.email"
+                  [attr.aria-label]="(user.enabled === false ? 'Enable account for ' : 'Disable account for ') + user.email"
+                  [attr.data-testid]="'user-enabled-toggle-' + user.email"
+                  (change)="updateAdminUserEnabled(user, $any($event.target).checked)"
+                />
+                <span class="enabled-status-text" [attr.data-testid]="'user-enabled-status-' + user.email">{{ user.enabled === false ? 'Disabled' : 'Enabled' }}</span>
+              </label>
+              <ng-template #readOnlyEnabled>
+                <span class="enabled-status-control enabled-status-control-readonly" [attr.data-testid]="'user-enabled-readonly-' + user.email">
+                  <span class="enabled-status-text" [attr.data-testid]="'user-enabled-status-' + user.email">{{ user.enabled === false ? 'Disabled' : 'Enabled' }}</span>
+                </span>
+              </ng-template>
+            </td>
+            <td>
+              <button *ngIf="canRemoveAdminUser(user)" type="button" data-testid="remove-admin-user" class="action-button danger details-button" [disabled]="userActionLoading || userUpdateLoadingEmail === user.email" (click)="deleteAdminUser(user)">
+                Remove
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
 
   <section *ngIf="adminSection === 'submissions'" class="submissions-workspace">
     <div class="submissions-tools">
@@ -490,6 +634,43 @@
       >
         <span *ngIf="submissionsRefreshing" class="button-spinner" aria-hidden="true"></span>
         {{ submissionsRefreshing ? 'Refreshing...' : 'Refresh' }}
+      </button>
+    </div>
+
+    <div class="submission-export-panel">
+      <label class="control-group">
+        <span>Export From</span>
+        <input
+          class="admin-input"
+          type="date"
+          data-testid="submission-export-from"
+          [(ngModel)]="submissionExportFromDate"
+        />
+      </label>
+      <label class="control-group">
+        <span>Export To</span>
+        <input
+          class="admin-input"
+          type="date"
+          data-testid="submission-export-to"
+          [(ngModel)]="submissionExportToDate"
+        />
+      </label>
+      <label class="control-group">
+        <span>Category</span>
+        <select class="admin-select" data-testid="submission-export-group" [(ngModel)]="submissionExportGroup">
+          <option value="all">All categories</option>
+          <option *ngFor="let category of submissionExportCategories" [value]="category.key">{{ category.label }}</option>
+        </select>
+      </label>
+      <button
+        type="button"
+        class="action-button primary submission-export-button"
+        data-testid="submission-export-button"
+        [disabled]="submissionsLoading"
+        (click)="exportSubmissionsToExcel()"
+      >
+        Export Excel
       </button>
     </div>
 
@@ -617,6 +798,7 @@
 
       <div class="submission-actions">
         <button
+          *ngIf="canDeleteSubmissionItems"
           type="button"
           class="action-button danger"
           data-testid="delete-submission-button"
@@ -649,9 +831,40 @@
       role="dialog"
       aria-modal="true"
       [attr.aria-labelledby]="'admin-modal-title'"
+      [attr.data-testid]="modal.contentType === 'roleHelp' ? 'role-help-modal' : null"
     >
       <h2 id="admin-modal-title">{{ modal.title }}</h2>
-      <p>{{ modal.message }}</p>
+      <ng-container *ngIf="modal.contentType === 'roleHelp'; else standardModalMessage">
+        <div class="role-help-content">
+          <section>
+            <h3>Role Access</h3>
+            <dl class="role-help-list">
+              <div>
+                <dt>Super Admin</dt>
+                <dd>Can manage backend content, submissions, and users at all levels. Super Admins can create, remove, change roles, enable, and disable Super Admin, Admin, and Viewer accounts.</dd>
+              </div>
+              <div>
+                <dt>Admin</dt>
+                <dd>Can edit backend content and manage day-to-day admin work. Admins can create, remove, enable, and disable Viewer accounts only.</dd>
+              </div>
+              <div>
+                <dt>Viewer</dt>
+                <dd>Can view admin information available to their account, but cannot edit backend content, delete submissions, create users, remove users, change roles, or enable and disable accounts.</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section>
+            <h3>User Management Rules</h3>
+            <ul>
+              <li>Users cannot remove, disable, or change the role for their own account.</li>
+            </ul>
+          </section>
+        </div>
+      </ng-container>
+      <ng-template #standardModalMessage>
+        <p>{{ modal.message }}</p>
+      </ng-template>
 
       <div class="modal-actions">
         <button

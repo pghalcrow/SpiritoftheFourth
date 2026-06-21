@@ -181,19 +181,20 @@ class SubmissionsRepository:
             "updatedAt": record["updatedAt"],
         }
 
-    def list_submissions(self, limit=100):
+    def list_submissions(self, limit=None):
         items = []
         last_key = None
 
-        while len(items) < limit:
+        while True:
+            remaining_limit = limit - len(items) if limit is not None else None
             result = self._query_submissions(
                 scan_index_forward=False,
-                limit=limit - len(items),
+                limit=remaining_limit,
                 exclusive_start_key=last_key,
             )
             items.extend(result.get("Items", []))
             last_key = result.get("LastEvaluatedKey")
-            if not last_key:
+            if not last_key or (limit is not None and len(items) >= limit):
                 break
 
         return {"items": items, "lastEvaluatedKey": last_key}

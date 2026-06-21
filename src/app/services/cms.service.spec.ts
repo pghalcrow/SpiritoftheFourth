@@ -134,4 +134,74 @@ describe('CmsService', () => {
     expect(req.request.headers.get('Authorization')).toBe('Bearer cms-developer-token');
     req.flush({ testMode: false });
   });
+
+  it('logs in with email and password', () => {
+    service.login('admin@example.com', 'secret7').subscribe(res => {
+      expect(res.role).toBe('superAdmin');
+      expect(res.email).toBe('admin@example.com');
+    });
+
+    const req = httpMock.expectOne(`${environment.cms.baseUrl}${environment.cms.routes.login}`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ email: 'admin@example.com', password: 'secret7' });
+    req.flush({ success: true, token: 'jwt-token', role: 'superAdmin', email: 'admin@example.com' });
+  });
+
+  it('requests and confirms admin password reset', () => {
+    service.requestPasswordReset('admin@example.com').subscribe(res => {
+      expect(res.success).toBeTrue();
+    });
+    const request = httpMock.expectOne(`${environment.cms.baseUrl}${environment.cms.routes.passwordReset}`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ email: 'admin@example.com' });
+    request.flush({ success: true });
+
+    service.confirmPasswordReset('admin@example.com', '123456', 'secret7').subscribe(res => {
+      expect(res.success).toBeTrue();
+    });
+    const confirm = httpMock.expectOne(`${environment.cms.baseUrl}${environment.cms.routes.passwordResetConfirm}`);
+    expect(confirm.request.method).toBe('POST');
+    expect(confirm.request.body).toEqual({ email: 'admin@example.com', code: '123456', password: 'secret7' });
+    confirm.flush({ success: true });
+  });
+
+  it('manages admin users with bearer auth', () => {
+    sessionStorage.setItem('adminToken', 'jwt-token');
+
+    service.getAdminUsers().subscribe(res => {
+      expect(res.items[0].role).toBe('viewer');
+    });
+    const list = httpMock.expectOne(`${environment.cms.baseUrl}${environment.cms.routes.adminUsers}`);
+    expect(list.request.method).toBe('GET');
+    expect(list.request.headers.get('Authorization')).toBe('Bearer jwt-token');
+    list.flush({ items: [{ email: 'viewer@example.com', role: 'viewer', enabled: true, status: 'CONFIRMED' }] });
+
+    service.createAdminUser('viewer2@example.com', 'viewer').subscribe(res => {
+      expect(res.email).toBe('viewer2@example.com');
+    });
+    const create = httpMock.expectOne(`${environment.cms.baseUrl}${environment.cms.routes.adminUsers}`);
+    expect(create.request.method).toBe('POST');
+    expect(create.request.body).toEqual({ email: 'viewer2@example.com', role: 'viewer' });
+    expect(create.request.headers.get('Authorization')).toBe('Bearer jwt-token');
+    create.flush({ email: 'viewer2@example.com', role: 'viewer' });
+
+    service.updateAdminUser('viewer2@example.com', { role: 'admin', enabled: false }).subscribe(res => {
+      expect(res.email).toBe('viewer2@example.com');
+      expect(res.role).toBe('admin');
+      expect(res.enabled).toBeFalse();
+    });
+    const update = httpMock.expectOne(`${environment.cms.baseUrl}${environment.cms.routes.adminUsers}/viewer2%40example.com`);
+    expect(update.request.method).toBe('PATCH');
+    expect(update.request.body).toEqual({ role: 'admin', enabled: false });
+    expect(update.request.headers.get('Authorization')).toBe('Bearer jwt-token');
+    update.flush({ email: 'viewer2@example.com', role: 'admin', enabled: false });
+
+    service.deleteAdminUser('viewer2@example.com').subscribe(res => {
+      expect(res.success).toBeTrue();
+    });
+    const remove = httpMock.expectOne(`${environment.cms.baseUrl}${environment.cms.routes.adminUsers}/viewer2%40example.com`);
+    expect(remove.request.method).toBe('DELETE');
+    expect(remove.request.headers.get('Authorization')).toBe('Bearer jwt-token');
+    remove.flush({ success: true, email: 'viewer2@example.com' });
+  });
 });

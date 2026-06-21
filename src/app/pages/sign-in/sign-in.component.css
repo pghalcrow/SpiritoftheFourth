@@ -38,6 +38,33 @@
   line-height: 1.1;
 }
 
+.auth-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 5px;
+  background: #edf4fb;
+  border: 1px solid #cbd9e8;
+  border-radius: 8px;
+}
+
+.auth-mode-switch button {
+  min-height: 38px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #31516f;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.auth-mode-switch button.active {
+  background: #ffffff;
+  border-color: #9fb3c8;
+  color: #0a3161;
+  box-shadow: 0 6px 16px rgba(16, 35, 61, 0.08);
+}
+
 .password-field {
   display: grid;
   gap: 8px;
@@ -62,6 +89,49 @@
   transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
+.password-input-wrap {
+  position: relative;
+}
+
+.password-input-wrap input {
+  padding-right: 52px;
+}
+
+.password-reveal-button {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #31516f;
+  cursor: pointer;
+}
+
+.password-reveal-button:hover,
+.password-reveal-button:focus-visible {
+  background: #edf4fb;
+  border-color: #cbd9e8;
+  color: #0a3161;
+  outline: none;
+}
+
+.password-reveal-button svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
 .password-field input:focus {
   background: #ffffff;
   border-color: #1769aa;
@@ -83,15 +153,47 @@
   background: #08284f;
 }
 
+.login-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.local-reset-link {
+  display: inline-flex;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 1px solid #0a3161;
+  border-radius: 8px;
+  color: #0a3161;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.local-reset-link:hover {
+  background: #edf4fb;
+}
+
+.login-info,
 .login-error {
   margin: 0;
   padding: 10px 12px;
-  background: #fff5f4;
-  border: 1px solid #f0b8b2;
   border-radius: 8px;
-  color: #b42318;
   font-weight: 700;
   text-align: center;
+}
+
+.login-info {
+  background: #f0fbf7;
+  border: 1px solid #b6e3d1;
+  color: #23745d;
+}
+
+.login-error {
+  background: #fff5f4;
+  border: 1px solid #f0b8b2;
+  color: #b42318;
 }
 
 @media (max-width: 575.98px) {

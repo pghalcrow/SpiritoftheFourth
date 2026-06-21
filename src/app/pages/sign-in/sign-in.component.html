@@ -1,20 +1,60 @@
 <main class="admin-login-shell">
-  <form class="admin-login-card" (ngSubmit)="login()">
+  <form class="admin-login-card" (ngSubmit)="authMode === 'login' ? login() : requestReset()">
     <p class="login-eyebrow">CMS Access</p>
-    <h2>Admin Sign In</h2>
+    <h2>{{ authMode === 'login' ? 'Admin Sign In' : 'Reset Password' }}</h2>
+
+    <div class="auth-mode-switch" aria-label="Authentication mode">
+      <button type="button" [class.active]="authMode === 'login'" (click)="setMode('login')">Log in</button>
+      <button type="button" [class.active]="authMode === 'reset'" (click)="setMode('reset')">Reset password</button>
+    </div>
 
     <label class="password-field">
-      <span>Password</span>
+      <span>Email</span>
       <input
-        type="password"
-        name="adminPassword"
-        [(ngModel)]="password"
-        placeholder="Enter password"
-        autocomplete="current-password"
+        type="email"
+        name="adminEmail"
+        [(ngModel)]="email"
+        placeholder="name@example.com"
+        autocomplete="email"
+        required
       />
     </label>
 
-    <button type="submit" class="login-button">Sign In</button>
+    <label class="password-field" *ngIf="authMode === 'login'">
+      <span>Password</span>
+      <div class="password-input-wrap">
+        <input
+          [type]="showPassword ? 'text' : 'password'"
+          name="adminPassword"
+          [(ngModel)]="password"
+          placeholder="Enter password"
+          autocomplete="current-password"
+        />
+        <button
+          type="button"
+          class="password-reveal-button"
+          data-testid="password-reveal-button"
+          aria-label="Press and hold to show password"
+          (pointerdown)="revealPassword()"
+          (pointerup)="concealPassword()"
+          (pointerleave)="concealPassword()"
+          (pointercancel)="concealPassword()"
+          (touchend)="concealPassword()"
+          (blur)="concealPassword()"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+            <circle cx="12" cy="12" r="2.8"></circle>
+          </svg>
+        </button>
+      </div>
+    </label>
+
+    <button type="submit" class="login-button" [disabled]="isLoading">
+      {{ isLoading ? 'Working...' : (authMode === 'login' ? 'Sign In' : 'Send Reset Link') }}
+    </button>
+    <p *ngIf="infoMessage" class="login-info">{{ infoMessage }}</p>
+    <a *ngIf="localResetUrl" class="local-reset-link" [href]="localResetUrl">Open reset page</a>
     <p *ngIf="errorMessage" class="login-error">{{ errorMessage }}</p>
   </form>
 </main>

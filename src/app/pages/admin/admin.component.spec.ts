@@ -13,6 +13,9 @@ describe('AdminComponent', () => {
   let cmsService: jasmine.SpyObj<CmsService>;
 
   beforeEach(async () => {
+    sessionStorage.clear();
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    sessionStorage.setItem('adminEmail', 'super@example.com');
     cmsService = jasmine.createSpyObj<CmsService>('CmsService', [
       'getEvents',
       'updateEvents',
@@ -23,6 +26,10 @@ describe('AdminComponent', () => {
       'deleteSubmission',
       'getTestMode',
       'updateTestMode',
+      'getAdminUsers',
+      'createAdminUser',
+      'deleteAdminUser',
+      'updateAdminUser',
     ]);
     cmsService.getEvents.and.returnValue(of({
       events: [{
@@ -60,6 +67,10 @@ describe('AdminComponent', () => {
     cmsService.deleteSubmission.and.returnValue(of({ success: true, submissionId: 's1' }));
     cmsService.getTestMode.and.returnValue(of({ testMode: false }));
     cmsService.updateTestMode.and.returnValue(of({ testMode: true, updatedBy: 'developer' }));
+    cmsService.getAdminUsers.and.returnValue(of({ items: [] }));
+    cmsService.createAdminUser.and.returnValue(of({ email: 'viewer@example.com', role: 'viewer' }));
+    cmsService.deleteAdminUser.and.returnValue(of({ success: true, email: 'viewer@example.com' }));
+    cmsService.updateAdminUser.and.returnValue(of({ email: 'viewer@example.com', role: 'viewer', enabled: true }));
 
     await TestBed.configureTestingModule({
       declarations: [AdminComponent],
@@ -94,6 +105,8 @@ describe('AdminComponent', () => {
   });
 
   it('defaults to submissions and uses a dynamic admin header', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    fixture.detectChanges();
     const nativeElement = fixture.nativeElement as HTMLElement;
 
     expect(component.adminSection).toBe('submissions');
@@ -105,6 +118,41 @@ describe('AdminComponent', () => {
 
     expect(component.adminSection).toBe('events');
     expect(nativeElement.querySelector('.admin-toolbar h1')?.textContent).toContain('Upcoming Events');
+  });
+
+  it('hides the events section from admins and blocks direct events navigation', () => {
+    sessionStorage.setItem('adminRole', 'admin');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    expect(nativeElement.querySelector('[data-testid="admin-section-events"]')).toBeFalsy();
+
+    component.selectAdminSection('events');
+    fixture.detectChanges();
+
+    expect(component.adminSection).toBe('submissions');
+    expect(nativeElement.querySelector('.event-card')).toBeFalsy();
+  });
+
+  it('syncs a stale signed-in role from the backend user list on load', () => {
+    fixture.destroy();
+    sessionStorage.clear();
+    sessionStorage.setItem('adminToken', 'local-admin-token:admin@example.com');
+    sessionStorage.setItem('adminRole', 'admin');
+    sessionStorage.setItem('adminEmail', 'admin@example.com');
+    cmsService.getAdminUsers.and.returnValue(of({
+      items: [
+        { email: 'admin@example.com', role: 'superAdmin', enabled: true, status: 'CONFIRMED' },
+      ]
+    }));
+
+    fixture = TestBed.createComponent(AdminComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    expect(sessionStorage.getItem('adminRole')).toBe('superAdmin');
+    expect(nativeElement.querySelector('[data-testid="admin-section-events"]')).toBeTruthy();
   });
 
   it('shows an events loading state instead of the empty state while events are loading', () => {
@@ -130,11 +178,37 @@ describe('AdminComponent', () => {
     expect(nativeElement.querySelector('.empty-events')).toBeTruthy();
   });
 
-  it('shows events before submissions in the admin section selector', () => {
+  it('shows events submissions and users in the admin section selector for user managers', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    fixture.detectChanges();
+
     const nativeElement = fixture.nativeElement as HTMLElement;
     const sectionButtons = Array.from(nativeElement.querySelectorAll<HTMLButtonElement>('.section-switcher .section-button'));
 
-    expect(sectionButtons.map(button => button.textContent?.trim())).toEqual(['Events', 'Submissions']);
+    expect(sectionButtons.map(button => button.textContent?.trim())).toEqual(['Events', 'Submissions', 'Users']);
+  });
+
+  it('hides the admin section selector when the current role only has one page view', () => {
+    sessionStorage.setItem('adminRole', 'viewer');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+
+    expect(component.availableAdminSections).toEqual(['submissions']);
+    expect(nativeElement.querySelector('.section-switcher')).toBeFalsy();
+    expect(nativeElement.querySelector('[data-testid="admin-section-submissions"]')).toBeFalsy();
+    expect(nativeElement.querySelector('.admin-toolbar h1')?.textContent).toContain('Submissions');
+  });
+
+  it('hides backend mutation actions for viewer role', () => {
+    sessionStorage.setItem('adminRole', 'viewer');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+
+    expect(nativeElement.querySelector('[data-testid="admin-section-users"]')).toBeFalsy();
+    expect(nativeElement.querySelector('.event-toolbar-actions .action-button')).toBeFalsy();
+    expect(nativeElement.querySelector('[data-testid="delete-submission-button"]')).toBeFalsy();
   });
 
   it('does not show an artist submission group tab', () => {
@@ -144,6 +218,413 @@ describe('AdminComponent', () => {
 
     expect(tabLabels).not.toContain('Artists');
     expect(nativeElement.querySelector('[data-testid="submission-group-artist"]')).toBeFalsy();
+  });
+
+  it('lets admins create only viewer accounts from user management', () => {
+    sessionStorage.setItem('adminRole', 'admin');
+    cmsService.getAdminUsers.and.returnValue(of({ items: [] }));
+    cmsService.createAdminUser.and.returnValue(of({ email: 'viewer@example.com', role: 'viewer' }));
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-users"]')!.click();
+    fixture.detectChanges();
+
+    const roleOptions = Array.from(nativeElement.querySelectorAll<HTMLOptionElement>('[data-testid="new-user-role"] option'));
+    expect(roleOptions.map(option => option.value)).toEqual(['viewer']);
+    expect(roleOptions.map(option => option.textContent?.trim())).toEqual(['Viewer']);
+
+    component.newUserEmail = 'viewer@example.com';
+    component.newUserRole = 'viewer';
+    component.createAdminUser();
+
+    expect(cmsService.createAdminUser).toHaveBeenCalledWith('viewer@example.com', 'viewer');
+  });
+
+  it('validates the create user email before creating an account', () => {
+    sessionStorage.setItem('adminRole', 'admin');
+    cmsService.getAdminUsers.and.returnValue(of({ items: [] }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    component.newUserEmail = 'not-an-email';
+    component.newUserRole = 'viewer';
+    component.createAdminUser();
+    fixture.detectChanges();
+
+    expect(cmsService.createAdminUser).not.toHaveBeenCalled();
+    expect(component.newUserEmailError).toBe('Enter a valid email address.');
+    expect(fixture.nativeElement.querySelector('[data-testid="new-user-email-error"]')?.textContent).toContain('Enter a valid email address.');
+  });
+
+  it('prevents creating a user with an email that already exists', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    cmsService.getAdminUsers.and.returnValue(of({
+      items: [
+        { email: 'viewer@example.com', role: 'viewer', enabled: true, status: 'CONFIRMED' },
+      ]
+    }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    component.newUserEmail = 'VIEWER@example.com';
+    component.newUserRole = 'viewer';
+    component.createAdminUser();
+    fixture.detectChanges();
+
+    expect(cmsService.createAdminUser).not.toHaveBeenCalled();
+    expect(component.newUserEmailError).toBe('An account using that email already exists.');
+    expect(fixture.nativeElement.querySelector('[data-testid="new-user-email-error"]')?.textContent).toContain('An account using that email already exists.');
+  });
+
+  it('shows friendly role labels in the user role selector', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    cmsService.getAdminUsers.and.returnValue(of({ items: [] }));
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-users"]')!.click();
+    fixture.detectChanges();
+
+    const roleOptions = Array.from(nativeElement.querySelectorAll<HTMLOptionElement>('[data-testid="new-user-role"] option'));
+
+    expect(roleOptions.map(option => option.value)).toEqual(['superAdmin', 'admin', 'viewer']);
+    expect(roleOptions.map(option => option.textContent?.trim())).toEqual(['Super Admin', 'Admin', 'Viewer']);
+  });
+
+  it('opens a user roles help modal from the users panel', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    cmsService.getAdminUsers.and.returnValue(of({ items: [] }));
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-users"]')!.click();
+    fixture.detectChanges();
+
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="user-role-help"]')!.click();
+    fixture.detectChanges();
+
+    const modal = nativeElement.querySelector('[data-testid="role-help-modal"]') as HTMLElement;
+    expect(modal).toBeTruthy();
+    expect(modal.textContent).toContain('User Roles & Permissions');
+    expect(modal.textContent).not.toContain('Has full access to developer controls');
+    expect(modal.textContent).toContain('Super Admin');
+    expect(modal.textContent).toContain('Admin');
+    expect(modal.textContent).toContain('Viewer');
+    expect(modal.textContent).toContain('Admins can create, remove, enable, and disable Viewer accounts only');
+    expect(modal.textContent).toContain('cannot edit backend content, delete submissions, create users, remove users, change roles, or enable and disable accounts');
+    expect(modal.textContent).toContain('Users cannot remove, disable, or change the role for their own account');
+    expect(modal.textContent).not.toContain('Developers can create and remove all roles');
+    expect(modal.textContent).not.toContain('The role selector shows friendly names');
+  });
+
+  it('shows the current signed in user and role on the users panel', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    sessionStorage.setItem('adminEmail', 'super@example.com');
+    cmsService.getAdminUsers.and.returnValue(of({ items: [] }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const currentUserSummary = nativeElement.querySelector('[data-testid="current-admin-user"]');
+    expect(currentUserSummary?.textContent).toContain('super@example.com');
+    expect(currentUserSummary?.textContent).toContain('Super Admin');
+  });
+
+  it('shows friendly account statuses with explanatory help on the users panel', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    cmsService.getAdminUsers.and.returnValue(of({
+      items: [
+        { email: 'active@example.com', role: 'admin', enabled: true, status: 'CONFIRMED' },
+        { email: 'setup@example.com', role: 'viewer', enabled: true, status: 'RESET_REQUIRED' },
+        { email: 'change@example.com', role: 'viewer', enabled: true, status: 'FORCE_CHANGE_PASSWORD' },
+        { email: 'pending@example.com', role: 'viewer', enabled: true, status: 'UNCONFIRMED' },
+      ]
+    }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const accountStatusHeader = nativeElement.querySelector('[data-testid="account-status-header"]');
+    const accountStatusHelp = nativeElement.querySelector('[data-testid="account-status-help"]');
+    const accountStatusTooltip = nativeElement.querySelector('[data-testid="account-status-tooltip"]');
+
+    expect(accountStatusHeader?.textContent).toContain('Account Status');
+    expect(accountStatusHelp?.getAttribute('aria-label')).toContain('Account status help');
+    expect(accountStatusHelp?.getAttribute('aria-describedby')).toBe('account-status-tooltip');
+    expect(accountStatusTooltip?.textContent).toContain('Active users can sign in');
+    expect(accountStatusTooltip?.textContent).toContain('Password setup needed');
+    expect(accountStatusTooltip?.textContent).toContain('Not confirmed');
+    expect(nativeElement.textContent).toContain('Active');
+    expect(nativeElement.textContent).toContain('Password setup needed');
+    expect(nativeElement.textContent).toContain('Password change required');
+    expect(nativeElement.textContent).toContain('Not confirmed');
+  });
+
+  it('sorts admin users by role and then email address', () => {
+    sessionStorage.setItem('adminRole', 'developer');
+    sessionStorage.setItem('adminEmail', 'developer@example.com');
+    cmsService.getAdminUsers.and.returnValue(of({
+      items: [
+        { email: 'z-viewer@example.com', role: 'viewer', enabled: true, status: 'CONFIRMED' },
+        { email: 'b-admin@example.com', role: 'admin', enabled: true, status: 'CONFIRMED' },
+        { email: 'developer@example.com', role: 'developer', enabled: true, status: 'CONFIRMED' },
+        { email: 'a-admin@example.com', role: 'admin', enabled: true, status: 'CONFIRMED' },
+        { email: 'b-super@example.com', role: 'superAdmin', enabled: true, status: 'CONFIRMED' },
+        { email: 'a-super@example.com', role: 'superAdmin', enabled: true, status: 'CONFIRMED' },
+        { email: 'a-viewer@example.com', role: 'viewer', enabled: true, status: 'CONFIRMED' },
+      ]
+    }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    expect(component.adminUsers.map(user => user.email)).toEqual([
+      'developer@example.com',
+      'a-super@example.com',
+      'b-super@example.com',
+      'a-admin@example.com',
+      'b-admin@example.com',
+      'a-viewer@example.com',
+      'z-viewer@example.com',
+    ]);
+  });
+
+  it('does not allow a user manager to remove their own account', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    sessionStorage.setItem('adminEmail', 'super@example.com');
+    cmsService.getAdminUsers.and.returnValue(of({
+      items: [
+        { email: 'super@example.com', role: 'superAdmin', enabled: true, status: 'CONFIRMED' },
+        { email: 'admin@example.com', role: 'admin', enabled: true, status: 'CONFIRMED' },
+      ]
+    }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const removeButtons = Array.from(nativeElement.querySelectorAll<HTMLButtonElement>('[data-testid="remove-admin-user"]'));
+    expect(removeButtons.length).toBe(1);
+    expect(removeButtons[0].closest('tr')?.textContent).toContain('admin@example.com');
+
+    component.deleteAdminUser({ email: 'super@example.com', role: 'superAdmin' });
+    expect(cmsService.deleteAdminUser).not.toHaveBeenCalledWith('super@example.com');
+  });
+
+  it('shows remove actions only for users within the current role scope', () => {
+    sessionStorage.setItem('adminRole', 'admin');
+    sessionStorage.setItem('adminEmail', 'admin@example.com');
+    cmsService.getAdminUsers.and.returnValue(of({
+      items: [
+        { email: 'admin@example.com', role: 'admin', enabled: true, status: 'CONFIRMED' },
+        { email: 'super@example.com', role: 'superAdmin', enabled: true, status: 'CONFIRMED' },
+        { email: 'viewer@example.com', role: 'viewer', enabled: true, status: 'CONFIRMED' },
+      ]
+    }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const removeButtons = Array.from(nativeElement.querySelectorAll<HTMLButtonElement>('[data-testid="remove-admin-user"]'));
+    expect(removeButtons.length).toBe(1);
+    expect(removeButtons[0].closest('tr')?.textContent).toContain('viewer@example.com');
+  });
+
+  it('uses a modal confirmation before deleting an admin user', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    sessionStorage.setItem('adminEmail', 'super@example.com');
+    cmsService.getAdminUsers.and.returnValue(of({
+      items: [
+        { email: 'super@example.com', role: 'superAdmin', enabled: true, status: 'CONFIRMED' },
+        { email: 'viewer@example.com', role: 'viewer', enabled: true, status: 'CONFIRMED' },
+      ]
+    }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    let nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="remove-admin-user"]')!.click();
+    fixture.detectChanges();
+
+    expect(cmsService.deleteAdminUser).not.toHaveBeenCalled();
+    expect(component.adminUsers.length).toBe(2);
+    expect(nativeElement.querySelector('.admin-modal')?.textContent).toContain('Remove user');
+    expect(nativeElement.querySelector('.admin-modal')?.textContent).toContain('viewer@example.com');
+
+    component.confirmModal();
+    fixture.detectChanges();
+    nativeElement = fixture.nativeElement as HTMLElement;
+
+    expect(cmsService.deleteAdminUser).toHaveBeenCalledWith('viewer@example.com');
+    expect(component.adminUsers.length).toBe(1);
+    expect(component.adminUsers[0].email).toBe('super@example.com');
+    expect(nativeElement.querySelector('.admin-modal')).toBeFalsy();
+  });
+
+  it('lets super admins change scoped user roles from the role column', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    sessionStorage.setItem('adminEmail', 'super@example.com');
+    cmsService.getAdminUsers.and.returnValue(of({
+      items: [
+        { email: 'super@example.com', role: 'superAdmin', enabled: true, status: 'CONFIRMED' },
+        { email: 'admin@example.com', role: 'admin', enabled: true, status: 'CONFIRMED' },
+      ]
+    }));
+    cmsService.updateAdminUser.and.returnValue(of({ email: 'admin@example.com', role: 'viewer', enabled: true, status: 'CONFIRMED' }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const roleSelect = nativeElement.querySelector<HTMLSelectElement>('[data-testid="user-role-select-admin@example.com"]')!;
+    const roleOptions = Array.from(roleSelect.options);
+
+    expect(roleOptions.map(option => option.value)).toEqual(['superAdmin', 'admin', 'viewer']);
+    expect(roleOptions.map(option => option.textContent?.trim())).toEqual(['Super Admin', 'Admin', 'Viewer']);
+    expect(roleSelect.value).toBe('admin');
+
+    roleSelect.value = 'viewer';
+    roleSelect.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(cmsService.updateAdminUser).toHaveBeenCalledWith('admin@example.com', { role: 'viewer' });
+    expect(component.adminUsers.find(user => user.email === 'admin@example.com')?.role).toBe('viewer');
+    expect(nativeElement.textContent).toContain('User role changed');
+    expect(nativeElement.textContent).toContain('admin@example.com is now Viewer');
+  });
+
+  it('selects each user role from the current user data', () => {
+    sessionStorage.setItem('adminRole', 'developer');
+    sessionStorage.setItem('adminEmail', 'developer@example.com');
+    cmsService.getAdminUsers.and.returnValue(of({
+      items: [
+        { email: 'superadmin@example.com', role: 'superAdmin', enabled: true, status: 'CONFIRMED' },
+        { email: 'admin@example.com', role: 'admin', enabled: true, status: 'CONFIRMED' },
+        { email: 'viewer@example.com', role: 'viewer', enabled: true, status: 'CONFIRMED' },
+      ]
+    }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    expect(nativeElement.querySelector<HTMLSelectElement>('[data-testid="user-role-select-superadmin@example.com"]')?.value).toBe('superAdmin');
+    expect(nativeElement.querySelector<HTMLSelectElement>('[data-testid="user-role-select-admin@example.com"]')?.value).toBe('admin');
+    expect(nativeElement.querySelector<HTMLSelectElement>('[data-testid="user-role-select-viewer@example.com"]')?.value).toBe('viewer');
+  });
+
+  it('does not show role or enabled controls for self or users outside the current role scope', () => {
+    sessionStorage.setItem('adminRole', 'admin');
+    sessionStorage.setItem('adminEmail', 'admin@example.com');
+    cmsService.getAdminUsers.and.returnValue(of({
+      items: [
+        { email: 'admin@example.com', role: 'admin', enabled: true, status: 'CONFIRMED' },
+        { email: 'super@example.com', role: 'superAdmin', enabled: true, status: 'CONFIRMED' },
+        { email: 'viewer@example.com', role: 'viewer', enabled: true, status: 'CONFIRMED' },
+      ]
+    }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    expect(nativeElement.querySelector('[data-testid="user-role-select-admin@example.com"]')).toBeFalsy();
+    expect(nativeElement.querySelector('[data-testid="user-enabled-toggle-admin@example.com"]')).toBeFalsy();
+    expect(nativeElement.querySelector('[data-testid="user-enabled-readonly-admin@example.com"]')).toBeTruthy();
+    expect(nativeElement.querySelector('[data-testid="user-enabled-readonly-admin@example.com"]')?.classList).toContain('enabled-status-control');
+    expect(nativeElement.querySelector('[data-testid="user-enabled-readonly-admin@example.com"]')?.classList).toContain('enabled-status-control-readonly');
+    expect(nativeElement.querySelector('[data-testid="user-enabled-readonly-spacer-admin@example.com"]')).toBeFalsy();
+    expect(nativeElement.querySelector('[data-testid="user-role-select-super@example.com"]')).toBeFalsy();
+    expect(nativeElement.querySelector('[data-testid="user-enabled-toggle-super@example.com"]')).toBeFalsy();
+    expect(nativeElement.querySelector('[data-testid="user-role-select-viewer@example.com"]')).toBeFalsy();
+    expect(nativeElement.querySelector('[data-testid="user-enabled-toggle-viewer@example.com"]')).toBeTruthy();
+  });
+
+  it('automatically saves enabled changes for scoped users', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    sessionStorage.setItem('adminEmail', 'super@example.com');
+    cmsService.getAdminUsers.and.returnValue(of({
+      items: [
+        { email: 'viewer@example.com', role: 'viewer', enabled: true, status: 'CONFIRMED' },
+      ]
+    }));
+    cmsService.updateAdminUser.and.returnValue(of({ email: 'viewer@example.com', role: 'viewer', enabled: false, status: 'CONFIRMED' }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const enabledToggle = nativeElement.querySelector<HTMLInputElement>('[data-testid="user-enabled-toggle-viewer@example.com"]')!;
+    enabledToggle.checked = false;
+    enabledToggle.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(cmsService.updateAdminUser).toHaveBeenCalledWith('viewer@example.com', { enabled: false });
+    expect(component.adminUsers[0].enabled).toBeFalse();
+  });
+
+  it('shows enabled as a checkbox with status text below it', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    sessionStorage.setItem('adminEmail', 'super@example.com');
+    cmsService.getAdminUsers.and.returnValue(of({
+      items: [
+        { email: 'viewer@example.com', role: 'viewer', enabled: false, status: 'CONFIRMED' },
+      ]
+    }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const enabledControl = nativeElement.querySelector<HTMLElement>('[data-testid="user-enabled-control-viewer@example.com"]')!;
+    const enabledToggle = nativeElement.querySelector<HTMLInputElement>('[data-testid="user-enabled-toggle-viewer@example.com"]')!;
+    const enabledStatus = nativeElement.querySelector<HTMLElement>('[data-testid="user-enabled-status-viewer@example.com"]')!;
+
+    expect(enabledControl).toBeTruthy();
+    expect(enabledControl.classList).toContain('enabled-status-control');
+    expect(enabledToggle.checked).toBeFalse();
+    expect(enabledStatus.textContent?.trim()).toBe('Disabled');
+    expect(enabledStatus.classList).toContain('enabled-status-text');
+  });
+
+  it('hides developer accounts from non-developer user managers', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    sessionStorage.setItem('adminEmail', 'super@example.com');
+    cmsService.getAdminUsers.and.returnValue(of({
+      items: [
+        { email: 'developer@example.com', role: 'developer', enabled: true, status: 'CONFIRMED' },
+        { email: 'admin@example.com', role: 'admin', enabled: true, status: 'CONFIRMED' },
+      ]
+    }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    expect(nativeElement.textContent).not.toContain('developer@example.com');
+    expect(nativeElement.textContent).not.toContain('Developer');
+    expect(nativeElement.textContent).toContain('admin@example.com');
   });
 
   it('does not show test mode controls for normal admins', () => {
@@ -172,6 +653,32 @@ describe('AdminComponent', () => {
       fixture.detectChanges();
 
       expect(cmsService.updateTestMode).toHaveBeenCalledWith(true);
+    } finally {
+      environment.production = originalProduction;
+    }
+  });
+
+  it('allows developer test mode controls on localhost', () => {
+    const originalProduction = environment.production;
+    environment.production = false;
+    sessionStorage.setItem('adminRole', 'developer');
+    cmsService.getTestMode.and.returnValue(of({ testMode: true, localOnly: true }));
+    cmsService.updateTestMode.and.returnValue(of({ testMode: false, localOnly: true }));
+    try {
+      component.ngOnInit();
+      fixture.detectChanges();
+
+      const panel = fixture.nativeElement.querySelector('[data-testid="developer-test-mode"]') as HTMLElement;
+      const toggle = fixture.nativeElement.querySelector('[data-testid="toggle-test-mode"]') as HTMLInputElement;
+
+      expect(panel.textContent).toContain('Test Mode');
+      expect(toggle.disabled).toBeFalse();
+
+      toggle.click();
+      fixture.detectChanges();
+
+      expect(cmsService.getTestMode).toHaveBeenCalled();
+      expect(cmsService.updateTestMode).toHaveBeenCalledWith(false);
     } finally {
       environment.production = originalProduction;
     }
@@ -519,6 +1026,238 @@ describe('AdminComponent', () => {
     expect(cmsService.getSubmissions).toHaveBeenCalled();
     expect(nativeElement.querySelector('.submissions-table')?.textContent).toContain('Volunteer Request');
     expect(nativeElement.querySelector('.submissions-table')?.textContent).toContain('Pat Halcrow');
+  });
+
+  it('defaults the submission export date range from July 5 of the previous year through today', () => {
+    const today = new Date();
+    const pad = (part: number) => String(part).padStart(2, '0');
+    const expectedToday = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+
+    expect(component.submissionExportFromDate).toBe(`${today.getFullYear() - 1}-07-05`);
+    expect(component.submissionExportToDate).toBe(expectedToday);
+    expect(component.submissionExportGroup).toBe('all');
+  });
+
+  it('renders submission export date and category controls', () => {
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const fromInput = nativeElement.querySelector<HTMLInputElement>('[data-testid="submission-export-from"]')!;
+    const toInput = nativeElement.querySelector<HTMLInputElement>('[data-testid="submission-export-to"]')!;
+    const groupSelect = nativeElement.querySelector<HTMLSelectElement>('[data-testid="submission-export-group"]')!;
+    const exportButton = nativeElement.querySelector<HTMLButtonElement>('[data-testid="submission-export-button"]')!;
+
+    expect(fromInput.value).toBe(component.submissionExportFromDate);
+    expect(toInput.value).toBe(component.submissionExportToDate);
+    expect(Array.from(groupSelect.options).map(option => option.textContent?.trim())).toContain('All categories');
+    expect(exportButton.textContent).toContain('Export Excel');
+  });
+
+  it('exports one workbook with a worksheet for each submission category', () => {
+    const writeWorkbook = spyOn<any>(component, 'writeSubmissionWorkbook').and.stub();
+    component.submissionExportFromDate = '2025-07-05';
+    component.submissionExportToDate = '2026-06-21';
+    component.submissionExportGroup = 'all';
+    component.submissions = [
+      {
+        submissionId: 'vendor-1',
+        submissionTitle: 'Vendor Application',
+        submittedAt: '2026-06-05T10:00:00-07:00',
+        name: 'Vendor B',
+        email: 'vendor@example.com',
+        phone: '555-1000',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        source: 'vendorApplication',
+        rawData: {
+          formType: 'vendorApplicationForm',
+          companyName: 'Booth Co',
+          vendorType: 'Food',
+          agreeCheckbox: true,
+          signatureName: 'Vendor B',
+        },
+      },
+      {
+        submissionId: 'parade-1',
+        submissionTitle: 'Parade Entry',
+        submittedAt: '2026-06-06T10:00:00-07:00',
+        name: 'Parade Float',
+        email: 'parade@example.com',
+        phone: '555-2000',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { formType: 'paradeEntryForm', entryName: 'Veterans Float', contactName: 'Myrna' },
+      },
+      {
+        submissionId: 'old-volunteer',
+        submissionTitle: 'Volunteer Request',
+        submittedAt: '2025-07-04T10:00:00-07:00',
+        name: 'Too Old',
+        email: 'old@example.com',
+        phone: '555-3000',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { formType: 'volunteerForm', availability: 'Morning' },
+      },
+    ];
+
+    component.exportSubmissionsToExcel();
+
+    expect(writeWorkbook).toHaveBeenCalled();
+    const sheets = writeWorkbook.calls.mostRecent().args[0] as { sheet: string; data: any[][] }[];
+    expect(sheets.map(sheet => sheet.sheet)).toEqual(['Vendors', 'Artists', 'Sponsors', 'Motor Show', 'Parade', 'Volunteers', 'Special Events']);
+    const vendorRows = sheets.find(sheet => sheet.sheet === 'Vendors')!.data;
+    const paradeRows = sheets.find(sheet => sheet.sheet === 'Parade')!.data;
+    const volunteerRows = sheets.find(sheet => sheet.sheet === 'Volunteers')!.data;
+
+    expect(vendorRows[0]).toContain('Company Name');
+    expect(vendorRows[1]).toContain('Booth Co');
+    expect(vendorRows[0]).not.toContain('Agree Checkbox');
+    expect(vendorRows[0]).not.toContain('Signature Name');
+    expect(paradeRows[0]).toContain('Entry Name');
+    expect(paradeRows[1]).toContain('Veterans Float');
+    expect(volunteerRows.length).toBe(1);
+
+    sheets.forEach(sheet => {
+      expect(sheet.data[0]).not.toContain('Submitted At');
+      expect(sheet.data[0]).not.toContain('Source');
+      expect(sheet.data[0]).not.toContain('Updated At');
+      expect(sheet.data[0]).not.toContain('Raw Data');
+    });
+  });
+
+  it('exports a single worksheet when a submission category is selected', () => {
+    const writeWorkbook = spyOn<any>(component, 'writeSubmissionWorkbook').and.stub();
+    component.submissionExportFromDate = '2025-07-05';
+    component.submissionExportToDate = '2026-06-21';
+    component.submissionExportGroup = 'parade';
+    component.submissions = [{
+      submissionId: 'parade-1',
+      submissionTitle: 'Parade Entry',
+      submittedAt: '2026-06-06T10:00:00-07:00',
+      name: 'Parade Float',
+      email: 'parade@example.com',
+      phone: '555-2000',
+      paymentStatus: 'none',
+      paymentProvider: 'none',
+      status: 'New',
+      assignedTo: '',
+      notes: '',
+      rawData: { formType: 'paradeEntryForm', entryName: 'Veterans Float', contactName: 'Myrna' },
+    }];
+
+    component.exportSubmissionsToExcel();
+
+    const sheets = writeWorkbook.calls.mostRecent().args[0] as { sheet: string; data: any[][] }[];
+    expect(sheets.map(sheet => sheet.sheet)).toEqual(['Parade']);
+    const paradeRows = sheets[0].data;
+    expect(paradeRows[0]).toContain('Entry Name');
+    expect(paradeRows[1]).toContain('Veterans Float');
+  });
+
+  it('exports numeric submission fields as numbers while preserving contact fields as text', () => {
+    const writeWorkbook = spyOn<any>(component, 'writeSubmissionWorkbook').and.stub();
+    component.submissionExportFromDate = '2025-07-05';
+    component.submissionExportToDate = '2026-06-21';
+    component.submissionExportGroup = 'motorShow';
+    component.submissions = [{
+      submissionId: 'motor-1',
+      submissionTitle: 'Motor Show Event',
+      submittedAt: '2026-06-06T10:00:00-07:00',
+      name: 'Pat Halcrow',
+      email: 'pat@example.com',
+      phone: '555-1212',
+      amount: '125',
+      paymentStatus: 'paid',
+      paymentProvider: 'stripe',
+      status: 'New',
+      assignedTo: '',
+      notes: '',
+      rawData: {
+        formType: 'motorShowOrder',
+        phone: '555-1212',
+        zipcode: '01234',
+        year: '1969',
+        grandTotal: '89.50',
+        additionalPlaques: '2',
+        additionalSmall: 1,
+      },
+    } as any];
+
+    component.exportSubmissionsToExcel();
+
+    const sheets = writeWorkbook.calls.mostRecent().args[0] as { sheet: string; data: any[][] }[];
+    const motorShowRows = sheets[0].data;
+    const header = motorShowRows[0];
+    const row = motorShowRows[1];
+
+    expect(row[header.indexOf('Amount')]).toBe(125);
+    expect(row[header.indexOf('Grand Total')]).toBe(89.5);
+    expect(row[header.indexOf('Additional Plaques')]).toBe(2);
+    expect(row[header.indexOf('Additional Small')]).toBe(1);
+    expect(row[header.indexOf('Phone')]).toBe('555-1212');
+    expect(row[header.indexOf('Zip Code')]).toBe(1234);
+    expect(row[header.indexOf('Vehicle Year')]).toBe(1969);
+  });
+
+  it('omits payment and internal admin fields from submission exports', () => {
+    const writeWorkbook = spyOn<any>(component, 'writeSubmissionWorkbook').and.stub();
+    component.submissionExportFromDate = '2025-07-05';
+    component.submissionExportToDate = '2026-06-21';
+    component.submissionExportGroup = 'all';
+    component.submissions = [{
+      submissionId: 'vendor-1',
+      submissionTitle: 'Vendor Application',
+      submittedAt: '2026-06-05T10:00:00-07:00',
+      name: 'Vendor B',
+      email: 'vendor@example.com',
+      phone: '555-1000',
+      paymentStatus: 'paid',
+      paymentProvider: 'stripe',
+      paymentReceived: true,
+      amount: 125,
+      currency: 'USD',
+      status: 'In Review',
+      assignedTo: 'Patrick',
+      notes: 'Internal note',
+      rawData: {
+        formType: 'vendorApplicationForm',
+        companyName: 'Booth Co',
+        paymentMethod: 'card',
+        nested: { paymentMethod: 'check' },
+      },
+    } as any];
+
+    component.exportSubmissionsToExcel();
+
+    const sheets = writeWorkbook.calls.mostRecent().args[0] as { sheet: string; data: any[][] }[];
+    const omittedHeaders = [
+      'Payment Status',
+      'Payment Method',
+      'Payment Provider',
+      'Payment Received',
+      'Currency',
+      'Admin Status',
+      'Assigned To',
+      'Notes',
+      'Submission ID',
+      'Updated By',
+    ];
+
+    sheets.forEach(sheet => {
+      omittedHeaders.forEach(header => expect(sheet.data[0]).not.toContain(header));
+    });
+
+    sheets.forEach(sheet => expect(sheet.data[0]).not.toContain('Raw Data'));
   });
 
   it('shows a submissions loading state without spinning refresh while submissions initially load', () => {
@@ -1324,6 +2063,7 @@ describe('AdminComponent', () => {
   });
 
   it('uses a modal confirmation before deleting a submission row', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
     cmsService.getSubmissions.and.returnValue(of({
       items: [{
         submissionId: 's1',
@@ -1363,6 +2103,7 @@ describe('AdminComponent', () => {
   });
 
   it('shows deleting feedback while a confirmed submission delete is in progress', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
     const deleteResponse = new Subject<any>();
     cmsService.getSubmissions.and.returnValue(of({
       items: [{

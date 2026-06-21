@@ -31,6 +31,7 @@ import { UpcomingEventsComponent } from './pages/upcoming-events/upcoming-events
 import { OrderComponent } from './pages/order/order.component';
 import { SignInComponent } from './pages/sign-in/sign-in.component';
 import { AdminComponent } from './pages/admin/admin.component';
+import { AdminPasswordResetComponent } from './pages/admin-password-reset/admin-password-reset.component';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 
 
@@ -61,6 +62,7 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
     UpcomingEventsComponent,
     OrderComponent,
     SignInComponent,
+    AdminPasswordResetComponent,
     AdminComponent,
   ],
   imports: [

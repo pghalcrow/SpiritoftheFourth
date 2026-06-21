@@ -106,6 +106,93 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {"testMode": True, "localOnly": True})
 
+    def test_local_admin_email_login_uses_local_auth_store(self):
+        client = create_app().test_client()
+
+        response = client.post(
+            "/admin/login",
+            json={"email": "developer@example.com", "password": "Bubbles123!@#"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertTrue(body["success"])
+        self.assertEqual(body["role"], "developer")
+        self.assertEqual(body["email"], "developer@example.com")
+        self.assertTrue(body["token"].startswith("local-admin-token:"))
+
+    def test_local_admin_email_login_token_can_load_submissions(self):
+        client = create_app().test_client()
+
+        login_response = client.post(
+            "/admin/login",
+            json={"email": "developer@example.com", "password": "Bubbles123!@#"},
+        )
+        token = login_response.get_json()["token"]
+
+        response = client.get(
+            "/admin/submissions",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("items", response.get_json())
+
+    def test_local_password_reset_returns_local_reset_link(self):
+        client = create_app().test_client()
+
+        response = client.post(
+            "/admin/password-reset",
+            json={"email": "viewer@example.com"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertTrue(body["success"])
+        self.assertEqual(body["resetCode"], "local-reset")
+        self.assertIn("/admin/reset-password", body["resetUrl"])
+        self.assertIn("viewer%40example.com", body["resetUrl"])
+        self.assertIn("code=local-reset", body["resetUrl"])
+
+    def test_local_password_reset_returns_local_reset_link_for_super_admin(self):
+        client = create_app().test_client()
+
+        response = client.post(
+            "/admin/password-reset",
+            json={"email": "superadmin@example.com"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertTrue(body["success"])
+        self.assertEqual(body["resetCode"], "local-reset")
+        self.assertIn("/admin/reset-password", body["resetUrl"])
+        self.assertIn("superadmin%40example.com", body["resetUrl"])
+        self.assertIn("code=local-reset", body["resetUrl"])
+
+    def test_local_password_reset_does_not_return_link_for_unknown_email(self):
+        client = create_app().test_client()
+
+        response = client.post(
+            "/admin/password-reset",
+            json={"email": "unknown@example.com"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body, {"success": True})
+
+    def test_local_password_reset_confirm_rejects_unknown_email(self):
+        client = create_app().test_client()
+
+        response = client.post(
+            "/admin/password-reset/confirm",
+            json={"email": "unknown@example.com", "code": "local-reset", "password": "newpass7"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["error"], "Account not found")
+
     def test_can_read_events_from_configured_local_events_file(self):
         import tempfile
 

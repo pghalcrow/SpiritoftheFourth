@@ -1,16 +1,24 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
-import { CmsService, CmsEvent, AdminSubmission } from 'src/app/services/cms.service';
+import { CmsService, CmsEvent, AdminRole, AdminSubmission, AdminUser } from 'src/app/services/cms.service';
 import { environment } from 'src/environments/environment';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { Observable, forkJoin } from 'rxjs';
 import { finalize, tap } from 'rxjs/operators';
+import writeExcelFile from 'write-excel-file/browser';
 
 type AdminModalVariant = 'success' | 'danger' | 'warning';
 type PricingMode = 'free' | 'fixed' | 'perParticipant';
 type SubmissionGroupKey = 'all' | 'vendor' | 'artist' | 'sponsor' | 'motorShow' | 'parade' | 'volunteer' | 'specialEvents';
+type AdminSection = 'events' | 'submissions' | 'users';
 const ALLOWED_EVENT_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
+const ADMIN_ROLE_SORT_ORDER: Record<string, number> = {
+  developer: 0,
+  superAdmin: 1,
+  admin: 2,
+  viewer: 3,
+};
 
 interface AdminModal {
   title: string;
@@ -19,6 +27,7 @@ interface AdminModal {
   confirmText: string;
   cancelText?: string;
   onConfirm?: () => void;
+  contentType?: 'roleHelp';
 }
 
 interface SubmissionDisplayRow {
@@ -31,6 +40,19 @@ interface SubmissionGroupTab {
   label: string;
 }
 
+interface SubmissionExportCategory {
+  key: Exclude<SubmissionGroupKey, 'all'>;
+  label: string;
+  sheetName: string;
+}
+
+interface SubmissionExportSheet {
+  sheet: string;
+  data: SubmissionExportCell[][];
+}
+
+type SubmissionExportCell = string | number | boolean | Date | null;
+
 @Component({
   selector: 'app-admin',
   templateUrl: './admin.component.html',
@@ -41,7 +63,7 @@ export class AdminComponent implements OnInit {
   activeEventIndex = 0;
   selectedFile?: File;
   modal?: AdminModal;
-  adminSection: 'events' | 'submissions' = 'submissions';
+  adminSection: AdminSection = 'submissions';
   submissions: AdminSubmission[] = [];
   selectedSubmission?: AdminSubmission;
   selectedSubmissionDetailRows: SubmissionDisplayRow[] = [];
@@ -62,9 +84,28 @@ export class AdminComponent implements OnInit {
     { key: 'specialEvents', label: 'Special Events' },
   ];
   submissionStatuses = ['New', 'In Review', 'Follow Up', 'Complete', 'Archived'];
+  submissionExportFromDate = '';
+  submissionExportToDate = '';
+  submissionExportGroup: SubmissionGroupKey = 'all';
+  submissionExportCategories: SubmissionExportCategory[] = [
+    { key: 'vendor', label: 'Vendors', sheetName: 'Vendors' },
+    { key: 'artist', label: 'Artists', sheetName: 'Artists' },
+    { key: 'sponsor', label: 'Sponsors', sheetName: 'Sponsors' },
+    { key: 'motorShow', label: 'Motor Show', sheetName: 'Motor Show' },
+    { key: 'parade', label: 'Parade', sheetName: 'Parade' },
+    { key: 'volunteer', label: 'Volunteers', sheetName: 'Volunteers' },
+    { key: 'specialEvents', label: 'Special Events', sheetName: 'Special Events' },
+  ];
   testMode = false;
   testModeLocalOnly = false;
   testModeLoading = false;
+  adminUsers: AdminUser[] = [];
+  usersLoading = false;
+  userActionLoading = false;
+  userUpdateLoadingEmail: string | null = null;
+  newUserEmail = '';
+  newUserEmailError = '';
+  newUserRole: AdminRole = 'viewer';
 
   activePricingHelp: string | null = null;
   pricingHelp = {
@@ -77,9 +118,11 @@ export class AdminComponent implements OnInit {
   constructor(private cmsService: CmsService, private router: Router, private sanitizer: DomSanitizer) {}
 
   ngOnInit() {
+    this.setDefaultSubmissionExportDates();
     this.loadEvents();
     this.loadSubmissions();
     this.loadTestMode();
+    this.syncCurrentUserRole();
   }
 
   loadEvents() {
@@ -159,11 +202,119 @@ export class AdminComponent implements OnInit {
   }
 
   get adminHeaderTitle(): string {
+    if (this.adminSection === 'users') return 'Admin Users';
     return this.adminSection === 'submissions' ? 'Submissions' : 'Upcoming Events';
   }
 
+  get currentRole(): AdminRole {
+    return (sessionStorage.getItem('adminRole') as AdminRole) || 'admin';
+  }
+
+  get currentEmail(): string {
+    return (sessionStorage.getItem('adminEmail') || '').trim().toLowerCase();
+  }
+
+  get currentRoleLabel(): string {
+    return this.formatRole(this.currentRole);
+  }
+
+  formatRole(role: AdminRole | string): string {
+    const labels: Record<string, string> = {
+      developer: 'Developer',
+      superAdmin: 'Super Admin',
+      admin: 'Admin',
+      viewer: 'Viewer',
+    };
+    return labels[role] || 'Unknown Role';
+  }
+
+  formatAccountStatus(status?: string): string {
+    const labels: Record<string, string> = {
+      CONFIRMED: 'Active',
+      RESET_REQUIRED: 'Password setup needed',
+      FORCE_CHANGE_PASSWORD: 'Password change required',
+      UNCONFIRMED: 'Not confirmed',
+    };
+    return labels[String(status || '').trim()] || 'Unknown';
+  }
+
   get isDeveloper(): boolean {
-    return sessionStorage.getItem('adminRole') === 'developer';
+    return this.currentRole === 'developer';
+  }
+
+  get canEditBackend(): boolean {
+    return this.canAccessEvents;
+  }
+
+  get canAccessEvents(): boolean {
+    return ['developer', 'superAdmin'].includes(this.currentRole);
+  }
+
+  get canDeleteSubmissionItems(): boolean {
+    return ['developer', 'superAdmin'].includes(this.currentRole);
+  }
+
+  get canManageUsers(): boolean {
+    return ['developer', 'superAdmin', 'admin'].includes(this.currentRole);
+  }
+
+  get availableAdminSections(): AdminSection[] {
+    const sections: AdminSection[] = [];
+    if (this.canAccessEvents) sections.push('events');
+    sections.push('submissions');
+    if (this.canManageUsers) sections.push('users');
+    return sections;
+  }
+
+  get showAdminSectionSwitcher(): boolean {
+    return this.availableAdminSections.length > 1;
+  }
+
+  get creatableRoles(): AdminRole[] {
+    if (this.currentRole === 'developer') return ['developer', 'superAdmin', 'admin', 'viewer'];
+    if (this.currentRole === 'superAdmin') return ['superAdmin', 'admin', 'viewer'];
+    if (this.currentRole === 'admin') return ['viewer'];
+    return [];
+  }
+
+  canRemoveAdminUser(user: AdminUser): boolean {
+    return this.canManageAdminUser(user);
+  }
+
+  canManageAdminUser(user: AdminUser): boolean {
+    const targetEmail = (user.email || user.username || '').trim().toLowerCase();
+    if (!this.canManageUsers || !targetEmail || targetEmail === this.currentEmail) return false;
+
+    if (this.currentRole === 'developer') return true;
+    if (this.currentRole === 'superAdmin') return ['superAdmin', 'admin', 'viewer'].includes(user.role);
+    if (this.currentRole === 'admin') return user.role === 'viewer';
+    return false;
+  }
+
+  getRoleOptionsForUser(user: AdminUser): AdminRole[] {
+    if (!this.canManageAdminUser(user)) return [];
+    return this.creatableRoles;
+  }
+
+  canChangeAdminUserRole(user: AdminUser): boolean {
+    const options = this.getRoleOptionsForUser(user);
+    return options.length > 1 && options.includes(user.role);
+  }
+
+  canToggleAdminUserEnabled(user: AdminUser): boolean {
+    return this.canManageAdminUser(user);
+  }
+
+  showRoleHelp() {
+    this.showModal(
+      'User Roles & Permissions',
+      '',
+      'warning',
+      'Close',
+      undefined,
+      undefined,
+      'roleHelp'
+    );
   }
 
   get testModeLabel(): string {
@@ -172,15 +323,10 @@ export class AdminComponent implements OnInit {
 
   loadTestMode() {
     if (!this.isDeveloper) return;
-    if (!environment.production) {
-      this.testMode = true;
-      this.testModeLocalOnly = true;
-      return;
-    }
     this.cmsService.getTestMode().subscribe({
       next: res => {
         this.testMode = res.testMode;
-        this.testModeLocalOnly = Boolean(res.localOnly);
+        this.testModeLocalOnly = Boolean(res.localOnly || !environment.production);
       },
       error: err => {
         console.error('Test mode status failed', err);
@@ -190,12 +336,12 @@ export class AdminComponent implements OnInit {
   }
 
   toggleTestMode(enabled: boolean) {
-    if (!this.isDeveloper || this.testModeLocalOnly) return;
+    if (!this.isDeveloper) return;
     this.testModeLoading = true;
     this.cmsService.updateTestMode(enabled).subscribe({
       next: res => {
         this.testMode = res.testMode;
-        this.testModeLocalOnly = Boolean(res.localOnly);
+        this.testModeLocalOnly = Boolean(res.localOnly || !environment.production);
         this.testModeLoading = false;
         this.showModal(
           this.testMode ? 'Test mode enabled' : 'Live mode enabled',
@@ -219,11 +365,199 @@ export class AdminComponent implements OnInit {
     }
   }
 
-  selectAdminSection(section: 'events' | 'submissions') {
+  selectAdminSection(section: AdminSection) {
+    if (section === 'events' && !this.canAccessEvents) return;
+    if (section === 'users' && !this.canManageUsers) return;
     this.adminSection = section;
     if (section === 'submissions' && !this.submissions.length) {
       this.loadSubmissions('initial');
     }
+    if (section === 'users') {
+      this.loadAdminUsers();
+    }
+  }
+
+  loadAdminUsers() {
+    if (!this.canManageUsers) return;
+    this.usersLoading = true;
+    this.cmsService.getAdminUsers().pipe(finalize(() => this.usersLoading = false)).subscribe({
+      next: res => {
+        const users = res.items || [];
+        this.applyCurrentUserRole(users);
+        this.adminUsers = this.sortAdminUsers(this.filterVisibleAdminUsers(users));
+      },
+      error: err => {
+        console.error('Admin users load failed', err);
+        this.showModal('Users unavailable', 'Could not load admin users.', 'danger');
+      }
+    });
+  }
+
+  syncCurrentUserRole() {
+    if (!this.canManageUsers || !this.currentEmail) return;
+    this.cmsService.getAdminUsers().subscribe({
+      next: res => this.applyCurrentUserRole(res.items || []),
+      error: err => console.error('Current user role sync failed', err)
+    });
+  }
+
+  private applyCurrentUserRole(users: AdminUser[]) {
+    const currentUser = users.find(user => (user.email || user.username || '').trim().toLowerCase() === this.currentEmail);
+    if (!currentUser?.role || currentUser.role === this.currentRole) return;
+    sessionStorage.setItem('adminRole', currentUser.role);
+  }
+
+  private filterVisibleAdminUsers(users: AdminUser[]): AdminUser[] {
+    if (this.currentRole === 'developer') return users;
+    return users.filter(user => user.role !== 'developer');
+  }
+
+  private sortAdminUsers(users: AdminUser[]): AdminUser[] {
+    return [...users].sort((firstUser, secondUser) => {
+      const firstRoleOrder = ADMIN_ROLE_SORT_ORDER[firstUser.role || ''] ?? Number.MAX_SAFE_INTEGER;
+      const secondRoleOrder = ADMIN_ROLE_SORT_ORDER[secondUser.role || ''] ?? Number.MAX_SAFE_INTEGER;
+      if (firstRoleOrder !== secondRoleOrder) {
+        return firstRoleOrder - secondRoleOrder;
+      }
+
+      const firstEmail = (firstUser.email || firstUser.username || '').trim().toLowerCase();
+      const secondEmail = (secondUser.email || secondUser.username || '').trim().toLowerCase();
+      return firstEmail.localeCompare(secondEmail);
+    });
+  }
+
+  createAdminUser() {
+    const email = this.newUserEmail.trim();
+    if (!this.canManageUsers || !this.creatableRoles.includes(this.newUserRole)) return;
+    if (!this.isValidEmail(email)) {
+      this.newUserEmailError = 'Enter a valid email address.';
+      return;
+    }
+    if (this.adminUserEmailExists(email)) {
+      this.newUserEmailError = 'An account using that email already exists.';
+      return;
+    }
+    this.newUserEmailError = '';
+    this.userActionLoading = true;
+    this.cmsService.createAdminUser(email, this.newUserRole)
+      .pipe(finalize(() => this.userActionLoading = false))
+      .subscribe({
+        next: () => {
+          this.newUserEmail = '';
+          this.newUserEmailError = '';
+          this.newUserRole = this.creatableRoles[0] || 'viewer';
+          this.loadAdminUsers();
+          this.showModal('User invited', 'The user has been created and a password reset email has been sent.', 'success');
+        },
+        error: err => {
+          console.error('Admin user create failed', err);
+          if (this.isExistingUserError(err)) {
+            this.newUserEmailError = 'An account using that email already exists.';
+            return;
+          }
+          this.showModal('User create failed', 'Could not create the admin user.', 'danger');
+        }
+      });
+  }
+
+  onNewUserEmailChange() {
+    if (!this.newUserEmailError) return;
+    const email = this.newUserEmail.trim();
+    if (!this.isValidEmail(email)) {
+      this.newUserEmailError = 'Enter a valid email address.';
+      return;
+    }
+    this.newUserEmailError = this.adminUserEmailExists(email) ? 'An account using that email already exists.' : '';
+  }
+
+  private isValidEmail(email: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  private adminUserEmailExists(email: string): boolean {
+    const normalizedEmail = email.trim().toLowerCase();
+    return this.adminUsers.some(user => (user.email || user.username || '').trim().toLowerCase() === normalizedEmail);
+  }
+
+  private isExistingUserError(error: any): boolean {
+    return String(error?.error?.error || error?.message || '').toLowerCase().includes('already exists');
+  }
+
+  deleteAdminUser(user: AdminUser) {
+    if (!this.canRemoveAdminUser(user) || !user.email) return;
+    const email = user.email;
+    this.showModal(
+      'Remove user',
+      `Are you sure you want to remove ${email}? This will remove their admin access.`,
+      'danger',
+      'Remove User',
+      'Cancel',
+      () => this.confirmDeleteAdminUser(email)
+    );
+  }
+
+  private confirmDeleteAdminUser(email: string) {
+    this.userActionLoading = true;
+    this.cmsService.deleteAdminUser(email)
+      .pipe(finalize(() => this.userActionLoading = false))
+      .subscribe({
+        next: () => {
+          this.adminUsers = this.adminUsers.filter(item => item.email !== email);
+        },
+        error: err => {
+          console.error('Admin user delete failed', err);
+          this.showModal('User delete failed', 'Could not remove the admin user.', 'danger');
+        }
+      });
+  }
+
+  updateAdminUserRole(user: AdminUser, role: AdminRole | string) {
+    const nextRole = role as AdminRole;
+    if (!user.email || !this.canChangeAdminUserRole(user) || !this.getRoleOptionsForUser(user).includes(nextRole) || user.role === nextRole) {
+      return;
+    }
+
+    this.userUpdateLoadingEmail = user.email;
+    this.cmsService.updateAdminUser(user.email, { role: nextRole })
+      .pipe(finalize(() => this.userUpdateLoadingEmail = null))
+      .subscribe({
+        next: updatedUser => {
+          this.applyAdminUserUpdate(user.email, updatedUser);
+          this.showModal(
+            'User role changed',
+            `${user.email} is now ${this.formatRole(updatedUser.role || nextRole)}.`,
+            'success'
+          );
+        },
+        error: err => {
+          console.error('Admin user role update failed', err);
+          this.showModal('User update failed', 'Could not update the admin user role.', 'danger');
+        }
+      });
+  }
+
+  updateAdminUserEnabled(user: AdminUser, enabled: boolean) {
+    if (!user.email || !this.canToggleAdminUserEnabled(user) || user.enabled === enabled) {
+      return;
+    }
+
+    this.userUpdateLoadingEmail = user.email;
+    this.cmsService.updateAdminUser(user.email, { enabled })
+      .pipe(finalize(() => this.userUpdateLoadingEmail = null))
+      .subscribe({
+        next: updatedUser => this.applyAdminUserUpdate(user.email, updatedUser),
+        error: err => {
+          console.error('Admin user enabled update failed', err);
+          this.showModal('User update failed', 'Could not update the admin user account access.', 'danger');
+        }
+      });
+  }
+
+  private applyAdminUserUpdate(email: string, update: Partial<AdminUser>) {
+    this.adminUsers = this.sortAdminUsers(this.adminUsers.map(user => {
+      if (user.email !== email) return user;
+      return { ...user, ...update };
+    }));
   }
 
   refreshSubmissions() {
@@ -250,6 +584,158 @@ export class AdminComponent implements OnInit {
         this.showModal('Submissions unavailable', 'Could not load submissions.', 'danger');
       }
     });
+  }
+
+  private setDefaultSubmissionExportDates() {
+    const today = new Date();
+    this.submissionExportFromDate = `${today.getFullYear() - 1}-07-05`;
+    this.submissionExportToDate = this.formatDateInputValue(today);
+  }
+
+  private formatDateInputValue(date: Date): string {
+    const pad = (part: number) => String(part).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  }
+
+  exportSubmissionsToExcel() {
+    const fromDate = this.parseExportDate(this.submissionExportFromDate, false);
+    const toDate = this.parseExportDate(this.submissionExportToDate, true);
+    if (!fromDate || !toDate || fromDate.getTime() > toDate.getTime()) {
+      this.showModal('Invalid export dates', 'Choose a valid export date range.', 'warning');
+      return;
+    }
+
+    const categories = this.submissionExportGroup === 'all'
+      ? this.submissionExportCategories
+      : this.submissionExportCategories.filter(category => category.key === this.submissionExportGroup);
+
+    const sheets = categories.map(category => {
+      const rows = this.submissions
+        .filter(submission => this.submissionMatchesGroup(submission, category.key))
+        .filter(submission => this.submissionIsWithinExportDateRange(submission, fromDate, toDate));
+      return this.buildSubmissionExportSheet(category.sheetName, rows, category.key);
+    });
+
+    this.writeSubmissionWorkbook(sheets, this.buildSubmissionExportFilename());
+  }
+
+  private writeSubmissionWorkbook(sheets: SubmissionExportSheet[], filename: string) {
+    writeExcelFile(sheets).toFile(filename);
+  }
+
+  private parseExportDate(value: string, endOfDay: boolean): Date | undefined {
+    if (!value) return undefined;
+    const [year, month, day] = value.split('-').map(part => Number(part));
+    if (!year || !month || !day) return undefined;
+    const date = new Date(year, month - 1, day, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  }
+
+  private submissionIsWithinExportDateRange(submission: AdminSubmission, fromDate: Date, toDate: Date): boolean {
+    if (!submission.submittedAt) return false;
+    const submittedAt = new Date(submission.submittedAt);
+    if (Number.isNaN(submittedAt.getTime())) return false;
+    return submittedAt.getTime() >= fromDate.getTime() && submittedAt.getTime() <= toDate.getTime();
+  }
+
+  private buildSubmissionExportRows(submissions: AdminSubmission[], group: SubmissionGroupKey): Record<string, string | number | boolean>[] {
+    const rawKeys = this.getSubmissionExportRawKeys(submissions, group);
+    return submissions.map(submission => {
+      const row: Record<string, string | number | boolean> = {
+        Submission: this.formatSubmissionTitle(submission),
+        Name: submission.name || '',
+        Email: submission.email || '',
+        Phone: submission.phone || '',
+        Amount: this.hasDisplayValue(submission.amount) ? Number(submission.amount) : '',
+      };
+      rawKeys.forEach(key => {
+        row[this.formatSubmissionFieldLabel(key)] = this.hasDisplayValue(submission.rawData?.[key])
+          ? this.formatSubmissionExportFieldValue(submission.rawData[key], key)
+          : '';
+      });
+      return row;
+    });
+  }
+
+  private buildSubmissionExportSheet(sheetName: string, submissions: AdminSubmission[], group: SubmissionGroupKey): SubmissionExportSheet {
+    const rows = this.buildSubmissionExportRows(submissions, group);
+    const headers = this.getSubmissionExportHeaders(rows);
+    return {
+      sheet: sheetName,
+      data: [
+        headers,
+        ...rows.map(row => headers.map(header => this.hasDisplayValue(row[header]) ? row[header] : null)),
+      ],
+    };
+  }
+
+  private getSubmissionExportHeaders(rows: Record<string, string | number | boolean>[]): string[] {
+    if (!rows.length) {
+      const headers = [
+        'Submission',
+        'Name',
+        'Email',
+        'Phone',
+        'Amount',
+      ];
+      return headers;
+    }
+    const headers = new Set<string>();
+    rows.forEach(row => Object.keys(row).forEach(header => headers.add(header)));
+    return Array.from(headers);
+  }
+
+  private getSubmissionExportRawKeys(submissions: AdminSubmission[], group: SubmissionGroupKey): string[] {
+    const excludedFields = new Set([
+      'action',
+      'adminStatus',
+      'assignedTo',
+      'attachments',
+      'body',
+      'currency',
+      'email',
+      'fileDropRef',
+      'firstName',
+      'fullName',
+      'lastName',
+      'name',
+      'notes',
+      'paymentMethod',
+      'paymentProvider',
+      'paymentReceived',
+      'paymentStatus',
+      'phone',
+      'replyTo',
+      'stripe_session_id',
+      'submission_id',
+      'submissionId',
+      'subject',
+      'toContact',
+      'type',
+      'updatedBy',
+    ]);
+    if (group === 'vendor') {
+      excludedFields.add('agreeCheckbox');
+      excludedFields.add('signatureName');
+    }
+    const keys = new Set<string>();
+    submissions.forEach(submission => {
+      const rawData = submission.rawData;
+      if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) return;
+      Object.keys(rawData).forEach(key => {
+        if (!excludedFields.has(key) && this.hasDisplayValue(rawData[key])) {
+          keys.add(key);
+        }
+      });
+    });
+    return Array.from(keys).sort((first, second) =>
+      this.formatSubmissionFieldLabel(first).localeCompare(this.formatSubmissionFieldLabel(second))
+    );
+  }
+
+  private buildSubmissionExportFilename(): string {
+    const group = this.submissionExportGroup === 'all' ? 'all-categories' : this.submissionExportGroup;
+    return `spirit-of-the-fourth-submissions-${group}-${this.submissionExportFromDate}-to-${this.submissionExportToDate}.xlsx`;
   }
 
   get filteredSubmissions(): AdminSubmission[] {
@@ -590,6 +1076,99 @@ export class AdminComponent implements OnInit {
     return String(value);
   }
 
+  private formatSubmissionExportFieldValue(value: any, key = ''): string | number | boolean {
+    if (key === 'formType' && typeof value === 'string') {
+      return this.formatFormTypeValue(value);
+    }
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (Array.isArray(value)) return value.map(item => this.formatSubmissionFieldValue(item)).join(', ');
+    if (value && typeof value === 'object') return JSON.stringify(value);
+    if (value === 'motorShowOrder Order' || value === 'Motor Show Event Order') return 'Motor Show Event';
+    if (value === 'Freedom Club Donation Order') return 'Freedom Club Donation';
+
+    const numericValue = this.getSubmissionExportNumericValue(value, key);
+    return numericValue === undefined ? String(value) : numericValue;
+  }
+
+  private getSubmissionExportNumericValue(value: any, key: string): number | undefined {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : undefined;
+    }
+    if (typeof value !== 'string' || !this.isNumericSubmissionExportField(key)) {
+      return undefined;
+    }
+
+    const normalizedValue = value.trim().replace(/[$,]/g, '');
+    if (!/^-?\d+(\.\d+)?$/.test(normalizedValue)) {
+      return undefined;
+    }
+
+    const numericValue = Number(normalizedValue);
+    return Number.isFinite(numericValue) ? numericValue : undefined;
+  }
+
+  private isNumericSubmissionExportField(key: string): boolean {
+    const normalizedKey = key.toLowerCase();
+    if (this.isRequiredNumericSubmissionExportField(normalizedKey)) {
+      return true;
+    }
+    if (this.isTextSubmissionExportField(normalizedKey)) {
+      return false;
+    }
+    return [
+      'amount',
+      'balance',
+      'cost',
+      'count',
+      'donation',
+      'fee',
+      'grandtotal',
+      'number',
+      'paid',
+      'participant',
+      'plaque',
+      'price',
+      'quantity',
+      'small',
+      'medium',
+      'large',
+      'total',
+      'xlarge',
+    ].some(term => normalizedKey.includes(term));
+  }
+
+  private isRequiredNumericSubmissionExportField(normalizedKey: string): boolean {
+    return normalizedKey === 'zipcode' ||
+      normalizedKey === 'zip' ||
+      normalizedKey === 'year' ||
+      normalizedKey === 'vehicleyear' ||
+      normalizedKey === 'vehicle_year';
+  }
+
+  private isTextSubmissionExportField(normalizedKey: string): boolean {
+    return [
+      'address',
+      'city',
+      'club',
+      'color',
+      'contact',
+      'email',
+      'entry',
+      'first',
+      'last',
+      'make',
+      'message',
+      'model',
+      'name',
+      'phone',
+      'state',
+      'street',
+      'vehicle',
+      'year',
+      'zip',
+    ].some(term => normalizedKey.includes(term));
+  }
+
   private isCurrencySubmissionField(key: string): boolean {
     return ['donationAmount', 'grandTotal', 'total', 'amount'].includes(key);
   }
@@ -750,6 +1329,7 @@ export class AdminComponent implements OnInit {
   logout() {
     sessionStorage.removeItem('adminToken');
     sessionStorage.removeItem('adminRole');
+    sessionStorage.removeItem('adminEmail');
     this.router.navigate(['/sign-in']);
   }
 
@@ -1072,9 +1652,10 @@ export class AdminComponent implements OnInit {
     variant: AdminModalVariant,
     confirmText = 'OK',
     cancelText?: string,
-    onConfirm?: () => void
+    onConfirm?: () => void,
+    contentType?: AdminModal['contentType']
   ) {
-    this.modal = { title, message, variant, confirmText, cancelText, onConfirm };
+    this.modal = { title, message, variant, confirmText, cancelText, onConfirm, contentType };
   }
 
   closeModal() {

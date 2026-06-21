@@ -204,6 +204,77 @@ class DeployLambdasScriptTests(unittest.TestCase):
             function_url_updates = [call for call in calls if call[:2] == ["lambda", "update-function-url-config"]]
             self.assertEqual(len(function_url_updates), 1)
 
+    def test_prod_deploy_requires_e2e_checklist_confirmation(self):
+        result = subprocess.run(
+            ["backend/scripts/deploy_lambdas.sh", "prod"],
+            cwd=Path(__file__).resolve().parents[2],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("Refusing production Lambda deploy", result.stdout)
+        self.assertIn("docs/E2E_DEPLOY_CHECKLIST.md", result.stdout)
+
+    def test_prod_deploy_allows_explicit_e2e_checklist_confirmation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            calls_path = tmp_path / "aws-calls.jsonl"
+            fake_aws = tmp_path / "aws"
+            fake_aws.write_text(
+                textwrap.dedent(
+                    f"""\
+                    #!/usr/bin/env python3
+                    import json
+                    import sys
+
+                    args = sys.argv[1:]
+                    with open({str(calls_path)!r}, "a") as calls:
+                        calls.write(json.dumps(args) + "\\n")
+
+                    if args[:3] == ["lambda", "get-function-configuration", "--region"]:
+                        print(json.dumps({{"ADMIN_PASSWORD": "secret"}}))
+                    elif args[:2] == ["lambda", "update-function-code"]:
+                        pass
+                    elif args[:2] == ["lambda", "wait"]:
+                        pass
+                    elif args[:2] == ["lambda", "update-function-configuration"]:
+                        env_arg = args[args.index("--environment") + 1]
+                        parsed = json.loads(env_arg)
+                        assert parsed["Variables"]["SUBMISSIONS_TABLE"] == "sotf-submissions"
+                    elif args[:2] == ["lambda", "update-function-url-config"]:
+                        assert args[args.index("--function-name") + 1] == "events_service"
+                    else:
+                        raise SystemExit(f"Unexpected aws args: {{args}}")
+                    """
+                )
+            )
+            fake_aws.chmod(0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{tmp_path}{os.pathsep}{env['PATH']}"
+            env["LAMBDA_VENDOR_DEPS"] = "false"
+            env["CONFIRM_E2E_CHECKLIST"] = "true"
+
+            result = subprocess.run(
+                ["backend/scripts/deploy_lambdas.sh", "prod"],
+                cwd=Path(__file__).resolve().parents[2],
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            calls = [json.loads(line) for line in calls_path.read_text().splitlines()]
+            prod_code_updates = [
+                call for call in calls
+                if call[:2] == ["lambda", "update-function-code"]
+                and call[call.index("--function-name") + 1] == "events_service"
+            ]
+            self.assertEqual(len(prod_code_updates), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

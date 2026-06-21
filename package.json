@@ -7,7 +7,8 @@
     "start:local": "ng serve --configuration local",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test --browsers=ChromeHeadless",
+    "deploy:checklist": "cat docs/E2E_DEPLOY_CHECKLIST.md"
   },
   "private": true,
   "dependencies": {
@@ -32,6 +33,7 @@
     "moment": "^2.29.4",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
+    "write-excel-file": "^4.1.1",
     "zone.js": "~0.12.0"
   },
   "devDependencies": {

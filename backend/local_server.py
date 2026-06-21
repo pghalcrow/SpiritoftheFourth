@@ -5,6 +5,7 @@ import re
 import sys
 import uuid
 from pathlib import Path
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -14,6 +15,7 @@ from backend.local_repository import LocalSubmissionsRepository
 from backend.shared.submissions_mapping import map_live_submission
 from backend.shared.submissions_repository import SubmissionsRepository
 from backend.shared.time_utils import pacific_now_iso
+from backend.shared.admin_auth import ROLE_ADMIN, ROLE_DEVELOPER, ROLE_SUPER_ADMIN, ROLE_VIEWER, normalize_role
 
 import backend.lambdas.events_service.lambda_function as events_service
 import backend.lambdas.create_order.app as create_order_app
@@ -22,6 +24,120 @@ import backend.lambdas.sotf_mailer.lambda_function as sotf_mailer
 
 LOCAL_EVENTS_FILE = Path(os.environ.get("LOCAL_EVENTS_FILE", "backend/.local/events.json"))
 LOCAL_REPOSITORY = LocalSubmissionsRepository(os.environ.get("LOCAL_SUBMISSIONS_FILE", "backend/.local/submissions.json"))
+
+
+class LocalAdminAuthService:
+    LOCAL_TEST_PASSWORD = "Bubbles123!@#"
+
+    def __init__(self):
+        self.users_path = Path(os.environ.get("LOCAL_ADMIN_USERS_FILE", "backend/.local/admin_users.json"))
+        self.users = self._load_users()
+
+    def _seed_users(self):
+        return {
+            "developer@example.com": {"email": "developer@example.com", "password": self.LOCAL_TEST_PASSWORD, "role": ROLE_DEVELOPER, "enabled": True, "status": "CONFIRMED"},
+            "superadmin@example.com": {"email": "superadmin@example.com", "password": self.LOCAL_TEST_PASSWORD, "role": ROLE_SUPER_ADMIN, "enabled": True, "status": "CONFIRMED"},
+            "admin@example.com": {"email": "admin@example.com", "password": self.LOCAL_TEST_PASSWORD, "role": ROLE_ADMIN, "enabled": True, "status": "CONFIRMED"},
+            "viewer@example.com": {"email": "viewer@example.com", "password": self.LOCAL_TEST_PASSWORD, "role": ROLE_VIEWER, "enabled": True, "status": "CONFIRMED"},
+        }
+
+    def _load_users(self):
+        if self.users_path.exists():
+            try:
+                data = json.loads(self.users_path.read_text() or "{}")
+                if isinstance(data, dict) and data:
+                    return data
+            except json.JSONDecodeError:
+                pass
+        users = self._seed_users()
+        self._save_users(users)
+        return users
+
+    def _save_users(self, users=None):
+        self.users_path.parent.mkdir(parents=True, exist_ok=True)
+        self.users_path.write_text(json.dumps(users or self.users, indent=2, sort_keys=True))
+
+    def login(self, email, password):
+        user = self.users.get(email)
+        if user and user.get("enabled") is False:
+            return {"success": False, "reason": "disabled"}
+        if not user or user.get("password") != password:
+            return {"success": False}
+        return {
+            "success": True,
+            "token": f"local-admin-token:{email}",
+            "role": user["role"],
+            "email": email,
+        }
+
+    def get_current_user(self, access_token):
+        email = access_token.replace("local-admin-token:", "")
+        user = self.users[email]
+        if user.get("enabled") is False:
+            raise PermissionError("Account is disabled")
+        return {"email": email, "username": email, "role": user["role"]}
+
+    def list_users(self):
+        return {
+            "items": [
+                {key: value for key, value in user.items() if key != "password"}
+                for user in self.users.values()
+            ]
+        }
+
+    def create_user(self, email, role):
+        normalized_email = str(email or "").strip().lower()
+        normalized_role = normalize_role(role)
+        if normalized_email in {key.lower() for key in self.users.keys()}:
+            raise ValueError("An account using that email already exists.")
+        self.users[normalized_email] = {
+            "email": normalized_email,
+            "password": "reset7",
+            "role": normalized_role,
+            "enabled": True,
+            "status": "RESET_REQUIRED",
+        }
+        self._save_users()
+        return {"email": normalized_email, "role": normalized_role}
+
+    def delete_user(self, email):
+        self.users.pop(email, None)
+        self._save_users()
+        return {"email": email}
+
+    def update_user(self, email, role=None, enabled=None):
+        if email not in self.users:
+            raise KeyError(email)
+        if role is not None:
+            normalized_role = normalize_role(role)
+            if not normalized_role:
+                raise ValueError("Invalid role")
+            self.users[email]["role"] = normalized_role
+        if enabled is not None:
+            self.users[email]["enabled"] = bool(enabled)
+        self._save_users()
+        return {key: value for key, value in self.users[email].items() if key != "password"}
+
+    def request_password_reset(self, email):
+        if email not in self.users:
+            return {"success": True}
+        reset_code = "local-reset"
+        reset_url = (
+            "http://localhost:4200/admin/reset-password"
+            f"?email={quote(email)}&code={quote(reset_code)}"
+        )
+        return {"success": True, "resetCode": reset_code, "resetUrl": reset_url}
+
+    def confirm_password_reset(self, email, code, password):
+        if email not in self.users:
+            raise ValueError("Account not found")
+        self.users[email]["password"] = password
+        self.users[email]["status"] = "CONFIRMED"
+        self._save_users()
+        return {"success": True}
+
+
+LOCAL_ADMIN_AUTH = LocalAdminAuthService()
 
 
 def get_local_events_file():
@@ -65,6 +181,7 @@ def create_app():
     events_service.get_events = local_get_events
     events_service.update_events = local_update_events
     events_service.upload_image = local_upload_image
+    events_service.get_admin_auth_service = lambda: LOCAL_ADMIN_AUTH
     create_order_app.get_submissions_repository = get_local_submissions_repository
     create_order_app.get_worksheet = get_local_worksheet
     create_order_app.load_events_config = local_load_events_config

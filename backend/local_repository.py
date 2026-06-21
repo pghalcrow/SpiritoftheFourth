@@ -35,13 +35,13 @@ class LocalSubmissionsRepository:
         self._write(items)
         return True
 
-    def list_submissions(self, limit=100):
+    def list_submissions(self, limit=None):
         items = sorted(
             self._read(),
             key=lambda item: item.get("submittedAt") or item.get("createdAt") or "",
             reverse=True,
         )
-        return {"items": items[:limit]}
+        return {"items": items[:limit] if limit is not None else items}
 
     def delete_submission(self, submission_id):
         items = self._read()

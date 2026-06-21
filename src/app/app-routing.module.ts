@@ -17,6 +17,7 @@ import { UpcomingEventsComponent } from './pages/upcoming-events/upcoming-events
 import { OrderComponent } from './pages/order/order.component';
 import { SignInComponent } from './pages/sign-in/sign-in.component';
 import { AdminComponent } from './pages/admin/admin.component';
+import { AdminPasswordResetComponent } from './pages/admin-password-reset/admin-password-reset.component';
 import { AdminGuard } from './guards/admin.guard';
 
 const routes: Routes = [
@@ -36,6 +37,7 @@ const routes: Routes = [
   { path: "privacy-policy", component: PrivacyPolicyComponent },
   { path: "order/:status", component: OrderComponent },
   { path: 'sign-in', component: SignInComponent },
+  { path: 'admin/reset-password', component: AdminPasswordResetComponent },
   { path: 'admin', component: AdminComponent, canActivate: [AdminGuard] },
   { path: "**", redirectTo: "" },
 ];

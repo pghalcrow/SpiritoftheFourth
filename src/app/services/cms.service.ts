@@ -45,7 +45,43 @@ export interface CmsEvent extends Event {
 export interface AdminLoginResponse {
   success: boolean;
   token?: string;
-  role?: 'admin' | 'developer';
+  idToken?: string;
+  role?: AdminRole;
+  email?: string;
+  reason?: 'disabled';
+}
+
+export type AdminRole = 'developer' | 'superAdmin' | 'admin' | 'viewer';
+
+export interface AdminUser {
+  email: string;
+  username?: string;
+  role: AdminRole;
+  enabled?: boolean;
+  status?: string;
+}
+
+export interface AdminUsersResponse {
+  items: AdminUser[];
+}
+
+export interface AdminUserMutationResponse {
+  success?: boolean;
+  email: string;
+  role?: AdminRole;
+  enabled?: boolean;
+  status?: string;
+}
+
+export interface AdminUserUpdate {
+  role?: AdminRole;
+  enabled?: boolean;
+}
+
+export interface AdminPasswordResetResponse {
+  success: boolean;
+  resetUrl?: string;
+  resetCode?: string;
 }
 
 export interface AdminSubmission {
@@ -201,8 +237,59 @@ export class CmsService {
     return url;
   }
 
+  getAdminUsers(): Observable<AdminUsersResponse> {
+    const token = sessionStorage.getItem('adminToken');
+    return this.http.get<AdminUsersResponse>(
+      `${this.baseUrl}${this.routes.adminUsers}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  }
+
+  createAdminUser(email: string, role: AdminRole): Observable<AdminUserMutationResponse> {
+    const token = sessionStorage.getItem('adminToken');
+    return this.http.post<AdminUserMutationResponse>(
+      `${this.baseUrl}${this.routes.adminUsers}`,
+      { email, role },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  }
+
+  deleteAdminUser(email: string): Observable<AdminUserMutationResponse> {
+    const token = sessionStorage.getItem('adminToken');
+    return this.http.delete<AdminUserMutationResponse>(
+      `${this.baseUrl}${this.routes.adminUsers}/${encodeURIComponent(email)}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  }
+
+  updateAdminUser(email: string, update: AdminUserUpdate): Observable<AdminUserMutationResponse> {
+    const token = sessionStorage.getItem('adminToken');
+    return this.http.patch<AdminUserMutationResponse>(
+      `${this.baseUrl}${this.routes.adminUsers}/${encodeURIComponent(email)}`,
+      update,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  }
+
+  requestPasswordReset(email: string): Observable<AdminPasswordResetResponse> {
+    return this.http.post<AdminPasswordResetResponse>(
+      `${this.baseUrl}${this.routes.passwordReset}`,
+      { email }
+    );
+  }
+
+  confirmPasswordReset(email: string, code: string, password: string): Observable<AdminPasswordResetResponse> {
+    return this.http.post<AdminPasswordResetResponse>(
+      `${this.baseUrl}${this.routes.passwordResetConfirm}`,
+      { email, code, password }
+    );
+  }
+
   /** Login as admin */
-  login(password: string): Observable<AdminLoginResponse> {
-    return this.http.post<AdminLoginResponse>(`${this.baseUrl}${this.routes.login}`, { password });
+  login(email: string, password?: string): Observable<AdminLoginResponse> {
+    if (password === undefined) {
+      return this.http.post<AdminLoginResponse>(`${this.baseUrl}${this.routes.login}`, { password: email });
+    }
+    return this.http.post<AdminLoginResponse>(`${this.baseUrl}${this.routes.login}`, { email, password });
   }
 }

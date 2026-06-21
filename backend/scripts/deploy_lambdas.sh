@@ -3,6 +3,21 @@ set -euo pipefail
 
 REGION="${AWS_REGION:-us-west-2}"
 STAGE="${1:-dev}"
+CHECKLIST_PATH="docs/E2E_DEPLOY_CHECKLIST.md"
+
+echo "Pre-deploy checklist: ${CHECKLIST_PATH}"
+
+if [[ "${STAGE}" == "prod" && "${CONFIRM_E2E_CHECKLIST:-}" != "true" ]]; then
+  cat <<EOF
+Refusing production Lambda deploy.
+
+Review ${CHECKLIST_PATH} and rerun with:
+
+  CONFIRM_E2E_CHECKLIST=true backend/scripts/deploy_lambdas.sh prod
+
+EOF
+  exit 1
+fi
 
 if [[ "${STAGE}" == "prod" ]]; then
   EVENTS_FN="events_service"

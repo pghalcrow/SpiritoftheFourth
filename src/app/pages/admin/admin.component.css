@@ -41,12 +41,6 @@
   font-size: 1.15rem;
 }
 
-.developer-panel-note {
-  margin-top: 4px;
-  color: #516173;
-  font-size: 0.92rem;
-}
-
 .test-mode-toggle {
   display: inline-flex;
   align-items: center;
@@ -182,9 +176,65 @@ h4 {
   padding-top: 22px;
 }
 
+.users-workspace {
+  display: grid;
+  gap: 14px;
+  padding-top: 22px;
+}
+
+.current-admin-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+}
+
+.current-admin-panel h3 {
+  margin-top: 2px;
+  word-break: break-word;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  background: #edf4fb;
+  border: 1px solid #cbd9e8;
+  border-radius: 999px;
+  color: #0a3161;
+  font-size: 0.84rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.user-management-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+}
+
+.user-create-row {
+  display: grid;
+  align-items: flex-end;
+  grid-template-columns: minmax(220px, 1fr) minmax(160px, 220px) auto;
+  gap: 12px;
+}
+
+.user-create-button {
+  min-height: 44px;
+}
+
 .submissions-tools {
   display: flex;
-  align-items: end;
+  align-items: flex-end;
   gap: 12px;
   padding: 14px;
   background: #ffffff;
@@ -206,7 +256,6 @@ h4 {
   background: #ffffff;
   border: 1px solid #d8e0e9;
   border-radius: 8px;
-  box-shadow: 0 14px 38px rgba(16, 35, 61, 0.08);
   color: #0a3161;
   font-weight: 800;
 }
@@ -215,6 +264,21 @@ h4 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.submission-export-panel {
+  display: grid;
+  grid-template-columns: minmax(150px, 190px) minmax(150px, 190px) minmax(190px, 240px) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #d8e0e9;
+  border-radius: 8px;
+}
+
+.submission-export-button {
+  min-height: 44px;
 }
 
 .submission-group-tab {
@@ -244,7 +308,6 @@ h4 {
   background: #ffffff;
   border: 1px solid #d8e0e9;
   border-radius: 8px;
-  box-shadow: 0 14px 38px rgba(16, 35, 61, 0.08);
 }
 
 .submissions-table {
@@ -274,8 +337,61 @@ h4 {
   color: #0a3161;
   font-size: 0.78rem;
   font-weight: 900;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+}
+
+.status-help {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.status-help-button {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 6px;
+  padding: 0;
+  border: 1px solid #8aa4bf;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #0a3161;
+  cursor: help;
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1;
+  text-transform: none;
+}
+
+.status-help-button:hover,
+.status-help-button:focus {
+  border-color: #0a3161;
+  outline: none;
+}
+
+.status-help-tooltip {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 10px);
+  z-index: 4;
+  width: min(320px, 72vw);
+  padding: 10px 12px;
+  border: 1px solid #8aa4bf;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1f3144;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  white-space: normal;
+}
+
+.status-help:hover .status-help-tooltip,
+.status-help:focus-within .status-help-tooltip {
+  opacity: 1;
 }
 
 .submissions-table tbody tr {
@@ -324,12 +440,11 @@ h4 {
   padding: 20px;
   background: #ffffff;
   border-left: 1px solid #d0d9e4;
-  box-shadow: -14px 0 34px rgba(15, 31, 51, 0.18);
 }
 
 .submission-detail-header {
   display: flex;
-  align-items: start;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
   padding-bottom: 14px;
@@ -349,13 +464,11 @@ h4 {
   font-weight: 800;
   line-height: 1.1;
   cursor: pointer;
-  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
 .submission-close-button:hover {
   background: #edf4fb;
   border-color: #6f8faa;
-  transform: translateY(-1px);
 }
 
 .submission-close-button:focus-visible {
@@ -531,11 +644,17 @@ h4 {
   display: grid;
   gap: 12px;
   width: min(420px, 100%);
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: auto;
   padding: 22px;
   background: #ffffff;
   border: 1px solid #d8e0e9;
   border-top: 5px solid #0a6aa6;
   border-radius: 8px;
+}
+
+.admin-modal[data-testid="role-help-modal"] {
+  width: min(720px, 100%);
 }
 
 .admin-modal.success {
@@ -554,6 +673,53 @@ h4 {
   color: #4d6074;
 }
 
+.role-help-content {
+  display: grid;
+  gap: 18px;
+  color: #33465a;
+}
+
+.role-help-content h3 {
+  margin-bottom: 8px;
+  color: #0a3161;
+  font-size: 0.95rem;
+}
+
+.role-help-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.role-help-list div {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid #d8e0e9;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.role-help-list dt {
+  color: #0a3161;
+  font-weight: 900;
+}
+
+.role-help-list dd {
+  margin: 0;
+  color: #4d6074;
+  line-height: 1.4;
+}
+
+.role-help-content ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  color: #4d6074;
+  line-height: 1.4;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -565,7 +731,6 @@ h4 {
   background: #ffffff;
   border: 1px solid #d8e0e9;
   border-radius: 8px;
-  box-shadow: 0 14px 38px rgba(16, 35, 61, 0.08);
 }
 
 .event-card-header {
@@ -670,6 +835,12 @@ h4 {
   letter-spacing: 0.01em;
 }
 
+.field-error {
+  color: #b42318;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .admin-input,
 .admin-select,
 .admin-textarea {
@@ -717,6 +888,44 @@ h4 {
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
   padding-right: 34px;
+}
+
+.compact-select {
+  width: auto;
+  min-width: 136px;
+  min-height: 36px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+  font-size: 0.9rem;
+}
+
+.enabled-status-control {
+  display: inline-grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 58px;
+}
+
+.enabled-status-control input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #0a6aa6;
+}
+
+.enabled-status-control-readonly {
+  align-content: center;
+  min-height: 45px;
+  cursor: default;
+}
+
+.enabled-status-text {
+  display: block;
+  color: #667085;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .upload-panel {
@@ -954,11 +1163,6 @@ h4 {
   line-height: 1.1;
   text-align: center;
   cursor: pointer;
-  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
-}
-
-.action-button:hover {
-  transform: translateY(-1px);
 }
 
 .action-button.primary {
@@ -1006,6 +1210,14 @@ h4 {
   .section-heading.with-action {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .user-create-row {
+    grid-template-columns: 1fr;
+  }
+
+  .submission-export-panel {
+    grid-template-columns: 1fr;
   }
 
   .toolbar-actions {

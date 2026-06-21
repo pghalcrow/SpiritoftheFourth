@@ -4,6 +4,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import backend.lambdas.events_service.lambda_function as events_service
+from backend.shared.admin_auth import ROLE_ADMIN, ROLE_DEVELOPER, ROLE_SUPER_ADMIN, ROLE_VIEWER
 
 
 def make_event(method, path, body=None, token="cms-admin-token"):
@@ -18,6 +19,7 @@ def make_event(method, path, body=None, token="cms-admin-token"):
 class FakeRepo:
     def __init__(self):
         self.test_mode = False
+        self.last_list_limit = None
 
     def get_runtime_settings(self):
         return {"testMode": self.test_mode, "updatedBy": "", "updatedAt": ""}
@@ -26,7 +28,8 @@ class FakeRepo:
         self.test_mode = enabled
         return {"testMode": enabled, "updatedBy": updated_by, "updatedAt": "2026-06-15T12:00:00-07:00"}
 
-    def list_submissions(self, limit=100):
+    def list_submissions(self, limit=None):
+        self.last_list_limit = limit
         return {"items": [{"submissionId": "s1", "submissionTitle": "Volunteer", "status": "New"}]}
 
     def update_submission_admin_fields(self, submission_id, status=None, assigned_to=None, notes=None, updated_by=None, payment_received=None):
@@ -46,8 +49,53 @@ class FakeRepo:
 
 
 class DecimalRepo:
-    def list_submissions(self, limit=100):
+    def list_submissions(self, limit=None):
         return {"items": [{"submissionId": "s1", "amount": Decimal("125"), "rawData": {"rowNumber": Decimal("4")}}]}
+
+
+class FakeAuthService:
+    def __init__(self):
+        self.users = [
+            {"email": "developer@example.com", "role": ROLE_DEVELOPER, "enabled": True, "status": "CONFIRMED"},
+            {"email": "superAdmin@example.com", "role": ROLE_SUPER_ADMIN, "enabled": True, "status": "CONFIRMED"},
+            {"email": "admin@example.com", "role": ROLE_ADMIN, "enabled": True, "status": "CONFIRMED"},
+            {"email": "viewer@example.com", "role": ROLE_VIEWER, "enabled": True, "status": "CONFIRMED"},
+        ]
+
+    def login(self, email, password):
+        if email == "super@example.com" and password == "secret7":
+            return {"success": True, "token": "role:superAdmin", "role": ROLE_SUPER_ADMIN, "email": email}
+        return {"success": False}
+
+    def get_current_user(self, token):
+        role = token.replace("role:", "")
+        return {"email": f"{role}@example.com", "role": role}
+
+    def list_users(self):
+        return {"items": self.users}
+
+    def create_user(self, email, role):
+        self.users.append({"email": email, "role": role, "enabled": True, "status": "RESET_REQUIRED"})
+        return {"email": email, "role": role}
+
+    def delete_user(self, email):
+        return {"email": email}
+
+    def update_user(self, email, role=None, enabled=None):
+        for user in self.users:
+            if user["email"] == email:
+                if role is not None:
+                    user["role"] = role
+                if enabled is not None:
+                    user["enabled"] = enabled
+                return user
+        raise KeyError(email)
+
+    def request_password_reset(self, email):
+        return {"success": True}
+
+    def confirm_password_reset(self, email, code, password):
+        return {"success": True}
 
 
 class EventsServiceSubmissionRoutesTests(unittest.TestCase):
@@ -75,6 +123,20 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         self.assertTrue(body["success"])
         self.assertEqual(body["token"], "cms-developer-token")
         self.assertEqual(body["role"], "developer")
+
+    @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
+    def test_cognito_login_returns_role_token_and_email(self, _auth):
+        response = events_service.lambda_handler(
+            make_event("POST", "/admin/login", {"email": "super@example.com", "password": "secret7"}, token=None),
+            None,
+        )
+
+        self.assertEqual(response["statusCode"], 200)
+        body = json.loads(response["body"])
+        self.assertTrue(body["success"])
+        self.assertEqual(body["token"], "role:superAdmin")
+        self.assertEqual(body["role"], ROLE_SUPER_ADMIN)
+        self.assertEqual(body["email"], "super@example.com")
 
     @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
     def test_developer_token_can_list_submissions(self, _repo):
@@ -130,12 +192,13 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         self.assertEqual(response["headers"]["Pragma"], "no-cache")
 
     @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
-    def test_authorized_admin_can_list_submissions(self, _repo):
+    def test_authorized_admin_can_list_submissions(self, repo_factory):
         response = events_service.lambda_handler(make_event("GET", "/admin/submissions"), None)
 
         self.assertEqual(response["statusCode"], 200)
         body = json.loads(response["body"])
         self.assertEqual(body["items"][0]["submissionId"], "s1")
+        self.assertIsNone(repo_factory.return_value.last_list_limit)
 
     @patch.object(events_service, "get_submissions_repository", return_value=DecimalRepo())
     def test_admin_submissions_response_serializes_dynamodb_decimals(self, _repo):
@@ -150,6 +213,18 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         response = events_service.lambda_handler(make_event("GET", "/admin/submissions", token=None), None)
 
         self.assertEqual(response["statusCode"], 401)
+
+    @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
+    @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
+    def test_viewer_can_list_but_cannot_patch_submissions(self, _auth, _repo):
+        list_response = events_service.lambda_handler(make_event("GET", "/admin/submissions", token="role:viewer"), None)
+        patch_response = events_service.lambda_handler(
+            make_event("PATCH", "/admin/submissions/s1", {"notes": "No edit"}, token="role:viewer"),
+            None,
+        )
+
+        self.assertEqual(list_response["statusCode"], 200)
+        self.assertEqual(patch_response["statusCode"], 403)
 
     @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
     def test_authorized_admin_can_patch_submission_admin_fields(self, _repo):
@@ -187,8 +262,8 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         self.assertTrue(body["paymentReceived"])
 
     @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
-    def test_authorized_admin_can_delete_submission(self, _repo):
-        response = events_service.lambda_handler(make_event("DELETE", "/admin/submissions/s1"), None)
+    def test_super_admin_can_delete_submission(self, _repo):
+        response = events_service.lambda_handler(make_event("DELETE", "/admin/submissions/s1", token="cms-developer-token"), None)
 
         self.assertEqual(response["statusCode"], 200)
         body = json.loads(response["body"])
@@ -196,8 +271,14 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         self.assertEqual(body["submissionId"], "s1")
 
     @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
+    def test_admin_cannot_delete_submission(self, _repo):
+        response = events_service.lambda_handler(make_event("DELETE", "/admin/submissions/s1", token="cms-admin-token"), None)
+
+        self.assertEqual(response["statusCode"], 403)
+
+    @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
     def test_delete_submission_returns_404_when_missing(self, _repo):
-        response = events_service.lambda_handler(make_event("DELETE", "/admin/submissions/missing"), None)
+        response = events_service.lambda_handler(make_event("DELETE", "/admin/submissions/missing", token="cms-developer-token"), None)
 
         self.assertEqual(response["statusCode"], 404)
 
@@ -205,6 +286,153 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         response = events_service.lambda_handler(make_event("DELETE", "/admin/submissions/s1", token=None), None)
 
         self.assertEqual(response["statusCode"], 401)
+
+    @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
+    def test_super_admin_can_create_admin_user(self, _auth):
+        response = events_service.lambda_handler(
+            make_event("POST", "/admin/users", {"email": "admin@example.com", "role": ROLE_ADMIN}, token="role:superAdmin"),
+            None,
+        )
+
+        self.assertEqual(response["statusCode"], 200)
+        body = json.loads(response["body"])
+        self.assertEqual(body["email"], "admin@example.com")
+        self.assertEqual(body["role"], ROLE_ADMIN)
+
+    @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
+    def test_only_developer_can_list_developer_users(self, _auth):
+        super_admin_response = events_service.lambda_handler(
+            make_event("GET", "/admin/users", token="role:superAdmin"),
+            None,
+        )
+        developer_response = events_service.lambda_handler(
+            make_event("GET", "/admin/users", token="role:developer"),
+            None,
+        )
+
+        self.assertEqual(super_admin_response["statusCode"], 200)
+        super_admin_users = json.loads(super_admin_response["body"])["items"]
+        self.assertNotIn("developer@example.com", [user["email"] for user in super_admin_users])
+
+        self.assertEqual(developer_response["statusCode"], 200)
+        developer_users = json.loads(developer_response["body"])["items"]
+        self.assertIn("developer@example.com", [user["email"] for user in developer_users])
+
+    @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
+    def test_admin_cannot_create_admin_user_but_can_create_viewer(self, _auth):
+        admin_response = events_service.lambda_handler(
+            make_event("POST", "/admin/users", {"email": "admin2@example.com", "role": ROLE_ADMIN}, token="role:admin"),
+            None,
+        )
+        viewer_response = events_service.lambda_handler(
+            make_event("POST", "/admin/users", {"email": "viewer2@example.com", "role": ROLE_VIEWER}, token="role:admin"),
+            None,
+        )
+
+        self.assertEqual(admin_response["statusCode"], 403)
+        self.assertEqual(viewer_response["statusCode"], 200)
+
+    @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
+    def test_user_managers_cannot_delete_themselves(self, _auth):
+        response = events_service.lambda_handler(
+            make_event("DELETE", "/admin/users/superAdmin@example.com", token="role:superAdmin"),
+            None,
+        )
+
+        self.assertEqual(response["statusCode"], 403)
+        self.assertIn("Cannot remove your own account", json.loads(response["body"])["error"])
+
+    @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
+    def test_role_scoped_user_delete_rules_are_enforced(self, _auth):
+        developer_response = events_service.lambda_handler(
+            make_event("DELETE", "/admin/users/superAdmin@example.com", token="role:developer"),
+            None,
+        )
+        super_admin_response = events_service.lambda_handler(
+            make_event("DELETE", "/admin/users/admin@example.com", token="role:superAdmin"),
+            None,
+        )
+        admin_viewer_response = events_service.lambda_handler(
+            make_event("DELETE", "/admin/users/viewer@example.com", token="role:admin"),
+            None,
+        )
+        admin_admin_response = events_service.lambda_handler(
+            make_event("DELETE", "/admin/users/admin@example.com", token="role:admin"),
+            None,
+        )
+
+        self.assertEqual(developer_response["statusCode"], 200)
+        self.assertEqual(super_admin_response["statusCode"], 200)
+        self.assertEqual(admin_viewer_response["statusCode"], 200)
+        self.assertEqual(admin_admin_response["statusCode"], 403)
+
+    @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
+    def test_super_admin_can_update_role_and_enabled_for_scoped_users(self, _auth):
+        role_response = events_service.lambda_handler(
+            make_event("PATCH", "/admin/users/admin@example.com", {"role": ROLE_VIEWER}, token="role:superAdmin"),
+            None,
+        )
+        enabled_response = events_service.lambda_handler(
+            make_event("PATCH", "/admin/users/viewer@example.com", {"enabled": False}, token="role:superAdmin"),
+            None,
+        )
+
+        self.assertEqual(role_response["statusCode"], 200)
+        self.assertEqual(json.loads(role_response["body"])["role"], ROLE_VIEWER)
+        self.assertEqual(enabled_response["statusCode"], 200)
+        self.assertFalse(json.loads(enabled_response["body"])["enabled"])
+
+    @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
+    def test_user_update_requires_permission_for_current_and_new_role(self, _auth):
+        admin_promote_response = events_service.lambda_handler(
+            make_event("PATCH", "/admin/users/viewer@example.com", {"role": ROLE_ADMIN}, token="role:admin"),
+            None,
+        )
+        admin_disable_admin_response = events_service.lambda_handler(
+            make_event("PATCH", "/admin/users/admin@example.com", {"enabled": False}, token="role:admin"),
+            None,
+        )
+        super_admin_developer_response = events_service.lambda_handler(
+            make_event("PATCH", "/admin/users/developer@example.com", {"role": ROLE_VIEWER}, token="role:superAdmin"),
+            None,
+        )
+
+        self.assertEqual(admin_promote_response["statusCode"], 403)
+        self.assertEqual(admin_disable_admin_response["statusCode"], 403)
+        self.assertEqual(super_admin_developer_response["statusCode"], 403)
+
+    @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
+    def test_user_managers_cannot_update_themselves(self, _auth):
+        role_response = events_service.lambda_handler(
+            make_event("PATCH", "/admin/users/superAdmin@example.com", {"role": ROLE_ADMIN}, token="role:superAdmin"),
+            None,
+        )
+        enabled_response = events_service.lambda_handler(
+            make_event("PATCH", "/admin/users/superAdmin@example.com", {"enabled": False}, token="role:superAdmin"),
+            None,
+        )
+
+        self.assertEqual(role_response["statusCode"], 403)
+        self.assertEqual(enabled_response["statusCode"], 403)
+
+    @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
+    def test_password_reset_endpoints_are_public_and_policy_enforced_by_service(self, _auth):
+        request_response = events_service.lambda_handler(
+            make_event("POST", "/admin/password-reset", {"email": "viewer@example.com"}, token=None),
+            None,
+        )
+        confirm_response = events_service.lambda_handler(
+            make_event(
+                "POST",
+                "/admin/password-reset/confirm",
+                {"email": "viewer@example.com", "code": "123456", "password": "abc1234"},
+                token=None,
+            ),
+            None,
+        )
+
+        self.assertEqual(request_response["statusCode"], 200)
+        self.assertEqual(confirm_response["statusCode"], 200)
 
 
 if __name__ == "__main__":

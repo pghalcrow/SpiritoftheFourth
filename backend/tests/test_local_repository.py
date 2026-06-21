@@ -51,6 +51,23 @@ class LocalSubmissionsRepositoryTests(unittest.TestCase):
             self.assertEqual(updated["notes"], "Check received")
             self.assertTrue(updated["paymentReceived"])
 
+    def test_list_submissions_returns_all_items_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = LocalSubmissionsRepository(Path(tmp) / "submissions.json")
+            for index in range(105):
+                repo.create_submission({
+                    "submissionId": f"s{index}",
+                    "submissionTitle": f"Submission {index}",
+                    "submittedAt": f"2026-06-05T10:{index % 60:02d}:00-07:00",
+                    "status": "New",
+                    "assignedTo": "",
+                    "notes": "",
+                })
+
+            result = repo.list_submissions()
+
+            self.assertEqual(len(result["items"]), 105)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -261,6 +261,31 @@ class RepositoryTests(unittest.TestCase):
             {"pk": "SUBMISSION", "sk": "2026-06-05T10:02:00-07:00#s2"},
         )
 
+    def test_list_submissions_returns_all_items_by_default(self):
+        self.table.page_size = 20
+        for index in range(105):
+            submission_id = f"s{index}"
+            self.repo.create_submission({
+                "pk": "SUBMISSION",
+                "sk": f"2026-06-05T10:{index:03d}:00-07:00#{submission_id}",
+                "recordType": "submission",
+                "submissionId": submission_id,
+                "submissionTitle": f"Submission {index}",
+                "name": "Pat",
+                "email": "pat@example.com",
+                "phone": "555",
+                "status": "New",
+                "assignedTo": "",
+                "notes": "",
+            })
+
+        result = self.repo.list_submissions()
+
+        self.assertEqual(len(result["items"]), 105)
+        self.assertEqual(result["items"][0]["submissionId"], "s104")
+        self.assertEqual(result["items"][-1]["submissionId"], "s0")
+        self.assertIsNone(result["lastEvaluatedKey"])
+
     def test_update_admin_fields_finds_submission_on_later_page(self):
         self.table.page_size = 1
         self.repo.create_submission({
