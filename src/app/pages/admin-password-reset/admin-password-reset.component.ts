@@ -45,9 +45,9 @@ export class AdminPasswordResetComponent {
         this.infoMessage = 'Password updated.';
         this.router.navigate(['/sign-in']);
       },
-      error: () => {
+      error: error => {
         this.isLoading = false;
-        this.errorMessage = 'Password reset failed.';
+        this.errorMessage = error?.error?.error || 'Password reset failed.';
       }
     });
   }

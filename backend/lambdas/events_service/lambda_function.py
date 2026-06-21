@@ -6,6 +6,7 @@ from urllib.parse import unquote
 from decimal import Decimal
 
 import boto3
+from botocore.exceptions import ClientError
 
 from backend.shared.submissions_repository import SubmissionsRepository
 from backend.shared.runtime_mode import is_local_test_mode
@@ -39,6 +40,8 @@ NO_CACHE_HEADERS = {
     "Pragma": "no-cache",
     "Expires": "0",
 }
+RESET_CODE_ERROR_MESSAGE = "Invalid or expired reset code. Request a new password reset code and use the newest email."
+PASSWORD_POLICY_ERROR_MESSAGE = "Password does not meet policy. Use at least 7 characters and include at least one number."
 
 
 def lambda_handler(event, context):
@@ -261,6 +264,13 @@ def confirm_password_reset(body):
         return json_response(200, get_admin_auth_service().confirm_password_reset(email, code, password))
     except ValueError as error:
         return json_response(400, {"error": str(error)})
+    except ClientError as error:
+        code = error.response.get("Error", {}).get("Code", "")
+        if code in {"CodeMismatchException", "ExpiredCodeException"}:
+            return json_response(400, {"error": RESET_CODE_ERROR_MESSAGE})
+        if code == "InvalidPasswordException":
+            return json_response(400, {"error": PASSWORD_POLICY_ERROR_MESSAGE})
+        raise
 
 
 def list_admin_users(current_user):

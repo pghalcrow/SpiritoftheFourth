@@ -3,6 +3,8 @@ import unittest
 from decimal import Decimal
 from unittest.mock import patch
 
+from botocore.exceptions import ClientError
+
 import backend.lambdas.events_service.lambda_function as events_service
 from backend.shared.admin_auth import ROLE_ADMIN, ROLE_DEVELOPER, ROLE_SUPER_ADMIN, ROLE_VIEWER
 
@@ -96,6 +98,14 @@ class FakeAuthService:
 
     def confirm_password_reset(self, email, code, password):
         return {"success": True}
+
+
+class InvalidResetCodeAuthService(FakeAuthService):
+    def confirm_password_reset(self, email, code, password):
+        raise ClientError(
+            {"Error": {"Code": "CodeMismatchException", "Message": "Invalid verification code provided"}},
+            "ConfirmForgotPassword",
+        )
 
 
 class EventsServiceSubmissionRoutesTests(unittest.TestCase):
@@ -433,6 +443,22 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
 
         self.assertEqual(request_response["statusCode"], 200)
         self.assertEqual(confirm_response["statusCode"], 200)
+
+    @patch.object(events_service, "get_admin_auth_service", return_value=InvalidResetCodeAuthService())
+    def test_password_reset_confirm_returns_friendly_error_for_invalid_code(self, _auth):
+        response = events_service.lambda_handler(
+            make_event(
+                "POST",
+                "/admin/password-reset/confirm",
+                {"email": "viewer@example.com", "code": "123456", "password": "abc1234"},
+                token=None,
+            ),
+            None,
+        )
+
+        self.assertEqual(response["statusCode"], 400)
+        body = json.loads(response["body"])
+        self.assertIn("Invalid or expired reset code", body["error"])
 
 
 if __name__ == "__main__":

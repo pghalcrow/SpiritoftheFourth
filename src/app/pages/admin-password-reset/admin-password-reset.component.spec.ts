@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { AdminPasswordResetComponent } from './admin-password-reset.component';
 import { CmsService } from 'src/app/services/cms.service';
@@ -60,5 +60,18 @@ describe('AdminPasswordResetComponent', () => {
 
     expect(cmsService.confirmPasswordReset).toHaveBeenCalledWith('viewer@example.com', '123456', 'secret7');
     expect(router.navigate).toHaveBeenCalledWith(['/sign-in']);
+  });
+
+  it('shows the backend password reset error when confirmation fails', () => {
+    cmsService.confirmPasswordReset.and.returnValue(throwError(() => ({
+      error: { error: 'Invalid or expired reset code. Request a new password reset code and use the newest email.' }
+    })));
+    component.password = 'secret7';
+    component.confirmPassword = 'secret7';
+
+    component.submit();
+
+    expect(component.errorMessage).toContain('Invalid or expired reset code');
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 });
