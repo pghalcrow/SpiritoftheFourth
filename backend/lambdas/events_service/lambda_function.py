@@ -41,7 +41,7 @@ NO_CACHE_HEADERS = {
     "Expires": "0",
 }
 RESET_CODE_ERROR_MESSAGE = "Invalid or expired reset code. Request a new password reset code and use the newest email."
-PASSWORD_POLICY_ERROR_MESSAGE = "Password does not meet policy. Use at least 7 characters and include at least one number."
+PASSWORD_POLICY_ERROR_MESSAGE = "Password does not meet policy. Use at least 8 characters and include uppercase, lowercase, number, and symbol."
 
 
 def lambda_handler(event, context):

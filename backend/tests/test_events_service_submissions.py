@@ -108,6 +108,14 @@ class InvalidResetCodeAuthService(FakeAuthService):
         )
 
 
+class InvalidPasswordAuthService(FakeAuthService):
+    def confirm_password_reset(self, email, code, password):
+        raise ClientError(
+            {"Error": {"Code": "InvalidPasswordException", "Message": "Password did not conform with policy"}},
+            "ConfirmForgotPassword",
+        )
+
+
 class EventsServiceSubmissionRoutesTests(unittest.TestCase):
     def test_admin_login_returns_admin_role_for_admin_password(self):
         with patch.object(events_service, "ADMIN_PASSWORD", "admin-secret"):
@@ -459,6 +467,25 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         self.assertEqual(response["statusCode"], 400)
         body = json.loads(response["body"])
         self.assertIn("Invalid or expired reset code", body["error"])
+
+    @patch.object(events_service, "get_admin_auth_service", return_value=InvalidPasswordAuthService())
+    def test_password_reset_confirm_returns_complete_password_policy_error(self, _auth):
+        response = events_service.lambda_handler(
+            make_event(
+                "POST",
+                "/admin/password-reset/confirm",
+                {"email": "viewer@example.com", "code": "123456", "password": "Bubbles123"},
+                token=None,
+            ),
+            None,
+        )
+
+        self.assertEqual(response["statusCode"], 400)
+        body = json.loads(response["body"])
+        self.assertIn("uppercase", body["error"])
+        self.assertIn("lowercase", body["error"])
+        self.assertIn("number", body["error"])
+        self.assertIn("symbol", body["error"])
 
 
 if __name__ == "__main__":

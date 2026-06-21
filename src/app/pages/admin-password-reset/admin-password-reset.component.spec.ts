@@ -37,16 +37,23 @@ describe('AdminPasswordResetComponent', () => {
     expect(component.code).toBe('123456');
   });
 
-  it('requires matching passwords with at least seven characters and a number', () => {
+  it('requires matching passwords that meet the Cognito password policy', () => {
     component.password = 'secret';
     component.confirmPassword = 'secret';
     component.submit();
 
-    expect(component.errorMessage).toContain('at least 7 characters');
+    expect(component.errorMessage).toContain('at least 8 characters');
     expect(cmsService.confirmPasswordReset).not.toHaveBeenCalled();
 
-    component.password = 'secret7';
-    component.confirmPassword = 'different7';
+    component.password = 'Bubbles123';
+    component.confirmPassword = 'Bubbles123';
+    component.submit();
+
+    expect(component.errorMessage).toContain('symbol');
+    expect(cmsService.confirmPasswordReset).not.toHaveBeenCalled();
+
+    component.password = 'Bubbles123!';
+    component.confirmPassword = 'different123!';
     component.submit();
 
     expect(component.errorMessage).toContain('match');
@@ -54,11 +61,11 @@ describe('AdminPasswordResetComponent', () => {
   });
 
   it('submits valid reset and returns to sign in', () => {
-    component.password = 'secret7';
-    component.confirmPassword = 'secret7';
+    component.password = 'Bubbles123!';
+    component.confirmPassword = 'Bubbles123!';
     component.submit();
 
-    expect(cmsService.confirmPasswordReset).toHaveBeenCalledWith('viewer@example.com', '123456', 'secret7');
+    expect(cmsService.confirmPasswordReset).toHaveBeenCalledWith('viewer@example.com', '123456', 'Bubbles123!');
     expect(router.navigate).toHaveBeenCalledWith(['/sign-in']);
   });
 
@@ -66,8 +73,8 @@ describe('AdminPasswordResetComponent', () => {
     cmsService.confirmPasswordReset.and.returnValue(throwError(() => ({
       error: { error: 'Invalid or expired reset code. Request a new password reset code and use the newest email.' }
     })));
-    component.password = 'secret7';
-    component.confirmPassword = 'secret7';
+    component.password = 'Bubbles123!';
+    component.confirmPassword = 'Bubbles123!';
 
     component.submit();
 
