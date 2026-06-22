@@ -51,16 +51,24 @@ class FakeLoginClient:
 class FakeCreateClient:
     def __init__(self, create_error_code=None):
         self.create_error_code = create_error_code
+        self.create_user_calls = []
+        self.set_password_calls = []
+        self.group_calls = []
+        self.forgot_password_calls = []
 
     def admin_create_user(self, **kwargs):
+        self.create_user_calls.append(kwargs)
         if self.create_error_code:
             raise ClientError({"Error": {"Code": self.create_error_code}}, "AdminCreateUser")
 
+    def admin_set_user_password(self, **kwargs):
+        self.set_password_calls.append(kwargs)
+
     def admin_add_user_to_group(self, **kwargs):
-        pass
+        self.group_calls.append(kwargs)
 
     def forgot_password(self, **kwargs):
-        pass
+        self.forgot_password_calls.append(kwargs)
 
 
 class AdminRolePermissionTests(unittest.TestCase):
@@ -144,6 +152,21 @@ class AdminAuthServiceTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "already exists"):
             service.create_user("viewer@example.com", ROLE_VIEWER)
+
+    def test_create_user_confirms_user_before_sending_password_reset(self):
+        client = FakeCreateClient()
+        service = AdminAuthService(client=client, user_pool_id="pool-id", client_id="client-id")
+
+        response = service.create_user("viewer@example.com", ROLE_VIEWER)
+
+        self.assertEqual(response, {"email": "viewer@example.com", "role": ROLE_VIEWER})
+        self.assertEqual(client.create_user_calls[0]["MessageAction"], "SUPPRESS")
+        self.assertTrue(client.set_password_calls)
+        self.assertEqual(client.set_password_calls[0]["Username"], "viewer@example.com")
+        self.assertTrue(client.set_password_calls[0]["Permanent"])
+        self.assertTrue(password_meets_policy(client.set_password_calls[0]["Password"]))
+        self.assertEqual(client.group_calls[0]["GroupName"], "Viewer")
+        self.assertEqual(client.forgot_password_calls[0]["Username"], "viewer@example.com")
 
 
 if __name__ == "__main__":

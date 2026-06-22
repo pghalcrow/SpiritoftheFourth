@@ -197,6 +197,7 @@ class AdminAuthService:
         normalized_role = normalize_role(role)
         if not normalized_role:
             raise ValueError("Invalid role")
+        temporary_password = generate_temporary_password()
         try:
             self.client.admin_create_user(
                 UserPoolId=self.user_pool_id,
@@ -205,13 +206,19 @@ class AdminAuthService:
                     {"Name": "email", "Value": email},
                     {"Name": "email_verified", "Value": "true"},
                 ],
-                TemporaryPassword=generate_temporary_password(),
+                TemporaryPassword=temporary_password,
                 MessageAction="SUPPRESS",
             )
         except Exception as error:
             if self._is_existing_user_error(error):
                 raise ValueError("An account using that email already exists.")
             raise
+        self.client.admin_set_user_password(
+            UserPoolId=self.user_pool_id,
+            Username=email,
+            Password=temporary_password,
+            Permanent=True,
+        )
         self.client.admin_add_user_to_group(
             UserPoolId=self.user_pool_id,
             Username=email,
