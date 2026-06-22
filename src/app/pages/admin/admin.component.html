@@ -868,22 +868,72 @@
             <dl class="role-help-list">
               <div>
                 <dt>Super Admin</dt>
-                <dd>Can manage backend content, submissions, and users at all levels. Super Admins can create, remove, change roles, enable, and disable Super Admin, Admin, and Viewer accounts.</dd>
+                <dd>Can manage submissions, events, and user accounts at all levels.</dd>
               </div>
               <div>
                 <dt>Admin</dt>
-                <dd>Can edit backend content and manage day-to-day admin work. Admins can create, remove, enable, and disable Viewer accounts only.</dd>
+                <dd>Day-to-day user management role. Can manage Viewer accounts only.</dd>
               </div>
               <div>
                 <dt>Viewer</dt>
-                <dd>Can view admin information available to their account, but cannot edit backend content, delete submissions, create users, remove users, change roles, or enable and disable accounts.</dd>
+                <dd>Read-only role. Can view allowed admin information without making changes.</dd>
               </div>
             </dl>
           </section>
 
           <section>
+            <h3>Permissions</h3>
+            <div class="submissions-table-wrap role-permissions-scroll">
+              <table class="submissions-table" style="min-width: 640px;">
+                <thead>
+                  <tr>
+                    <th scope="col">User level</th>
+                    <th scope="col">View submissions</th>
+                    <th scope="col">Delete submissions</th>
+                    <th scope="col">Manage events</th>
+                    <th scope="col">Manage users</th>
+                    <th scope="col">Change roles</th>
+                    <th scope="col">Enable / disable users</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">Super Admin</th>
+                    <td data-testid="permission-superAdmin-viewSubmissions" class="permission-allowed" aria-label="Allowed">&#10003;</td>
+                    <td data-testid="permission-superAdmin-deleteSubmissions" class="permission-allowed" aria-label="Allowed">&#10003;</td>
+                    <td data-testid="permission-superAdmin-manageEvents" class="permission-allowed" aria-label="Allowed">&#10003;</td>
+                    <td data-testid="permission-superAdmin-manageUsers" class="permission-allowed" aria-label="Allowed">&#10003;</td>
+                    <td data-testid="permission-superAdmin-changeRoles" class="permission-allowed" aria-label="Allowed">&#10003;</td>
+                    <td data-testid="permission-superAdmin-toggleUsers" class="permission-allowed" aria-label="Allowed">&#10003;</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Admin</th>
+                    <td data-testid="permission-admin-viewSubmissions" class="permission-allowed" aria-label="Allowed">&#10003;</td>
+                    <td data-testid="permission-admin-deleteSubmissions" class="permission-denied" aria-label="Not allowed">&mdash;</td>
+                    <td data-testid="permission-admin-manageEvents" class="permission-denied" aria-label="Not allowed">&mdash;</td>
+                    <td data-testid="permission-admin-manageUsers" class="permission-allowed" aria-label="Allowed">&#10003;</td>
+                    <td data-testid="permission-admin-changeRoles" class="permission-denied" aria-label="Not allowed">&mdash;</td>
+                    <td data-testid="permission-admin-toggleUsers" class="permission-allowed" aria-label="Allowed">&#10003;</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Viewer</th>
+                    <td data-testid="permission-viewer-viewSubmissions" class="permission-allowed" aria-label="Allowed">&#10003;</td>
+                    <td data-testid="permission-viewer-deleteSubmissions" class="permission-denied" aria-label="Not allowed">&mdash;</td>
+                    <td data-testid="permission-viewer-manageEvents" class="permission-denied" aria-label="Not allowed">&mdash;</td>
+                    <td data-testid="permission-viewer-manageUsers" class="permission-denied" aria-label="Not allowed">&mdash;</td>
+                    <td data-testid="permission-viewer-changeRoles" class="permission-denied" aria-label="Not allowed">&mdash;</td>
+                    <td data-testid="permission-viewer-toggleUsers" class="permission-denied" aria-label="Not allowed">&mdash;</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section>
             <h3>User Management Rules</h3>
             <ul>
+              <li>Super Admins can manage Super Admin, Admin, and Viewer accounts.</li>
+              <li>Admins can manage Viewer accounts only.</li>
               <li>Users cannot remove, disable, or change the role for their own account.</li>
             </ul>
           </section>
