@@ -12,6 +12,8 @@ from backend.shared.admin_auth import (
     can_manage_role,
     can_read,
     can_update_test_mode,
+    generate_temporary_password,
+    password_meets_policy,
 )
 
 
@@ -98,6 +100,20 @@ class AdminRolePermissionTests(unittest.TestCase):
 
 
 class AdminAuthServiceTests(unittest.TestCase):
+    def test_generated_temporary_password_matches_cognito_password_policy(self):
+        password = generate_temporary_password()
+
+        self.assertTrue(password_meets_policy(password))
+        self.assertGreaterEqual(len(password), 8)
+        self.assertTrue(any(char.isupper() for char in password))
+        self.assertTrue(any(char.islower() for char in password))
+        self.assertTrue(any(char.isdigit() for char in password))
+        self.assertTrue(any(not char.isalnum() for char in password))
+
+    def test_password_policy_requires_symbol_and_mixed_character_classes(self):
+        self.assertFalse(password_meets_policy("Bubbles123"))
+        self.assertTrue(password_meets_policy("Bubbles123!"))
+
     def test_login_reports_disabled_cognito_users_without_exposing_bad_credentials(self):
         client = FakeLoginClient(error_code="NotAuthorizedException", message="User is disabled.")
         service = AdminAuthService(client=client, client_id="client-id")

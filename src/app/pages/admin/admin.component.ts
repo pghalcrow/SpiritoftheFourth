@@ -455,7 +455,7 @@ export class AdminComponent implements OnInit {
             this.newUserEmailError = 'An account using that email already exists.';
             return;
           }
-          this.showModal('User create failed', 'Could not create the admin user.', 'danger');
+          this.showModal('User create failed', err?.error?.error || 'Could not create the admin user.', 'danger');
         }
       });
   }

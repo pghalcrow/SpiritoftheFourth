@@ -75,12 +75,18 @@ def can_manage_role(actor_role, target_role):
 
 def password_meets_policy(password):
     value = str(password or "")
-    return len(value) > 6 and any(char.isdigit() for char in value)
+    return (
+        len(value) >= 8
+        and any(char.isupper() for char in value)
+        and any(char.islower() for char in value)
+        and any(char.isdigit() for char in value)
+        and any(not char.isalnum() for char in value)
+    )
 
 
 def generate_temporary_password():
-    alphabet = string.ascii_letters + string.digits
-    return "Tmp" + "".join(secrets.choice(alphabet) for _ in range(18)) + "7"
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    return "Tmp!" + "".join(secrets.choice(alphabet) for _ in range(18)) + "7"
 
 
 class AdminAuthService:

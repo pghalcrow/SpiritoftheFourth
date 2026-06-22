@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule } from '@angular/cdk/drag-drop';
-import { of, Subject } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 import { AdminComponent } from './admin.component';
 import { CmsService } from 'src/app/services/cms.service';
@@ -279,6 +279,24 @@ describe('AdminComponent', () => {
     expect(cmsService.createAdminUser).not.toHaveBeenCalled();
     expect(component.newUserEmailError).toBe('An account using that email already exists.');
     expect(fixture.nativeElement.querySelector('[data-testid="new-user-email-error"]')?.textContent).toContain('An account using that email already exists.');
+  });
+
+  it('shows the backend error message when creating an admin user fails', () => {
+    spyOn(console, 'error');
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    cmsService.getAdminUsers.and.returnValue(of({ items: [] }));
+    cmsService.createAdminUser.and.returnValue(throwError(() => ({
+      error: { error: 'Password did not conform with password policy: Password must have symbol characters' }
+    })));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    component.newUserEmail = 'newuser@example.com';
+    component.newUserRole = 'viewer';
+    component.createAdminUser();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.admin-modal')?.textContent).toContain('Password did not conform with password policy');
   });
 
   it('shows friendly role labels in the user role selector', () => {
