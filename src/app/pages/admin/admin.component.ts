@@ -730,15 +730,108 @@ export class AdminComponent implements OnInit {
           : '';
       });
       if (this.isMotorShowSubmission(submission)) {
-        this.parseSubmissionBodyRows(submission.rawData?.body).forEach(detail => {
-          const value = detail.label.toLowerCase() === 'total'
-            ? this.formatSubmissionExportFieldValue(detail.value, 'total')
-            : detail.value;
-          row[detail.label] = value;
-        });
+        this.addMotorShowExportDefaults(row, submission.rawData);
+        this.addMotorShowBodyExportFields(row, submission.rawData?.body);
       }
       return row;
     });
+  }
+
+  private addMotorShowExportDefaults(row: Record<string, string | number | boolean>, rawData: any) {
+    const total = this.hasDisplayValue(rawData?.grandTotal) ? rawData.grandTotal : rawData?.total;
+    if (!this.hasDisplayValue(row['Amount']) && this.hasDisplayValue(total)) {
+      row['Amount'] = this.formatSubmissionExportFieldValue(total, 'total');
+    }
+
+    [
+      ['additionalLarge', 'Additional Large'],
+      ['additionalMedium', 'Additional Medium'],
+      ['additionalPlaques', 'Additional Plaques'],
+      ['additionalSmall', 'Additional Small'],
+      ['additionalXLarge', 'Additional XLarge'],
+      ['additionalXXLarge', 'Additional XXLarge'],
+      ['additionalXXXLarge', 'Additional XXXLarge'],
+    ].forEach(([field, header]) => {
+      if (this.hasDisplayValue(row[header])) return;
+      row[header] = this.hasDisplayValue(rawData?.[field])
+        ? this.formatSubmissionExportFieldValue(rawData[field], field)
+        : 0;
+    });
+  }
+
+  private addMotorShowBodyExportFields(row: Record<string, string | number | boolean>, body: any) {
+    this.parseSubmissionBodyRows(body).forEach(detail => {
+      const value = detail.label.toLowerCase() === 'total'
+        ? this.formatSubmissionExportFieldValue(detail.value, 'total')
+        : detail.value;
+      row[detail.label] = value;
+    });
+
+    const parsedFields = this.parseMotorShowBodyExportFields(body);
+    Object.entries(parsedFields).forEach(([key, value]) => {
+      if (!this.hasDisplayValue(row[key]) && this.hasDisplayValue(value)) {
+        row[key] = value;
+      }
+    });
+  }
+
+  private parseMotorShowBodyExportFields(body: any): Record<string, string | number> {
+    const rows = this.parseSubmissionBodyRows(body);
+    const byLabel = new Map(rows.map(row => [row.label.toLowerCase(), row.value]));
+    const fields: Record<string, string | number> = {};
+
+    const address = byLabel.get('address');
+    if (address) {
+      fields['Address'] = address;
+      const addressMatch = address.match(/^(.+),\s*([^,]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+      if (addressMatch) {
+        fields['Street Address'] = addressMatch[1].trim();
+        fields['City'] = addressMatch[2].trim();
+        fields['State'] = addressMatch[3].trim();
+        const zipValue = this.formatSubmissionExportFieldValue(addressMatch[4].trim(), 'zipcode');
+        fields['Zip Code'] = typeof zipValue === 'number' ? zipValue : String(zipValue);
+      }
+    }
+
+    const vehicle = byLabel.get('vehicle');
+    if (vehicle) {
+      fields['Vehicle'] = vehicle;
+      const colorMatch = vehicle.match(/\(([^)]+)\)\s*$/);
+      const vehicleWithoutColor = vehicle.replace(/\s*\([^)]+\)\s*$/, '').trim();
+      const vehicleParts = vehicleWithoutColor.split(/\s+/).filter(Boolean);
+      if (vehicleParts.length >= 2) {
+        const yearValue = this.formatSubmissionExportFieldValue(vehicleParts[0], 'year');
+        fields['Vehicle Year'] = typeof yearValue === 'number' ? yearValue : String(yearValue);
+        fields['Make'] = vehicleParts[1];
+        if (vehicleParts.length > 2) {
+          fields['Model'] = vehicleParts.slice(2).join(' ');
+        }
+      }
+      if (colorMatch) {
+        fields['Color'] = colorMatch[1].trim();
+      }
+    }
+
+    const clubAffiliation = byLabel.get('club affiliation');
+    if (clubAffiliation) {
+      fields['Club Affiliation'] = clubAffiliation;
+    }
+
+    const bundle = byLabel.get('t-shirt & plaque bundle');
+    if (bundle) {
+      fields['T-Shirt & Plaque Bundle'] = bundle;
+      fields['Combo Size'] = bundle;
+    }
+
+    const total = byLabel.get('total') || byLabel.get('total due');
+    if (total) {
+      const totalValue = this.formatSubmissionExportFieldValue(total, 'total');
+      fields['Amount'] = typeof totalValue === 'number' ? totalValue : String(totalValue);
+      fields['Total'] = typeof totalValue === 'number' ? totalValue : String(totalValue);
+      fields['Grand Total'] = fields['Total'];
+    }
+
+    return fields;
   }
 
   private buildSubmissionExportSheet(sheetName: string, submissions: AdminSubmission[], group: SubmissionGroupKey): SubmissionExportSheet {
@@ -788,6 +881,10 @@ export class AdminComponent implements OnInit {
       'paymentProvider',
       'paymentReceived',
       'paymentStatus',
+      'paymentHoldCreatedAt',
+      'paymentHoldId',
+      'payment_hold_created_at',
+      'payment_hold_id',
       'phone',
       'replyTo',
       'stripe_session_id',
@@ -1339,6 +1436,7 @@ export class AdminComponent implements OnInit {
       'club affiliation',
       't-shirt & plaque bundle',
       'total',
+      'total due',
     ]);
 
     return body

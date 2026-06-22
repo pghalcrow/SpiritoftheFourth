@@ -1431,10 +1431,46 @@ describe('AdminComponent', () => {
     expect(header).toContain('Vehicle');
     expect(header).toContain('T-Shirt & Plaque Bundle');
     expect(header).toContain('Total');
+    expect(header).toContain('Street Address');
+    expect(header).toContain('City');
+    expect(header).toContain('State');
+    expect(header).toContain('Zip Code');
+    expect(header).toContain('Vehicle Year');
+    expect(header).toContain('Make');
+    expect(header).toContain('Model');
+    expect(header).toContain('Color');
+    expect(header).toContain('Combo Size');
+    expect(header).toContain('Amount');
+    expect(header).toContain('Additional Large');
+    expect(header).toContain('Additional Medium');
+    expect(header).toContain('Additional Plaques');
+    expect(header).toContain('Additional Small');
+    expect(header).toContain('Additional XLarge');
+    expect(header).toContain('Additional XXLarge');
+    expect(header).toContain('Additional XXXLarge');
+    expect(header).toContain('Grand Total');
     expect(row[header.indexOf('Address')]).toBe('13502 Appaloosa Dr, Lakeside, CA 92040');
     expect(row[header.indexOf('Vehicle')]).toBe('1932 Ford Coupe (Orange)');
     expect(row[header.indexOf('T-Shirt & Plaque Bundle')]).toBe('No');
     expect(row[header.indexOf('Total')]).toBe(25);
+    expect(row[header.indexOf('Street Address')]).toBe('13502 Appaloosa Dr');
+    expect(row[header.indexOf('City')]).toBe('Lakeside');
+    expect(row[header.indexOf('State')]).toBe('CA');
+    expect(row[header.indexOf('Zip Code')]).toBe(92040);
+    expect(row[header.indexOf('Vehicle Year')]).toBe(1932);
+    expect(row[header.indexOf('Make')]).toBe('Ford');
+    expect(row[header.indexOf('Model')]).toBe('Coupe');
+    expect(row[header.indexOf('Color')]).toBe('Orange');
+    expect(row[header.indexOf('Combo Size')]).toBe('No');
+    expect(row[header.indexOf('Amount')]).toBe(25);
+    expect(row[header.indexOf('Additional Large')]).toBe(0);
+    expect(row[header.indexOf('Additional Medium')]).toBe(0);
+    expect(row[header.indexOf('Additional Plaques')]).toBe(0);
+    expect(row[header.indexOf('Additional Small')]).toBe(0);
+    expect(row[header.indexOf('Additional XLarge')]).toBe(0);
+    expect(row[header.indexOf('Additional XXLarge')]).toBe(0);
+    expect(row[header.indexOf('Additional XXXLarge')]).toBe(0);
+    expect(row[header.indexOf('Grand Total')]).toBe(25);
   });
 
   it('omits payment and internal admin fields from submission exports', () => {
@@ -1461,6 +1497,10 @@ describe('AdminComponent', () => {
         formType: 'vendorApplicationForm',
         companyName: 'Booth Co',
         paymentMethod: 'card',
+        paymentHoldCreatedAt: '2026-06-05T10:00:00-07:00',
+        paymentHoldId: 'hold-camel-1',
+        payment_hold_created_at: '2026-06-05T10:00:00-07:00',
+        payment_hold_id: 'hold-snake-1',
         nested: { paymentMethod: 'check' },
       },
     } as any];
@@ -1473,6 +1513,8 @@ describe('AdminComponent', () => {
       'Payment Method',
       'Payment Provider',
       'Payment Received',
+      'Payment Hold Created At',
+      'Payment Hold Id',
       'Currency',
       'Admin Status',
       'Assigned To',
