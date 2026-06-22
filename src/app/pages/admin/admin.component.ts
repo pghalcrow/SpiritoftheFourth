@@ -400,6 +400,7 @@ export class AdminComponent implements OnInit {
         this.adminUsers = this.sortAdminUsers(this.filterVisibleAdminUsers(users));
       },
       error: err => {
+        if (this.handleAuthFailure(err)) return;
         console.error('Admin users load failed', err);
         this.showModal('Users unavailable', 'Could not load admin users.', 'danger');
       }
@@ -410,7 +411,10 @@ export class AdminComponent implements OnInit {
     if (!this.canManageUsers || !this.currentEmail) return;
     this.cmsService.getAdminUsers().subscribe({
       next: res => this.applyCurrentUserRole(res.items || []),
-      error: err => console.error('Current user role sync failed', err)
+      error: err => {
+        if (this.handleAuthFailure(err)) return;
+        console.error('Current user role sync failed', err);
+      }
     });
   }
 
@@ -463,6 +467,7 @@ export class AdminComponent implements OnInit {
           this.showModal('User invited', 'The user has been created and a password reset email has been sent.', 'success');
         },
         error: err => {
+          if (this.handleAuthFailure(err)) return;
           console.error('Admin user create failed', err);
           if (this.isExistingUserError(err)) {
             this.newUserEmailError = 'An account using that email already exists.';
@@ -518,6 +523,7 @@ export class AdminComponent implements OnInit {
           this.adminUsers = this.adminUsers.filter(item => item.email !== email);
         },
         error: err => {
+          if (this.handleAuthFailure(err)) return;
           console.error('Admin user delete failed', err);
           this.showModal('User delete failed', 'Could not remove the admin user.', 'danger');
         }
@@ -543,6 +549,7 @@ export class AdminComponent implements OnInit {
           );
         },
         error: err => {
+          if (this.handleAuthFailure(err)) return;
           console.error('Admin user role update failed', err);
           this.showModal('User update failed', 'Could not update the admin user role.', 'danger');
         }
@@ -560,6 +567,7 @@ export class AdminComponent implements OnInit {
       .subscribe({
         next: updatedUser => this.applyAdminUserUpdate(user.email, updatedUser),
         error: err => {
+          if (this.handleAuthFailure(err)) return;
           console.error('Admin user enabled update failed', err);
           this.showModal('User update failed', 'Could not update the admin user account access.', 'danger');
         }
@@ -1570,6 +1578,7 @@ export class AdminComponent implements OnInit {
         this.showModal('Submission saved', 'Admin fields have been updated.', 'success');
       },
       error: err => {
+        if (this.handleAuthFailure(err)) return;
         console.error('Submission save failed', err);
         this.submissionActionLoading = null;
         this.showModal('Save failed', 'Could not update the submission.', 'danger');
@@ -1603,6 +1612,7 @@ export class AdminComponent implements OnInit {
         this.showModal('Submission deleted', 'The submission has been deleted.', 'success');
       },
       error: err => {
+        if (this.handleAuthFailure(err)) return;
         console.error('Submission delete failed', err);
         this.submissionActionLoading = null;
         this.showModal('Delete failed', 'Could not delete the submission.', 'danger');
@@ -1651,8 +1661,14 @@ export class AdminComponent implements OnInit {
 
   uploadImage() {
     if (!this.selectedFile) return;
-    this.cmsService.uploadImage(this.selectedFile).subscribe(res => {
-      console.log('Uploaded image URL:', res.url);
+    this.cmsService.uploadImage(this.selectedFile).subscribe({
+      next: res => {
+        console.log('Uploaded image URL:', res.url);
+      },
+      error: err => {
+        if (this.handleAuthFailure(err)) return;
+        console.error(err);
+      }
     });
   }
 
@@ -1665,7 +1681,10 @@ export class AdminComponent implements OnInit {
         eventItem.flyerUrl = res.url;  // ✅ Auto-update event flyer
         this.selectedFile = undefined; // Reset selection
       },
-      error: (err) => console.error(err)
+      error: (err) => {
+        if (this.handleAuthFailure(err)) return;
+        console.error(err);
+      }
     });
   }
 
@@ -1702,6 +1721,7 @@ export class AdminComponent implements OnInit {
       forkJoin(uploadObservables).subscribe({
         next: () => this.finalizeSave(),
         error: err => {
+          if (this.handleAuthFailure(err)) return;
           console.error('Image upload failed', err);
           this.showModal('Image upload failed', 'Please try saving again.', 'danger');
         }
@@ -1841,6 +1861,7 @@ export class AdminComponent implements OnInit {
         }
       },
       error: err => {
+        if (this.handleAuthFailure(err)) return;
         console.error('Events save failed', err);
         this.showModal('Save failed', 'Please try saving again.', 'danger');
       }
