@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from html import escape
 import uuid
 import re
 from zoneinfo import ZoneInfo
@@ -274,6 +275,22 @@ def build_item_row(name, quantity, value):
     """
 
 
+def build_freedom_club_admin_details_rows(form_data, donation_amount):
+    details = [
+        ("Name", get_form_full_name(form_data)),
+        ("Phone Number", form_data.get("phone", "")),
+        ("Email", form_data.get("email", "")),
+        ("Donation Amount", f"${float(donation_amount):.2f}"),
+    ]
+    return "".join(
+        "<tr style='background-color:#fff'>"
+        f"<th style='padding:10px;border:1px solid #ddd;color:#333;text-align:left'>{escape(label)}</th>"
+        f"<td style='padding:10px;border:1px solid #ddd;color:#333'>{escape(str(value or ''))}</td>"
+        "</tr>"
+        for label, value in details
+    )
+
+
 def _positive_int(value):
     try:
         return max(0, int(value or 0))
@@ -327,7 +344,7 @@ def build_motor_show_items_html(form_data):
     return "".join(rows)
 
 
-def build_email_context(event_title, order_id, event_meta, buyer_info, items_html, form_fields_html, participants_table_rows, total_price, purchased_date):
+def build_email_context(event_title, order_id, event_meta, buyer_info, items_html, form_fields_html, participants_table_rows, total_price, purchased_date, admin_details_heading='<h3 style="margin-top: 30px; color: #333">Records</h3>'):
     return {
         "event": event_title,
         "order_id": order_id,
@@ -342,6 +359,7 @@ def build_email_context(event_title, order_id, event_meta, buyer_info, items_htm
         "total_price": total_price,
         "purchased_date": purchased_date,
         "form_fields_html": form_fields_html,
+        "admin_details_heading": admin_details_heading,
         "participants_table_rows": participants_table_rows,
         "participants": len(event_meta["additional_team_members"]) + 1,
     }
@@ -769,9 +787,13 @@ def process_paypal_order_completion(resource, event_create_time=None):
 
         form_fields_html = email_sender.build_form_fields_html(filtered_form_data)
         participants_table_rows = build_participants_table(clean_form_data)
+        admin_details_heading = "Records"
         if order_type == "Motor Show Event":
             items_html = build_motor_show_items_html(form_data)
             participants_table_rows = build_motor_show_table(clean_form_data)
+        elif order_type == "freedomClubDonation":
+            participants_table_rows = build_freedom_club_admin_details_rows(form_data, purchase_unit["amount"]["value"])
+            admin_details_heading = ""
 
         purchased_date = format_paypal_date(event_create_time or resource.get("update_time") or resource.get("create_time"))
         submitted_at = paypal_timestamp_to_iso(event_create_time or resource.get("update_time") or resource.get("create_time"))
@@ -779,7 +801,8 @@ def process_paypal_order_completion(resource, event_create_time=None):
 
         context = build_email_context(
             event_meta["event_title"], order_id, event_meta, buyer_info,
-            items_html, form_fields_html, participants_table_rows, total_price, purchased_date
+            items_html, form_fields_html, participants_table_rows, total_price, purchased_date,
+            admin_details_heading=admin_details_heading
         )
 
         if order_type == "vendorApplication":
@@ -1382,13 +1405,18 @@ def lambda_handler(event, context):
 
                 form_fields_html = email_sender.build_form_fields_html(filtered_form_data)
                 participants_table_rows = build_participants_table(clean_form_data)
+                admin_details_heading = "Records"
                 if event_type in ("Motor Show Event", "motorShowOrder"):
                     items_html = build_motor_show_items_html(form_data)
                     participants_table_rows = build_motor_show_table(clean_form_data)
+                elif event_type == "freedomClubDonation":
+                    participants_table_rows = build_freedom_club_admin_details_rows(form_data, total_price)
+                    admin_details_heading = ""
 
                 context_data = build_email_context(
                     event_meta["event_title"], session_id, event_meta, buyer_info,
-                    items_html, form_fields_html, participants_table_rows, total_price, purchased_date
+                    items_html, form_fields_html, participants_table_rows, total_price, purchased_date,
+                    admin_details_heading=admin_details_heading
                 )
 
                 if event_type == "vendorApplication":

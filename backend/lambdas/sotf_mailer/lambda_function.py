@@ -16,6 +16,8 @@ from backend.shared.submissions_repository import SubmissionsRepository
 from backend.shared.runtime_mode import is_test_mode, test_mode_email
 from backend.shared.time_utils import pacific_display_date, pacific_sheet_timestamp
 
+DEFAULT_SOURCE_EMAIL = "no-reply@spiritofthefourth.org"
+
 def get_submissions_repository():
     return SubmissionsRepository()
 
@@ -168,7 +170,7 @@ def get_source_email(mail_from):
     ses_source_email = os.environ.get("SES_SOURCE_EMAIL", "").strip()
     if get_email_transport() == "ses" and ses_source_email:
         return ses_source_email
-    return mail_from
+    return DEFAULT_SOURCE_EMAIL
 
 
 def apply_sender_headers(msg, mail_from):

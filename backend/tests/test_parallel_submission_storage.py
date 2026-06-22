@@ -105,6 +105,14 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
         self.assertEqual(recipients["header_to"], "pghalcrow@gmail.com")
         self.assertEqual(recipients["original_to"], "live@example.com, reply@example.com")
 
+    def test_mailer_defaults_from_header_to_no_reply(self):
+        mailer = import_sotf_mailer()
+
+        with patch.dict(mailer.os.environ, {"EMAIL_TRANSPORT": "ses"}, clear=True):
+            source_email = mailer.get_source_email("adm.spiritofthefourth@gmail.com")
+
+        self.assertEqual(source_email, "no-reply@spiritofthefourth.org")
+
     def test_mailer_records_submission_even_when_google_sheet_append_fails(self):
         mailer = import_sotf_mailer()
         event = {
@@ -255,6 +263,83 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
 
         self.assertEqual(event_meta["event_title"], "Freedom Club Donation")
         self.assertEqual(event_meta["contact_emails"], ["dave@example.com", "myrna@example.com"])
+
+    def test_transaction_receipts_do_not_render_order_id(self):
+        app = import_create_order_app()
+        sender = app.EmailSender.__new__(app.EmailSender)
+        context = app.build_email_context(
+            "Freedom Club Donation",
+            "txn_123",
+            {
+                "date_of_event": "",
+                "location_of_event": "",
+                "end_blurb": "",
+                "contact_email": "officer@example.com",
+                "additional_team_members": [],
+            },
+            {
+                "first_name": "Pat",
+                "last_name": "Halcrow",
+                "full_name": "Pat Halcrow",
+                "email": "pat@example.com",
+            },
+            "<tr><td>Donation</td><td>1</td><td>$100.00</td></tr>",
+            "",
+            "",
+            "100.00",
+            "06/22/2026",
+        )
+
+        buyer_body = sender.format_email("emails/buyer__receipt.html", context)
+        seller_body = sender.format_email("emails/seller__po.html", context)
+
+        self.assertNotIn("Order ID", seller_body)
+        self.assertNotIn("Order number", buyer_body)
+        self.assertNotIn("txn_123", buyer_body)
+        self.assertNotIn("txn_123", seller_body)
+
+    def test_freedom_club_admin_receipt_replaces_records_with_donor_summary(self):
+        app = import_create_order_app()
+        sender = app.EmailSender.__new__(app.EmailSender)
+        context = app.build_email_context(
+            "Freedom Club Donation",
+            "txn_123",
+            {
+                "date_of_event": "",
+                "location_of_event": "",
+                "end_blurb": "",
+                "contact_email": "officer@example.com",
+                "additional_team_members": [],
+            },
+            {
+                "first_name": "Pat",
+                "last_name": "Halcrow",
+                "full_name": "Pat Halcrow",
+                "email": "pat@example.com",
+            },
+            "<tr><td>Donation</td><td>1</td><td>$150.00</td></tr>",
+            "",
+            app.build_freedom_club_admin_details_rows({
+                "fullName": "Pat Halcrow",
+                "phone": "555-1212",
+                "email": "pat@example.com",
+            }, "150.00"),
+            "150.00",
+            "06/22/2026",
+            admin_details_heading="",
+        )
+
+        seller_body = sender.format_email("emails/seller__po.html", context)
+
+        self.assertNotIn("Records", seller_body)
+        self.assertIn("Name", seller_body)
+        self.assertIn("Pat Halcrow", seller_body)
+        self.assertIn("Phone Number", seller_body)
+        self.assertIn("555-1212", seller_body)
+        self.assertIn("Email", seller_body)
+        self.assertIn("pat@example.com", seller_body)
+        self.assertIn("Donation Amount", seller_body)
+        self.assertIn("$150.00", seller_body)
 
     def test_lookup_dynamic_submission_falls_back_to_google_sheet(self):
         app = import_create_order_app()

@@ -115,6 +115,7 @@ export interface AdminSubmissionListOptions {
   limit?: number;
   cursor?: string;
   summaryOnly?: boolean;
+  group?: string;
 }
 
 export interface AdminSubmissionUpdate {
@@ -181,6 +182,9 @@ export class CmsService {
     }
     if (options.summaryOnly === false) {
       params = params.set('summary', 'false');
+    }
+    if (options.group && options.group !== 'all') {
+      params = params.set('group', options.group);
     }
     return this.http.get<AdminSubmissionListResponse>(
       `${this.baseUrl}${this.routes.submissions}`,

@@ -613,9 +613,11 @@ export class AdminComponent implements OnInit {
     } else {
       this.submissionsLoading = true;
     }
-    const options = cursor
-      ? { limit: this.submissionPageSize, cursor }
-      : { limit: this.submissionPageSize };
+    const options: { limit: number; cursor?: string; group?: SubmissionGroupKey } = {
+      limit: this.submissionPageSize,
+    };
+    if (cursor) options.cursor = cursor;
+    if (this.selectedSubmissionGroup !== 'all') options.group = this.selectedSubmissionGroup;
     this.cmsService.getSubmissions(options).pipe(finalize(() => {
       if (isRefresh) {
         this.submissionsRefreshing = false;
@@ -761,12 +763,13 @@ export class AdminComponent implements OnInit {
     const rawKeys = this.getSubmissionExportRawKeys(submissions, group);
     return submissions.map(submission => {
       const row: Record<string, string | number | boolean> = {
-        Submission: this.formatSubmissionTitle(submission),
         Name: submission.name || '',
         Email: submission.email || '',
         Phone: submission.phone || '',
-        Amount: this.hasDisplayValue(submission.amount) ? Number(submission.amount) : '',
       };
+      if (this.hasDisplayValue(submission.amount)) {
+        row['Amount'] = this.formatSubmissionExportFieldValue(submission.amount, 'amount');
+      }
       rawKeys.forEach(key => {
         row[this.formatSubmissionFieldLabel(key)] = this.hasDisplayValue(submission.rawData?.[key])
           ? this.formatSubmissionExportFieldValue(submission.rawData[key], key)
@@ -783,9 +786,6 @@ export class AdminComponent implements OnInit {
 
   private addMotorShowExportDefaults(row: Record<string, string | number | boolean>, rawData: any) {
     const total = this.hasDisplayValue(rawData?.grandTotal) ? rawData.grandTotal : rawData?.total;
-    if (!this.hasDisplayValue(row['Amount']) && this.hasDisplayValue(total)) {
-      row['Amount'] = this.formatSubmissionExportFieldValue(total, 'total');
-    }
     if (!this.hasDisplayValue(row['Total']) && this.hasDisplayValue(total)) {
       row['Total'] = this.formatSubmissionExportFieldValue(total, 'total');
     }
@@ -883,7 +883,6 @@ export class AdminComponent implements OnInit {
     const total = byLabel.get('total') || byLabel.get('total due');
     if (total) {
       const totalValue = this.formatSubmissionExportFieldValue(total, 'total');
-      fields['Amount'] = typeof totalValue === 'number' ? totalValue : String(totalValue);
       fields['Total'] = typeof totalValue === 'number' ? totalValue : String(totalValue);
       fields['Grand Total'] = fields['Total'];
     }
@@ -906,18 +905,19 @@ export class AdminComponent implements OnInit {
   private getSubmissionExportHeaders(rows: Record<string, string | number | boolean>[], group?: SubmissionGroupKey): string[] {
     if (!rows.length) {
       const headers = [
-        'Submission',
         'Name',
         'Email',
         'Phone',
-        'Amount',
       ];
       return headers;
     }
     const headers = new Set<string>();
     rows.forEach(row => Object.keys(row).forEach(header => headers.add(header)));
-    const headerList = Array.from(headers);
-    return group === 'motorShow' ? this.orderMotorShowExportHeaders(headerList) : headerList;
+    const headerList = Array.from(headers)
+      .filter(header => rows.some(row => this.hasDisplayValue(row[header])));
+    if (group === 'motorShow') return this.orderMotorShowExportHeaders(headerList);
+    if (group === 'parade') return this.orderParadeExportHeaders(headerList);
+    return headerList;
   }
 
   private orderMotorShowExportHeaders(headers: string[]): string[] {
@@ -929,6 +929,7 @@ export class AdminComponent implements OnInit {
       'Grand Total',
       'Vehicle',
       'T-Shirt & Plaque Bundle',
+      'Signature Name',
     ]);
     const preferredOrder = [
       'Name',
@@ -941,9 +942,9 @@ export class AdminComponent implements OnInit {
       'Model',
       'Color',
       'Street Address',
-      'Zip Code',
-      'State',
       'City',
+      'State',
+      'Zip Code',
       'Club Affiliation',
       'Plaque & T-shirt',
       'Additional Large',
@@ -953,6 +954,37 @@ export class AdminComponent implements OnInit {
       'Additional XLarge',
       'Additional XXLarge',
       'Additional XXXLarge',
+    ];
+    const headerSet = new Set(headers.filter(header => !excludedHeaders.has(header)));
+    const orderedHeaders = preferredOrder.filter(header => headerSet.delete(header));
+    return [
+      ...orderedHeaders,
+      ...Array.from(headerSet),
+    ];
+  }
+
+  private orderParadeExportHeaders(headers: string[]): string[] {
+    const excludedHeaders = new Set([
+      'Submission',
+      'Signature Name',
+    ]);
+    const preferredOrder = [
+      'Name',
+      'Contact Name',
+      'Email',
+      'Phone',
+      'Entry Name',
+      'VIP Name',
+      'Available Seats',
+      'Vehicle Year',
+      'Make',
+      'Model',
+      'Color',
+      'Street Address',
+      'Address',
+      'City',
+      'State',
+      'Zip Code',
     ];
     const headerSet = new Set(headers.filter(header => !excludedHeaders.has(header)));
     const orderedHeaders = preferredOrder.filter(header => headerSet.delete(header));
@@ -974,6 +1006,7 @@ export class AdminComponent implements OnInit {
       'fileDropRef',
       'firstName',
       'fullName',
+      'headers',
       'lastName',
       'name',
       'notes',
@@ -987,24 +1020,28 @@ export class AdminComponent implements OnInit {
       'payment_hold_id',
       'phone',
       'replyTo',
+      'rowNumber',
+      'signatureName',
       'stripe_session_id',
+      'submission',
       'submission_id',
       'submissionId',
+      'submissions',
       'subject',
       'toContact',
       'type',
       'updatedBy',
-    ]);
-    if (group === 'vendor') {
-      excludedFields.add('agreeCheckbox');
-      excludedFields.add('signatureName');
-    }
+      'values',
+      'worksheet',
+    ].map(field => field.toLowerCase()));
+    if (group === 'vendor') excludedFields.add('agreecheckbox');
+    if (group === 'volunteer' || group === 'specialEvents') excludedFields.add('formtype');
     const keys = new Set<string>();
     submissions.forEach(submission => {
       const rawData = submission.rawData;
       if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) return;
       Object.keys(rawData).forEach(key => {
-        if (!excludedFields.has(key) && this.hasDisplayValue(rawData[key])) {
+        if (!excludedFields.has(key.toLowerCase()) && this.hasDisplayValue(rawData[key])) {
           keys.add(key);
         }
       });
@@ -1034,7 +1071,9 @@ export class AdminComponent implements OnInit {
 
   toggleSubmissionGroup(group: SubmissionGroupKey) {
     this.selectedSubmissionGroup = this.selectedSubmissionGroup === group ? 'all' : group;
+    this.submissionPageCursors = [undefined];
     this.clearSelectedSubmission();
+    this.loadSubmissions('refresh', undefined, 1);
   }
 
   private submissionMatchesGroup(submission: AdminSubmission, group: SubmissionGroupKey): boolean {
@@ -1360,6 +1399,10 @@ export class AdminComponent implements OnInit {
       make: 'Make',
       model: 'Model',
       color: 'Color',
+      contactName: 'Contact Name',
+      entryName: 'Entry Name',
+      vipName: 'VIP Name',
+      availableSeats: 'Available Seats',
       clubAffiliation: 'Club Affiliation',
       donationAmount: 'Donation Amount',
       availability: 'Availability',
@@ -1455,7 +1498,10 @@ export class AdminComponent implements OnInit {
       normalizedKey === 'zip' ||
       normalizedKey === 'year' ||
       normalizedKey === 'vehicleyear' ||
-      normalizedKey === 'vehicle_year';
+      normalizedKey === 'vehicle_year' ||
+      normalizedKey === 'availableseats' ||
+      normalizedKey === 'available_seats' ||
+      normalizedKey === 'available seats';
   }
 
   private isTextSubmissionExportField(normalizedKey: string): boolean {

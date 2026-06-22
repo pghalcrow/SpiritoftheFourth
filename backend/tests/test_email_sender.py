@@ -25,6 +25,15 @@ class EmailSenderTests(unittest.TestCase):
             mail_from="no-reply@example.com",
         ))
 
+    def test_create_order_sender_defaults_from_header_to_no_reply(self):
+        with patch.dict("os.environ", {"EMAIL_TRANSPORT": "ses"}, clear=True):
+            sender = EmailSender()
+
+        self.assertEqual(
+            sender._source_email("adm.spiritofthefourth@gmail.com"),
+            "no-reply@spiritofthefourth.org",
+        )
+
     def test_build_form_fields_html_uses_readable_labels_and_escapes_values(self):
         sender = EmailSender.__new__(EmailSender)
 

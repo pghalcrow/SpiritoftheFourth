@@ -51,10 +51,11 @@ class FakeRepo:
         self.last_list_limit = limit
         return {"items": [{"submissionId": "s1", "submissionTitle": "Volunteer", "status": "New"}]}
 
-    def list_submissions_page(self, limit=50, cursor=None, summary_only=True):
+    def list_submissions_page(self, limit=50, cursor=None, summary_only=True, group=None):
         self.last_list_limit = limit
         self.last_list_cursor = cursor
         self.last_list_summary_only = summary_only
+        self.last_list_group = group
         return {
             "items": [{
                 "submissionId": "s1",
@@ -65,8 +66,9 @@ class FakeRepo:
             "lastEvaluatedKey": {"pk": "SUBMISSION", "sk": "2026-06-05T10:00:00-07:00#s1"},
         }
 
-    def count_submissions(self):
-        return 125
+    def count_submissions(self, group=None):
+        self.last_count_group = group
+        return 12 if group == "vendor" else 125
 
     def get_submission(self, submission_id):
         if submission_id == "missing":
@@ -98,10 +100,10 @@ class DecimalRepo:
     def list_submissions(self, limit=None):
         return {"items": [{"submissionId": "s1", "amount": Decimal("125"), "rawData": {"rowNumber": Decimal("4")}}]}
 
-    def list_submissions_page(self, limit=50, cursor=None, summary_only=True):
+    def list_submissions_page(self, limit=50, cursor=None, summary_only=True, group=None):
         return {"items": [{"submissionId": "s1", "amount": Decimal("125"), "rawData": {"rowNumber": Decimal("4")}}]}
 
-    def count_submissions(self):
+    def count_submissions(self, group=None):
         return 1
 
 
@@ -269,6 +271,8 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         self.assertEqual(repo_factory.return_value.last_list_limit, 50)
         self.assertIsNone(repo_factory.return_value.last_list_cursor)
         self.assertTrue(repo_factory.return_value.last_list_summary_only)
+        self.assertIsNone(repo_factory.return_value.last_list_group)
+        self.assertIsNone(repo_factory.return_value.last_count_group)
         self.assertIn("nextCursor", body)
         self.assertEqual(body["totalCount"], 125)
         self.assertEqual(body["totalPages"], 3)
@@ -284,6 +288,20 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         self.assertEqual(response["statusCode"], 200)
         self.assertEqual(repo_factory.return_value.last_list_limit, 25)
         self.assertEqual(repo_factory.return_value.last_list_cursor, {"pk": "SUBMISSION", "sk": "cursor-key"})
+
+    @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
+    def test_list_submissions_uses_group_for_page_and_totals(self, repo_factory):
+        event = make_event("GET", "/admin/submissions")
+        event["queryStringParameters"] = {"limit": "5", "group": "vendor"}
+
+        response = events_service.lambda_handler(event, None)
+
+        self.assertEqual(response["statusCode"], 200)
+        body = json.loads(response["body"])
+        self.assertEqual(repo_factory.return_value.last_list_group, "vendor")
+        self.assertEqual(repo_factory.return_value.last_count_group, "vendor")
+        self.assertEqual(body["totalCount"], 12)
+        self.assertEqual(body["totalPages"], 3)
 
     @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
     def test_list_submissions_can_return_full_rows_for_export(self, repo_factory):

@@ -76,26 +76,6 @@
                     white-space: nowrap;
                   "
                 >
-                  Order ID
-                </td>
-                <td
-                  style="
-                    padding: 4px;
-                    border: 1px solid #ddd;
-                    white-space: nowrap;
-                  "
-                >
-                  {order_id}
-                </td>
-              </tr>
-              <tr>
-                <td
-                  style="
-                    padding: 4px;
-                    border: 1px solid #ddd;
-                    white-space: nowrap;
-                  "
-                >
                   Customer Name
                 </td>
                 <td
@@ -183,7 +163,7 @@
         <!-- dynamically generated rows for items -->
       </table>
 
-      <h3 style="margin-top: 30px; color: #333">Records</h3>
+      {admin_details_heading}
       <table style="width: 100%; border-collapse: collapse; text-align: left">
         {participants_table_rows}
       </table>

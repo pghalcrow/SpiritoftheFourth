@@ -11,6 +11,7 @@ import boto3
 from backend.shared.runtime_mode import is_test_mode, test_mode_email
 
 _PLACEHOLDER_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
+DEFAULT_SOURCE_EMAIL = "no-reply@spiritofthefourth.org"
 
 
 def resolve_email_recipient(mail_to: str) -> dict:
@@ -45,7 +46,7 @@ class EmailSender:
     def _source_email(self, mail_from: str) -> str:
         if self.email_transport == "ses" and self.ses_source_email:
             return self.ses_source_email
-        return mail_from
+        return DEFAULT_SOURCE_EMAIL
 
     def _apply_sender_headers(self, msg, mail_from: str):
         source_email = self._source_email(mail_from)

@@ -1172,6 +1172,38 @@ describe('AdminComponent', () => {
     expect(nativeElement.textContent).toContain('Page 2 of 2');
   });
 
+  it('resets to page one and uses category totals when a submission group is selected', () => {
+    cmsService.getSubmissions.calls.reset();
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 'vendor-1',
+        submissionTitle: 'New Vendor Application Submission',
+        submittedAt: '2026-06-07T10:00:00-07:00',
+        name: 'Vendor Person',
+        email: 'vendor@example.com',
+        phone: '555-3333',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { formType: 'vendorApplicationForm' },
+      }],
+      totalCount: 12,
+      totalPages: 1,
+    }));
+
+    component.submissionPageNumber = 2;
+    component.toggleSubmissionGroup('vendor');
+    fixture.detectChanges();
+
+    expect(cmsService.getSubmissions.calls.mostRecent().args[0]).toEqual({ limit: 50, group: 'vendor' });
+    expect(component.selectedSubmissionGroup).toBe('vendor');
+    expect(component.submissionPageNumber).toBe(1);
+    expect(component.submissionTotalCount).toBe(12);
+    expect(component.submissionTotalPages).toBe(1);
+    expect(component.hasPreviousSubmissionPage).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain('Page 1 of 1');
+  });
+
   it('loads full submission details when a summary row is selected', () => {
     cmsService.getSubmissions.and.returnValue(of({
       items: [{
@@ -1350,6 +1382,10 @@ describe('AdminComponent', () => {
           vendorType: 'Food',
           agreeCheckbox: true,
           signatureName: 'Vendor B',
+          worksheet: 'Event Submissions',
+          rowNumber: 8,
+          headers: ['Form', 'Email'],
+          values: ['Vendor Application', 'vendor@example.com'],
         },
       },
       {
@@ -1364,14 +1400,20 @@ describe('AdminComponent', () => {
         status: 'New',
         assignedTo: '',
         notes: '',
-        rawData: { formType: 'paradeEntryForm', entryName: 'Veterans Float', contactName: 'Myrna' },
+        rawData: {
+          formType: 'paradeEntryForm',
+          entryName: 'Veterans Float',
+          contactName: 'Myrna',
+          signatureName: 'Myrna',
+          availableSeats: '12',
+        },
       },
       {
-        submissionId: 'old-volunteer',
+        submissionId: 'volunteer-1',
         submissionTitle: 'Volunteer Request',
-        submittedAt: '2025-07-04T10:00:00-07:00',
-        name: 'Too Old',
-        email: 'old@example.com',
+        submittedAt: '2026-06-07T10:00:00-07:00',
+        name: 'Volunteer Person',
+        email: 'volunteer@example.com',
         phone: '555-3000',
         paymentStatus: 'none',
         paymentProvider: 'none',
@@ -1379,6 +1421,20 @@ describe('AdminComponent', () => {
         assignedTo: '',
         notes: '',
         rawData: { formType: 'volunteerForm', availability: 'Morning' },
+      },
+      {
+        submissionId: 'special-1',
+        submissionTitle: 'Community Picnic Signup',
+        submittedAt: '2026-06-08T10:00:00-07:00',
+        name: 'Special Person',
+        email: 'special@example.com',
+        phone: '555-4000',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { formType: 'communityPicnicForm', eventTitle: 'Community Picnic', mealPreference: 'Vegetarian' },
       },
     ];
 
@@ -1390,20 +1446,41 @@ describe('AdminComponent', () => {
     const vendorRows = sheets.find(sheet => sheet.sheet === 'Vendors')!.data;
     const paradeRows = sheets.find(sheet => sheet.sheet === 'Parade')!.data;
     const volunteerRows = sheets.find(sheet => sheet.sheet === 'Volunteers')!.data;
+    const specialEventRows = sheets.find(sheet => sheet.sheet === 'Special Events')!.data;
 
     expect(vendorRows[0]).toContain('Company Name');
     expect(vendorRows[1]).toContain('Booth Co');
     expect(vendorRows[0]).not.toContain('Agree Checkbox');
     expect(vendorRows[0]).not.toContain('Signature Name');
+    expect(vendorRows[0]).not.toContain('Worksheet');
+    expect(vendorRows[0]).not.toContain('Row Number');
+    expect(vendorRows[0]).not.toContain('Headers');
+    expect(vendorRows[0]).not.toContain('Values');
+    expect(vendorRows[0]).not.toContain('Submission');
     expect(paradeRows[0]).toContain('Entry Name');
+    expect(paradeRows[0]).toContain('Contact Name');
+    expect(paradeRows[0]).toContain('Available Seats');
+    expect(paradeRows[0].indexOf('Contact Name')).toBe(paradeRows[0].indexOf('Name') + 1);
     expect(paradeRows[1]).toContain('Veterans Float');
-    expect(volunteerRows.length).toBe(1);
+    expect(paradeRows[1][paradeRows[0].indexOf('Available Seats')]).toBe(12);
+    expect(paradeRows[0]).not.toContain('Signature Name');
+    expect(volunteerRows[0]).toContain('Availability');
+    expect(volunteerRows[0]).not.toContain('Form Type');
+    expect(volunteerRows[1]).toContain('Morning');
+    expect(specialEventRows[0]).toContain('Event Title');
+    expect(specialEventRows[0]).not.toContain('Form Type');
+    expect(specialEventRows[1]).toContain('Community Picnic');
 
     sheets.forEach(sheet => {
       expect(sheet.data[0]).not.toContain('Submitted At');
       expect(sheet.data[0]).not.toContain('Source');
       expect(sheet.data[0]).not.toContain('Updated At');
       expect(sheet.data[0]).not.toContain('Raw Data');
+      expect(sheet.data[0]).not.toContain('Submission');
+      expect(sheet.data[0]).not.toContain('Headers');
+      expect(sheet.data[0]).not.toContain('Worksheet');
+      expect(sheet.data[0]).not.toContain('Row Number');
+      expect(sheet.data[0]).not.toContain('Values');
     });
   });
 
@@ -1554,9 +1631,9 @@ describe('AdminComponent', () => {
     expect(header).not.toContain('Grand Total');
     expect(header.indexOf('Submitted Date')).toBe(header.indexOf('Phone') + 1);
     expect(header.indexOf('Total')).toBe(header.indexOf('Submitted Date') + 1);
-    expect(header.indexOf('Zip Code')).toBe(header.indexOf('Street Address') + 1);
-    expect(header.indexOf('State')).toBe(header.indexOf('Street Address') + 2);
-    expect(header.indexOf('City')).toBe(header.indexOf('State') + 1);
+    expect(header.indexOf('City')).toBe(header.indexOf('Street Address') + 1);
+    expect(header.indexOf('State')).toBe(header.indexOf('City') + 1);
+    expect(header.indexOf('Zip Code')).toBe(header.indexOf('State') + 1);
     expect(header.indexOf('Vehicle Year')).toBe(header.indexOf('Total') + 1);
     expect(header.indexOf('Make')).toBe(header.indexOf('Vehicle Year') + 1);
     expect(header.indexOf('Color')).toBe(header.indexOf('Model') + 1);

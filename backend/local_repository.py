@@ -51,27 +51,89 @@ class LocalSubmissionsRepository:
         )
         return {"items": items[:limit] if limit is not None else items}
 
-    def list_submissions_page(self, limit=50, cursor=None, summary_only=True):
+    def list_submissions_page(self, limit=50, cursor=None, summary_only=True, group=None):
         items = sorted(
             self._read(),
             key=lambda item: item.get("submittedAt") or item.get("createdAt") or "",
             reverse=True,
         )
-        offset = 0
-        if isinstance(cursor, dict):
-            try:
-                offset = max(int(cursor.get("offset", 0)), 0)
-            except (TypeError, ValueError):
-                offset = 0
+        group = group or (cursor.get("group") if isinstance(cursor, dict) else None)
+        if group and group != "all":
+            items = [item for item in items if self.submission_matches_group(item, group)]
+        offset = self._cursor_offset(cursor)
         page = items[offset:offset + limit]
         if summary_only:
             page = [self._summarize_submission(item) for item in page]
         next_offset = offset + len(page)
-        last_key = {"offset": next_offset} if next_offset < len(items) else None
+        last_key = {"offset": next_offset, "group": group} if next_offset < len(items) else None
         return {"items": page, "lastEvaluatedKey": last_key}
 
-    def count_submissions(self):
-        return len(self._read())
+    def count_submissions(self, group=None):
+        if not group or group == "all":
+            return len(self._read())
+        return sum(1 for item in self._read() if self.submission_matches_group(item, group))
+
+    def submission_matches_group(self, submission, group):
+        if not group or group == "all":
+            return True
+
+        text = self._submission_group_text(submission)
+        if group == "vendor":
+            return "vendor" in text or "vendorapplication" in text
+        if group == "artist":
+            return "artist" in text or "artistsignup" in text
+        if group == "sponsor":
+            return "sponsor" in text or "sponsorship" in text
+        if group == "motorShow":
+            return "motor show" in text or "motorshow" in text or "car show" in text
+        if group == "parade":
+            return "parade" in text or "paradeentry" in text or "paradecar" in text or "paradevip" in text
+        if group == "volunteer":
+            return "volunteer" in text
+        if group == "specialEvents":
+            return self._is_special_event_submission(submission)
+        return True
+
+    def _is_special_event_submission(self, submission):
+        if any(
+            self.submission_matches_group(submission, group)
+            for group in ("vendor", "artist", "sponsor", "motorShow", "parade", "volunteer")
+        ):
+            return False
+
+        raw_data = submission.get("rawData") or {}
+        return bool(
+            raw_data.get("eventTitle")
+            or raw_data.get("eventType")
+            or raw_data.get("pricing")
+            or raw_data.get("addOns")
+            or raw_data.get("players")
+            or raw_data.get("teamMembers")
+            or submission.get("paymentProvider") in {"stripe", "paypal"}
+        )
+
+    def _submission_group_text(self, submission):
+        raw_data = submission.get("rawData") or {}
+        return " ".join(
+            str(value).lower()
+            for value in (
+                submission.get("source"),
+                submission.get("submissionTitle"),
+                raw_data.get("formType"),
+                raw_data.get("eventTitle"),
+                raw_data.get("eventType"),
+                raw_data.get("type"),
+            )
+            if value
+        )
+
+    def _cursor_offset(self, cursor):
+        if not isinstance(cursor, dict):
+            return 0
+        try:
+            return max(int(cursor.get("offset", 0)), 0)
+        except (TypeError, ValueError):
+            return 0
 
     def get_submission(self, submission_id):
         for item in self._read():
