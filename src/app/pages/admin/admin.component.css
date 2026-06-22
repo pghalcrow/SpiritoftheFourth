@@ -339,6 +339,21 @@ h4 {
   font-weight: 900;
 }
 
+.submission-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 1100px;
+  padding: 12px;
+}
+
+.submission-page-status {
+  color: #66758a;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
 .status-help {
   position: relative;
   display: inline-flex;

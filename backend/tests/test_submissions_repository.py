@@ -261,6 +261,113 @@ class RepositoryTests(unittest.TestCase):
             {"pk": "SUBMISSION", "sk": "2026-06-05T10:02:00-07:00#s2"},
         )
 
+    def test_list_submissions_page_returns_one_page_with_summary_rows(self):
+        self.table.page_size = 10
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:01:00-07:00#s1",
+            "recordType": "submission",
+            "submissionId": "s1",
+            "submissionTitle": "Volunteer",
+            "submittedAt": "2026-06-05T10:01:00-07:00",
+            "name": "Pat",
+            "email": "pat@example.com",
+            "phone": "555",
+            "source": "website",
+            "status": "New",
+            "assignedTo": "",
+            "notes": "",
+            "rawData": {
+                "formType": "volunteerForm",
+                "eventTitle": "Morning Shift",
+                "message": "Available morning",
+                "headers": ["Large field"],
+            },
+        })
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:00:00-07:00#s0",
+            "recordType": "submission",
+            "submissionId": "s0",
+            "submissionTitle": "Older",
+            "name": "Pat",
+            "email": "pat@example.com",
+            "phone": "555",
+            "status": "New",
+            "assignedTo": "",
+            "notes": "",
+            "rawData": {"formType": "volunteerForm", "message": "Older"},
+        })
+
+        result = self.repo.list_submissions_page(limit=1, summary_only=True)
+
+        self.assertEqual(result["items"][0]["submissionId"], "s1")
+        self.assertEqual(result["items"][0]["rawData"], {
+            "formType": "volunteerForm",
+            "eventTitle": "Morning Shift",
+        })
+        self.assertNotIn("message", result["items"][0]["rawData"])
+        self.assertEqual(
+            result["lastEvaluatedKey"],
+            {"pk": "SUBMISSION", "sk": "2026-06-05T10:01:00-07:00#s1"},
+        )
+
+    def test_list_submissions_page_uses_exclusive_start_key(self):
+        for index in range(3):
+            submission_id = f"s{index}"
+            self.repo.create_submission({
+                "pk": "SUBMISSION",
+                "sk": f"2026-06-05T10:0{index}:00-07:00#{submission_id}",
+                "recordType": "submission",
+                "submissionId": submission_id,
+                "submissionTitle": f"Submission {index}",
+                "name": "Pat",
+                "email": "pat@example.com",
+                "phone": "555",
+                "status": "New",
+                "assignedTo": "",
+                "notes": "",
+            })
+
+        result = self.repo.list_submissions_page(
+            limit=1,
+            cursor={"pk": "SUBMISSION", "sk": "2026-06-05T10:02:00-07:00#s2"},
+        )
+
+        self.assertEqual([item["submissionId"] for item in result["items"]], ["s1"])
+
+    def test_get_submission_returns_full_raw_data(self):
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:01:00-07:00#s1",
+            "recordType": "submission",
+            "submissionId": "s1",
+            "submissionTitle": "Volunteer",
+            "name": "Pat",
+            "email": "pat@example.com",
+            "phone": "555",
+            "status": "New",
+            "assignedTo": "",
+            "notes": "",
+            "rawData": {"formType": "volunteerForm", "message": "Available morning"},
+        })
+
+        result = self.repo.get_submission("s1")
+
+        self.assertEqual(result["rawData"]["message"], "Available morning")
+
+    def test_tracks_admin_user_password_setup_status(self):
+        self.repo.mark_admin_user_password_setup_required("Viewer@Example.com")
+
+        statuses = self.repo.list_admin_user_setup_statuses()
+
+        self.assertTrue(statuses["viewer@example.com"]["passwordSetupRequired"])
+
+        self.repo.mark_admin_user_password_setup_complete("viewer@example.com")
+
+        updated_statuses = self.repo.list_admin_user_setup_statuses()
+        self.assertFalse(updated_statuses["viewer@example.com"]["passwordSetupRequired"])
+
     def test_list_submissions_returns_all_items_by_default(self):
         self.table.page_size = 20
         for index in range(105):

@@ -22,6 +22,9 @@ class FakeRepo:
     def __init__(self):
         self.test_mode = False
         self.last_list_limit = None
+        self.last_list_cursor = None
+        self.last_list_summary_only = None
+        self.password_setup_required = set()
 
     def get_runtime_settings(self):
         return {"testMode": self.test_mode, "updatedBy": "", "updatedAt": ""}
@@ -30,9 +33,47 @@ class FakeRepo:
         self.test_mode = enabled
         return {"testMode": enabled, "updatedBy": updated_by, "updatedAt": "2026-06-15T12:00:00-07:00"}
 
+    def list_admin_user_setup_statuses(self):
+        return {
+            email: {"passwordSetupRequired": True}
+            for email in self.password_setup_required
+        }
+
+    def mark_admin_user_password_setup_required(self, email):
+        self.password_setup_required.add(email.strip().lower())
+        return {"email": email.strip().lower(), "passwordSetupRequired": True}
+
+    def mark_admin_user_password_setup_complete(self, email):
+        self.password_setup_required.discard(email.strip().lower())
+        return {"email": email.strip().lower(), "passwordSetupRequired": False}
+
     def list_submissions(self, limit=None):
         self.last_list_limit = limit
         return {"items": [{"submissionId": "s1", "submissionTitle": "Volunteer", "status": "New"}]}
+
+    def list_submissions_page(self, limit=50, cursor=None, summary_only=True):
+        self.last_list_limit = limit
+        self.last_list_cursor = cursor
+        self.last_list_summary_only = summary_only
+        return {
+            "items": [{
+                "submissionId": "s1",
+                "submissionTitle": "Volunteer",
+                "status": "New",
+                "rawData": {"formType": "volunteerForm"},
+            }],
+            "lastEvaluatedKey": {"pk": "SUBMISSION", "sk": "2026-06-05T10:00:00-07:00#s1"},
+        }
+
+    def get_submission(self, submission_id):
+        if submission_id == "missing":
+            raise KeyError(f"Submission not found: {submission_id}")
+        return {
+            "submissionId": submission_id,
+            "submissionTitle": "Volunteer",
+            "status": "New",
+            "rawData": {"formType": "volunteerForm", "message": "Available morning"},
+        }
 
     def update_submission_admin_fields(self, submission_id, status=None, assigned_to=None, notes=None, updated_by=None, payment_received=None):
         return {
@@ -52,6 +93,9 @@ class FakeRepo:
 
 class DecimalRepo:
     def list_submissions(self, limit=None):
+        return {"items": [{"submissionId": "s1", "amount": Decimal("125"), "rawData": {"rowNumber": Decimal("4")}}]}
+
+    def list_submissions_page(self, limit=50, cursor=None, summary_only=True):
         return {"items": [{"submissionId": "s1", "amount": Decimal("125"), "rawData": {"rowNumber": Decimal("4")}}]}
 
 
@@ -216,7 +260,47 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         self.assertEqual(response["statusCode"], 200)
         body = json.loads(response["body"])
         self.assertEqual(body["items"][0]["submissionId"], "s1")
-        self.assertIsNone(repo_factory.return_value.last_list_limit)
+        self.assertEqual(repo_factory.return_value.last_list_limit, 50)
+        self.assertIsNone(repo_factory.return_value.last_list_cursor)
+        self.assertTrue(repo_factory.return_value.last_list_summary_only)
+        self.assertIn("nextCursor", body)
+
+    @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
+    def test_list_submissions_accepts_limit_and_cursor(self, repo_factory):
+        cursor = events_service.encode_submission_cursor({"pk": "SUBMISSION", "sk": "cursor-key"})
+        event = make_event("GET", "/admin/submissions")
+        event["queryStringParameters"] = {"limit": "25", "cursor": cursor}
+
+        response = events_service.lambda_handler(event, None)
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(repo_factory.return_value.last_list_limit, 25)
+        self.assertEqual(repo_factory.return_value.last_list_cursor, {"pk": "SUBMISSION", "sk": "cursor-key"})
+
+    @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
+    def test_list_submissions_can_return_full_rows_for_export(self, repo_factory):
+        event = make_event("GET", "/admin/submissions")
+        event["queryStringParameters"] = {"summary": "false"}
+
+        response = events_service.lambda_handler(event, None)
+
+        self.assertEqual(response["statusCode"], 200)
+        self.assertFalse(repo_factory.return_value.last_list_summary_only)
+
+    @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
+    def test_authorized_admin_can_get_submission_detail(self, _repo):
+        response = events_service.lambda_handler(make_event("GET", "/admin/submissions/s1"), None)
+
+        self.assertEqual(response["statusCode"], 200)
+        body = json.loads(response["body"])
+        self.assertEqual(body["submissionId"], "s1")
+        self.assertEqual(body["rawData"]["message"], "Available morning")
+
+    @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
+    def test_get_submission_detail_returns_404_when_missing(self, _repo):
+        response = events_service.lambda_handler(make_event("GET", "/admin/submissions/missing"), None)
+
+        self.assertEqual(response["statusCode"], 404)
 
     @patch.object(events_service, "get_submissions_repository", return_value=DecimalRepo())
     def test_admin_submissions_response_serializes_dynamodb_decimals(self, _repo):
@@ -307,15 +391,54 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
 
     @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
     def test_super_admin_can_create_admin_user(self, _auth):
-        response = events_service.lambda_handler(
-            make_event("POST", "/admin/users", {"email": "admin@example.com", "role": ROLE_ADMIN}, token="role:superAdmin"),
-            None,
-        )
+        repo = FakeRepo()
+        with patch.object(events_service, "get_submissions_repository", return_value=repo):
+            response = events_service.lambda_handler(
+                make_event("POST", "/admin/users", {"email": "new-admin@example.com", "role": ROLE_ADMIN}, token="role:superAdmin"),
+                None,
+            )
 
         self.assertEqual(response["statusCode"], 200)
         body = json.loads(response["body"])
-        self.assertEqual(body["email"], "admin@example.com")
+        self.assertEqual(body["email"], "new-admin@example.com")
         self.assertEqual(body["role"], ROLE_ADMIN)
+        self.assertEqual(body["status"], "RESET_REQUIRED")
+        self.assertIn("new-admin@example.com", repo.password_setup_required)
+
+    @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
+    def test_list_admin_users_shows_password_setup_required_until_reset_is_confirmed(self, _auth):
+        repo = FakeRepo()
+        repo.password_setup_required.add("admin@example.com")
+
+        with patch.object(events_service, "get_submissions_repository", return_value=repo):
+            list_response = events_service.lambda_handler(
+                make_event("GET", "/admin/users", token="role:superAdmin"),
+                None,
+            )
+            confirm_response = events_service.lambda_handler(
+                make_event(
+                    "POST",
+                    "/admin/password-reset/confirm",
+                    {"email": "admin@example.com", "code": "123456", "password": "Bubbles123!"},
+                    token=None,
+                ),
+                None,
+            )
+            updated_list_response = events_service.lambda_handler(
+                make_event("GET", "/admin/users", token="role:superAdmin"),
+                None,
+            )
+
+        self.assertEqual(list_response["statusCode"], 200)
+        users = json.loads(list_response["body"])["items"]
+        admin_user = next(user for user in users if user["email"] == "admin@example.com")
+        self.assertEqual(admin_user["status"], "RESET_REQUIRED")
+
+        self.assertEqual(confirm_response["statusCode"], 200)
+        self.assertNotIn("admin@example.com", repo.password_setup_required)
+        updated_users = json.loads(updated_list_response["body"])["items"]
+        updated_admin_user = next(user for user in updated_users if user["email"] == "admin@example.com")
+        self.assertEqual(updated_admin_user["status"], "CONFIRMED")
 
     @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
     def test_only_developer_can_list_developer_users(self, _auth):

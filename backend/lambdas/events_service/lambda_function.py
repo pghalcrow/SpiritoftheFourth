@@ -134,6 +134,10 @@ def lambda_handler(event, context):
         if not user:
             return json_response(401, {"error": "Unauthorized"})
         submission_id = raw_path.rsplit("/", 1)[-1]
+        if http_method == "GET":
+            if not can_read(user["role"]):
+                return json_response(403, {"error": "Read access required"})
+            return get_submission_detail(unquote(submission_id))
         if http_method == "PATCH":
             if not can_edit(user["role"]):
                 return json_response(403, {"error": "Edit access required"})
@@ -261,7 +265,9 @@ def confirm_password_reset(body):
     if not email or not code or not password:
         return json_response(400, {"error": "Email, code, and password are required"})
     try:
-        return json_response(200, get_admin_auth_service().confirm_password_reset(email, code, password))
+        result = get_admin_auth_service().confirm_password_reset(email, code, password)
+        mark_admin_user_password_setup_complete(email)
+        return json_response(200, result)
     except ValueError as error:
         return json_response(400, {"error": str(error)})
     except ClientError as error:
@@ -275,6 +281,7 @@ def confirm_password_reset(body):
 
 def list_admin_users(current_user):
     users = get_admin_auth_service().list_users()
+    users = merge_admin_user_setup_statuses(users)
     if normalize_role(current_user.get("role")) != ROLE_DEVELOPER:
         users = {
             **users,
@@ -284,6 +291,26 @@ def list_admin_users(current_user):
             ],
         }
     return json_response(200, users)
+
+
+def merge_admin_user_setup_statuses(users):
+    try:
+        setup_statuses = get_submissions_repository().list_admin_user_setup_statuses()
+    except Exception as error:
+        print(f"Could not load admin user setup statuses: {error}")
+        setup_statuses = {}
+    return {
+        **users,
+        "items": [
+            {
+                **user,
+                "status": "RESET_REQUIRED"
+                if setup_statuses.get(str(user.get("email") or user.get("username") or "").strip().lower(), {}).get("passwordSetupRequired")
+                else user.get("status", ""),
+            }
+            for user in users.get("items", [])
+        ],
+    }
 
 
 def create_admin_user(body, current_user):
@@ -296,9 +323,25 @@ def create_admin_user(body, current_user):
     if not can_manage_role(current_user["role"], role):
         return json_response(403, {"error": "Cannot manage requested role"})
     try:
-        return json_response(200, get_admin_auth_service().create_user(email, role))
+        created_user = get_admin_auth_service().create_user(email, role)
+        mark_admin_user_password_setup_required(email)
+        return json_response(200, {**created_user, "status": "RESET_REQUIRED"})
     except ValueError as error:
         return json_response(400, {"error": str(error)})
+
+
+def mark_admin_user_password_setup_required(email):
+    try:
+        get_submissions_repository().mark_admin_user_password_setup_required(email)
+    except Exception as error:
+        print(f"Could not mark admin user password setup required: {error}")
+
+
+def mark_admin_user_password_setup_complete(email):
+    try:
+        get_submissions_repository().mark_admin_user_password_setup_complete(email)
+    except Exception as error:
+        print(f"Could not mark admin user password setup complete: {error}")
 
 
 def update_admin_user(email, body, current_user):
@@ -400,7 +443,49 @@ def upload_image(data):
 
 def list_submissions(event):
     repo = get_submissions_repository()
-    return json_response(200, repo.list_submissions())
+    query = event.get("queryStringParameters") or {}
+    limit = parse_submission_limit(query.get("limit"))
+    cursor = decode_submission_cursor(query.get("cursor"))
+    summary_only = str(query.get("summary", "true")).lower() != "false"
+    result = repo.list_submissions_page(limit=limit, cursor=cursor, summary_only=summary_only)
+    last_key = result.get("lastEvaluatedKey")
+    return json_response(200, {
+        "items": result.get("items", []),
+        "nextCursor": encode_submission_cursor(last_key) if last_key else None,
+        "pageSize": limit,
+    })
+
+
+def parse_submission_limit(value):
+    try:
+        limit = int(value) if value is not None else 50
+    except (TypeError, ValueError):
+        limit = 50
+    return min(max(limit, 1), 100)
+
+
+def encode_submission_cursor(cursor):
+    if not cursor:
+        return None
+    payload = json.dumps(cursor, separators=(",", ":"), default=json_default).encode("utf-8")
+    return base64.urlsafe_b64encode(payload).decode("utf-8").rstrip("=")
+
+
+def decode_submission_cursor(cursor):
+    if not cursor:
+        return None
+    try:
+        padded = cursor + ("=" * (-len(cursor) % 4))
+        return json.loads(base64.urlsafe_b64decode(padded.encode("utf-8")).decode("utf-8"))
+    except Exception:
+        return None
+
+
+def get_submission_detail(submission_id):
+    try:
+        return json_response(200, get_submissions_repository().get_submission(submission_id))
+    except KeyError as e:
+        return json_response(404, {"error": str(e)})
 
 
 def update_submission_admin_fields(submission_id, body, user=None):

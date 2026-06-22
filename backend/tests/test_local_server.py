@@ -30,6 +30,16 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(json.loads(event["body"])["status"], "Complete")
         self.assertEqual(event["headers"]["Authorization"], "Bearer t")
 
+    def test_create_lambda_event_includes_query_string_parameters(self):
+        event = create_lambda_event(
+            "GET",
+            "/admin/submissions",
+            headers={"Authorization": "Bearer t"},
+            query_string_parameters={"limit": "50", "cursor": "next-page"},
+        )
+
+        self.assertEqual(event["queryStringParameters"], {"limit": "50", "cursor": "next-page"})
+
     def test_create_test_submission_writes_local_repository(self):
         original_path = LOCAL_REPOSITORY.path
         try:

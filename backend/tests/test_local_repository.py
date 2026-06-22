@@ -68,6 +68,20 @@ class LocalSubmissionsRepositoryTests(unittest.TestCase):
 
             self.assertEqual(len(result["items"]), 105)
 
+    def test_tracks_admin_user_password_setup_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = LocalSubmissionsRepository(Path(tmp) / "submissions.json")
+
+            repo.mark_admin_user_password_setup_required("Viewer@Example.com")
+
+            statuses = repo.list_admin_user_setup_statuses()
+            self.assertTrue(statuses["viewer@example.com"]["passwordSetupRequired"])
+
+            repo.mark_admin_user_password_setup_complete("viewer@example.com")
+
+            updated_statuses = repo.list_admin_user_setup_statuses()
+            self.assertFalse(updated_statuses["viewer@example.com"]["passwordSetupRequired"])
+
 
 if __name__ == "__main__":
     unittest.main()

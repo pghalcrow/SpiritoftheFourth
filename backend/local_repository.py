@@ -15,6 +15,14 @@ def json_default(value):
 
 
 class LocalSubmissionsRepository:
+    SUMMARY_RAW_DATA_KEYS = (
+        "formType",
+        "eventTitle",
+        "eventType",
+        "type",
+        "subject",
+    )
+
     def __init__(self, path="backend/.local/submissions.json"):
         self.path = Path(path)
         self.holds_path = self.path.with_name(f"{self.path.stem}_payment_holds.json")
@@ -43,6 +51,31 @@ class LocalSubmissionsRepository:
         )
         return {"items": items[:limit] if limit is not None else items}
 
+    def list_submissions_page(self, limit=50, cursor=None, summary_only=True):
+        items = sorted(
+            self._read(),
+            key=lambda item: item.get("submittedAt") or item.get("createdAt") or "",
+            reverse=True,
+        )
+        offset = 0
+        if isinstance(cursor, dict):
+            try:
+                offset = max(int(cursor.get("offset", 0)), 0)
+            except (TypeError, ValueError):
+                offset = 0
+        page = items[offset:offset + limit]
+        if summary_only:
+            page = [self._summarize_submission(item) for item in page]
+        next_offset = offset + len(page)
+        last_key = {"offset": next_offset} if next_offset < len(items) else None
+        return {"items": page, "lastEvaluatedKey": last_key}
+
+    def get_submission(self, submission_id):
+        for item in self._read():
+            if item.get("submissionId") == submission_id:
+                return item
+        raise KeyError(f"Submission not found: {submission_id}")
+
     def delete_submission(self, submission_id):
         items = self._read()
         for index, item in enumerate(items):
@@ -51,6 +84,23 @@ class LocalSubmissionsRepository:
                 self._write(items)
                 return item
         raise KeyError(f"Submission not found: {submission_id}")
+
+    def _summarize_submission(self, submission):
+        summary = {
+            key: value
+            for key, value in submission.items()
+            if key not in {"pk", "sk", "recordType", "rawData"}
+        }
+        raw_data = submission.get("rawData")
+        if isinstance(raw_data, dict):
+            raw_summary = {
+                key: raw_data[key]
+                for key in self.SUMMARY_RAW_DATA_KEYS
+                if key in raw_data
+            }
+            if raw_summary:
+                summary["rawData"] = raw_summary
+        return summary
 
     def update_submission_admin_fields(
         self,
@@ -100,9 +150,7 @@ class LocalSubmissionsRepository:
         return {"submissionId": submission_id, "provider": provider, **(metadata or {})}
 
     def get_runtime_settings(self):
-        if not self.settings_path.exists():
-            return {"testMode": False, "updatedBy": "", "updatedAt": ""}
-        settings = json.loads(self.settings_path.read_text() or "{}")
+        settings = self._read_settings()
         return {
             "testMode": bool(settings.get("testMode", False)),
             "updatedBy": settings.get("updatedBy", ""),
@@ -110,13 +158,36 @@ class LocalSubmissionsRepository:
         }
 
     def set_runtime_test_mode(self, enabled, updated_by):
-        settings = {
+        settings = self._read_settings()
+        settings.update({
             "testMode": bool(enabled),
             "updatedBy": updated_by,
             "updatedAt": now_iso(),
-        }
-        self.settings_path.write_text(json.dumps(settings, indent=2, sort_keys=True))
+        })
+        self._write_settings(settings)
         return settings
+
+    def list_admin_user_setup_statuses(self):
+        settings = self._read_settings()
+        statuses = settings.get("adminUserSetupStatuses", {})
+        return statuses if isinstance(statuses, dict) else {}
+
+    def mark_admin_user_password_setup_required(self, email):
+        return self._set_admin_user_password_setup_required(email, True)
+
+    def mark_admin_user_password_setup_complete(self, email):
+        return self._set_admin_user_password_setup_required(email, False)
+
+    def _set_admin_user_password_setup_required(self, email, required):
+        normalized_email = str(email or "").strip().lower()
+        settings = self._read_settings()
+        statuses = settings.get("adminUserSetupStatuses", {})
+        if not isinstance(statuses, dict):
+            statuses = {}
+        statuses[normalized_email] = {"passwordSetupRequired": bool(required)}
+        settings["adminUserSetupStatuses"] = statuses
+        self._write_settings(settings)
+        return {"email": normalized_email, "passwordSetupRequired": bool(required)}
 
     def _read(self):
         if not self.path.exists():
@@ -133,3 +204,12 @@ class LocalSubmissionsRepository:
 
     def _write_holds(self, holds):
         self.holds_path.write_text(json.dumps(holds, indent=2, sort_keys=True, default=json_default))
+
+    def _read_settings(self):
+        if not self.settings_path.exists():
+            return {}
+        return json.loads(self.settings_path.read_text() or "{}")
+
+    def _write_settings(self, settings):
+        self.settings_path.parent.mkdir(parents=True, exist_ok=True)
+        self.settings_path.write_text(json.dumps(settings, indent=2, sort_keys=True, default=json_default))

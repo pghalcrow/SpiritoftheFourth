@@ -50,17 +50,36 @@ describe('CmsService', () => {
     req.flush({ events: [{ title: 'Updated Event' }] });
   });
 
-  it('lists admin submissions', () => {
+  it('lists admin submissions with pagination query params', () => {
     sessionStorage.setItem('adminToken', 'cms-admin-token');
 
-    service.getSubmissions().subscribe(res => {
+    service.getSubmissions({ limit: 50, cursor: 'next-page', summaryOnly: false }).subscribe(res => {
       expect(res.items[0].submissionId).toBe('s1');
+      expect(res.nextCursor).toBe('cursor-2');
     });
 
-    const req = httpMock.expectOne(`${environment.cms.baseUrl}${environment.cms.routes.submissions}`);
+    const req = httpMock.expectOne(request =>
+      request.url === `${environment.cms.baseUrl}${environment.cms.routes.submissions}` &&
+      request.params.get('limit') === '50' &&
+      request.params.get('cursor') === 'next-page' &&
+      request.params.get('summary') === 'false'
+    );
     expect(req.request.method).toBe('GET');
     expect(req.request.headers.get('Authorization')).toBe('Bearer cms-admin-token');
-    req.flush({ items: [{ submissionId: 's1', submissionTitle: 'Volunteer', status: 'New' }] });
+    req.flush({ items: [{ submissionId: 's1', submissionTitle: 'Volunteer', status: 'New' }], nextCursor: 'cursor-2' });
+  });
+
+  it('gets one admin submission detail row', () => {
+    sessionStorage.setItem('adminToken', 'cms-admin-token');
+
+    service.getSubmissionDetail('s1').subscribe(res => {
+      expect(res.rawData.message).toBe('Available morning');
+    });
+
+    const req = httpMock.expectOne(`${environment.cms.baseUrl}${environment.cms.routes.submissions}/s1`);
+    expect(req.request.method).toBe('GET');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer cms-admin-token');
+    req.flush({ submissionId: 's1', submissionTitle: 'Volunteer', status: 'New', rawData: { message: 'Available morning' } });
   });
 
   it('updates admin submission fields', () => {

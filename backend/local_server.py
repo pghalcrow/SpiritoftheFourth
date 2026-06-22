@@ -150,11 +150,12 @@ def get_local_submissions_repository():
     return LOCAL_REPOSITORY
 
 
-def create_lambda_event(method, path, body=None, headers=None):
+def create_lambda_event(method, path, body=None, headers=None, query_string_parameters=None):
     return {
         "requestContext": {"http": {"method": method}},
         "rawPath": path,
         "headers": headers or {},
+        "queryStringParameters": query_string_parameters or {},
         "body": json.dumps(body or {}),
     }
 
@@ -238,6 +239,7 @@ def create_app():
             raw_path,
             body,
             dict(request.headers),
+            dict(request.args),
         )
         result = events_service.lambda_handler(event, None)
         return lambda_response(result)

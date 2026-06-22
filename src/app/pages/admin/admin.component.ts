@@ -4,8 +4,8 @@ import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { CmsService, CmsEvent, AdminRole, AdminSubmission, AdminUser } from 'src/app/services/cms.service';
 import { environment } from 'src/environments/environment';
 import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
-import { Observable, forkJoin } from 'rxjs';
-import { finalize, tap } from 'rxjs/operators';
+import { Observable, forkJoin, of } from 'rxjs';
+import { finalize, switchMap, tap } from 'rxjs/operators';
 import writeExcelFile from 'write-excel-file/browser';
 
 type AdminModalVariant = 'success' | 'danger' | 'warning';
@@ -19,6 +19,7 @@ const ADMIN_ROLE_SORT_ORDER: Record<string, number> = {
   admin: 2,
   viewer: 3,
 };
+const SUBMISSION_SUMMARY_RAW_KEYS = new Set(['formType', 'eventTitle', 'eventType', 'type', 'subject']);
 
 interface AdminModal {
   title: string;
@@ -74,6 +75,13 @@ export class AdminComponent implements OnInit {
   eventsLoading = false;
   submissionsLoading = false;
   submissionsRefreshing = false;
+  submissionPageSize = 50;
+  submissionPageNumber = 1;
+  private submissionPageCursors: (string | undefined)[] = [undefined];
+  private nextSubmissionCursor?: string | null;
+  submissionDetailLoading = false;
+  submissionExportLoading = false;
+  private submissionDetailCache: Record<string, AdminSubmission> = {};
   submissionGroupTabs: SubmissionGroupTab[] = [
     { key: 'all', label: 'All' },
     { key: 'vendor', label: 'Vendors' },
@@ -563,24 +571,53 @@ export class AdminComponent implements OnInit {
   }
 
   refreshSubmissions() {
-    this.loadSubmissions('refresh');
+    this.submissionPageCursors = [undefined];
+    this.loadSubmissions('refresh', undefined, 1);
   }
 
-  loadSubmissions(mode: 'initial' | 'refresh' = 'initial') {
+  get hasNextSubmissionPage(): boolean {
+    return Boolean(this.nextSubmissionCursor);
+  }
+
+  get hasPreviousSubmissionPage(): boolean {
+    return this.submissionPageNumber > 1;
+  }
+
+  loadNextSubmissionPage() {
+    if (!this.nextSubmissionCursor || this.submissionsLoading || this.submissionsRefreshing) return;
+    this.submissionPageCursors[this.submissionPageNumber] = this.nextSubmissionCursor;
+    this.loadSubmissions('page', this.nextSubmissionCursor, this.submissionPageNumber + 1);
+  }
+
+  loadPreviousSubmissionPage() {
+    if (!this.hasPreviousSubmissionPage || this.submissionsLoading || this.submissionsRefreshing) return;
+    const previousPageNumber = this.submissionPageNumber - 1;
+    this.loadSubmissions('page', this.submissionPageCursors[previousPageNumber - 1], previousPageNumber);
+  }
+
+  loadSubmissions(mode: 'initial' | 'refresh' | 'page' = 'initial', cursor?: string, pageNumber = 1) {
     const isRefresh = mode === 'refresh';
     if (isRefresh) {
       this.submissionsRefreshing = true;
     } else {
       this.submissionsLoading = true;
     }
-    this.cmsService.getSubmissions().pipe(finalize(() => {
+    const options = cursor
+      ? { limit: this.submissionPageSize, cursor }
+      : { limit: this.submissionPageSize };
+    this.cmsService.getSubmissions(options).pipe(finalize(() => {
       if (isRefresh) {
         this.submissionsRefreshing = false;
       } else {
         this.submissionsLoading = false;
       }
     })).subscribe({
-      next: res => this.submissions = res.items || [],
+      next: res => {
+        this.submissions = res.items || [];
+        this.nextSubmissionCursor = res.nextCursor || null;
+        this.submissionPageNumber = pageNumber;
+        this.clearSelectedSubmission();
+      },
       error: err => {
         if (this.handleAuthFailure(err)) return;
         console.error('Submissions load failed', err);
@@ -612,14 +649,46 @@ export class AdminComponent implements OnInit {
       ? this.submissionExportCategories
       : this.submissionExportCategories.filter(category => category.key === this.submissionExportGroup);
 
-    const sheets = categories.map(category => {
-      const rows = this.submissions
-        .filter(submission => this.submissionMatchesGroup(submission, category.key))
-        .filter(submission => this.submissionIsWithinExportDateRange(submission, fromDate, toDate));
-      return this.buildSubmissionExportSheet(category.sheetName, rows, category.key);
-    });
+    const currentRowsAreComplete = !this.nextSubmissionCursor && this.submissions.every(row => this.submissionHasFullExportData(row));
+    const exportRows$ = currentRowsAreComplete
+      ? of(this.submissions)
+      : this.fetchAllSubmissionExportRows();
 
-    this.writeSubmissionWorkbook(sheets, this.buildSubmissionExportFilename());
+    this.submissionExportLoading = true;
+    exportRows$.pipe(finalize(() => this.submissionExportLoading = false)).subscribe({
+      next: submissions => {
+        const sheets = categories.map(category => {
+          const rows = submissions
+            .filter(submission => this.submissionMatchesGroup(submission, category.key))
+            .filter(submission => this.submissionIsWithinExportDateRange(submission, fromDate, toDate));
+          return this.buildSubmissionExportSheet(category.sheetName, rows, category.key);
+        });
+
+        this.writeSubmissionWorkbook(sheets, this.buildSubmissionExportFilename());
+      },
+      error: err => {
+        if (this.handleAuthFailure(err)) return;
+        console.error('Submission export failed', err);
+        this.showModal('Export unavailable', 'Could not load submissions for the export.', 'danger');
+      }
+    });
+  }
+
+  private fetchAllSubmissionExportRows(cursor?: string, collected: AdminSubmission[] = []): Observable<AdminSubmission[]> {
+    return this.cmsService.getSubmissions({ limit: 100, cursor, summaryOnly: false }).pipe(
+      switchMap(res => {
+        const rows = [...collected, ...(res.items || [])];
+        return res.nextCursor
+          ? this.fetchAllSubmissionExportRows(res.nextCursor, rows)
+          : of(rows);
+      })
+    );
+  }
+
+  private submissionHasFullExportData(submission: AdminSubmission): boolean {
+    const rawData = submission.rawData;
+    if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) return true;
+    return Object.keys(rawData).some(key => !SUBMISSION_SUMMARY_RAW_KEYS.has(key));
   }
 
   private writeSubmissionWorkbook(sheets: SubmissionExportSheet[], filename: string) {
@@ -827,6 +896,34 @@ export class AdminComponent implements OnInit {
   }
 
   selectSubmission(submission: AdminSubmission) {
+    const cachedSubmission = this.submissionDetailCache[submission.submissionId];
+    this.applySelectedSubmission(cachedSubmission || submission);
+    if (cachedSubmission || this.submissionHasFullExportData(submission)) {
+      return;
+    }
+
+    this.submissionDetailLoading = true;
+    this.cmsService.getSubmissionDetail(submission.submissionId)
+      .pipe(finalize(() => this.submissionDetailLoading = false))
+      .subscribe({
+        next: detail => {
+          this.submissionDetailCache[submission.submissionId] = detail;
+          this.submissions = this.submissions.map(row =>
+            row.submissionId === detail.submissionId ? { ...row, ...detail } : row
+          );
+          if (this.selectedSubmission?.submissionId === detail.submissionId) {
+            this.applySelectedSubmission(detail);
+          }
+        },
+        error: err => {
+          if (this.handleAuthFailure(err)) return;
+          console.error('Submission detail load failed', err);
+          this.showModal('Submission unavailable', 'Could not load submission details.', 'danger');
+        }
+      });
+  }
+
+  private applySelectedSubmission(submission: AdminSubmission) {
     this.selectedSubmission = {
       ...submission,
       paymentReceived: this.isCheckPaymentSubmission(submission) ? submission.paymentReceived === true : submission.paymentReceived,
@@ -1259,6 +1356,9 @@ export class AdminComponent implements OnInit {
         this.submissions = this.submissions.map(row =>
           row.submissionId === updated.submissionId ? { ...row, ...updated } : row
         );
+        if (this.submissionDetailCache[updated.submissionId]) {
+          this.submissionDetailCache[updated.submissionId] = { ...this.submissionDetailCache[updated.submissionId], ...updated };
+        }
         this.submissionActionLoading = null;
         this.clearSelectedSubmission();
         this.showModal('Submission saved', 'Admin fields have been updated.', 'success');
@@ -1291,6 +1391,7 @@ export class AdminComponent implements OnInit {
     this.cmsService.deleteSubmission(submissionId).subscribe({
       next: () => {
         this.submissions = this.submissions.filter(row => row.submissionId !== submissionId);
+        delete this.submissionDetailCache[submissionId];
         this.submissionActionLoading = null;
         this.clearSelectedSubmission();
         this.showModal('Submission deleted', 'The submission has been deleted.', 'success');

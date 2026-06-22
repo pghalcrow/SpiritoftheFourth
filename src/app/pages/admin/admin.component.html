@@ -667,10 +667,10 @@
         type="button"
         class="action-button primary submission-export-button"
         data-testid="submission-export-button"
-        [disabled]="submissionsLoading"
+        [disabled]="submissionsLoading || submissionExportLoading"
         (click)="exportSubmissionsToExcel()"
       >
-        Export Excel
+        {{ submissionExportLoading ? 'Exporting...' : 'Export Excel' }}
       </button>
     </div>
 
@@ -730,6 +730,27 @@
           </tr>
         </tbody>
       </table>
+      <div class="submission-pagination" data-testid="submission-pagination">
+        <button
+          type="button"
+          class="action-button secondary"
+          data-testid="submission-page-previous"
+          [disabled]="!hasPreviousSubmissionPage || submissionsLoading || submissionsRefreshing"
+          (click)="loadPreviousSubmissionPage()"
+        >
+          Previous
+        </button>
+        <span class="submission-page-status">Page {{ submissionPageNumber }}</span>
+        <button
+          type="button"
+          class="action-button secondary"
+          data-testid="submission-page-next"
+          [disabled]="!hasNextSubmissionPage || submissionsLoading || submissionsRefreshing"
+          (click)="loadNextSubmissionPage()"
+        >
+          Next
+        </button>
+      </div>
     </div>
   </section>
 
@@ -757,6 +778,7 @@
         <div class="submission-data-heading">
           <h3>Submission Details</h3>
         </div>
+        <p *ngIf="submissionDetailLoading" class="submission-empty">Loading submission details...</p>
         <dl *ngIf="selectedSubmissionDetailRows.length; else noSubmissionDetails" class="submission-detail-list">
           <div *ngFor="let row of selectedSubmissionDetailRows" class="submission-detail-row">
             <dt>{{ row.label }}</dt>
@@ -764,7 +786,7 @@
           </div>
         </dl>
         <ng-template #noSubmissionDetails>
-          <p class="submission-empty">No additional submitted details.</p>
+          <p *ngIf="!submissionDetailLoading" class="submission-empty">No additional submitted details.</p>
         </ng-template>
       </section>
 

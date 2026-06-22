@@ -15,6 +15,14 @@ def _now_iso():
 
 
 class SubmissionsRepository:
+    SUMMARY_RAW_DATA_KEYS = (
+        "formType",
+        "eventTitle",
+        "eventType",
+        "type",
+        "subject",
+    )
+
     def __init__(self, table=None, table_name=None):
         if table is not None:
             self.table = table
@@ -181,6 +189,45 @@ class SubmissionsRepository:
             "updatedAt": record["updatedAt"],
         }
 
+    def list_admin_user_setup_statuses(self):
+        result = self.table.query(
+            KeyConditionExpression="pk = :pk",
+            ExpressionAttributeValues={":pk": "ADMIN_USER_SETUP"},
+        )
+        return {
+            item.get("email", item.get("sk", "")).strip().lower(): {
+                "passwordSetupRequired": bool(item.get("passwordSetupRequired", False)),
+            }
+            for item in result.get("Items", [])
+            if item.get("email") or item.get("sk")
+        }
+
+    def mark_admin_user_password_setup_required(self, email):
+        normalized_email = str(email or "").strip().lower()
+        record = {
+            "pk": "ADMIN_USER_SETUP",
+            "sk": normalized_email,
+            "recordType": "admin_user_setup",
+            "email": normalized_email,
+            "passwordSetupRequired": True,
+            "updatedAt": _now_iso(),
+        }
+        self.table.put_item(Item=record)
+        return {"email": normalized_email, "passwordSetupRequired": True}
+
+    def mark_admin_user_password_setup_complete(self, email):
+        normalized_email = str(email or "").strip().lower()
+        record = {
+            "pk": "ADMIN_USER_SETUP",
+            "sk": normalized_email,
+            "recordType": "admin_user_setup",
+            "email": normalized_email,
+            "passwordSetupRequired": False,
+            "updatedAt": _now_iso(),
+        }
+        self.table.put_item(Item=record)
+        return {"email": normalized_email, "passwordSetupRequired": False}
+
     def list_submissions(self, limit=None):
         items = []
         last_key = None
@@ -198,6 +245,23 @@ class SubmissionsRepository:
                 break
 
         return {"items": items, "lastEvaluatedKey": last_key}
+
+    def list_submissions_page(self, limit=50, cursor=None, summary_only=True):
+        result = self._query_submissions(
+            scan_index_forward=False,
+            limit=limit,
+            exclusive_start_key=cursor,
+        )
+        items = result.get("Items", [])
+        if summary_only:
+            items = [self._summarize_submission(item) for item in items]
+        return {"items": items, "lastEvaluatedKey": result.get("LastEvaluatedKey")}
+
+    def get_submission(self, submission_id):
+        submission = self._find_submission_by_id(submission_id)
+        if submission is None:
+            raise KeyError(f"Submission not found: {submission_id}")
+        return submission
 
     def update_submission_admin_fields(
         self,
@@ -264,6 +328,23 @@ class SubmissionsRepository:
                 raise KeyError(f"Submission not found: {submission_id}") from error
             raise
         return submission
+
+    def _summarize_submission(self, submission):
+        summary = {
+            key: value
+            for key, value in submission.items()
+            if key not in {"pk", "sk", "recordType", "rawData"}
+        }
+        raw_data = submission.get("rawData")
+        if isinstance(raw_data, dict):
+            raw_summary = {
+                key: raw_data[key]
+                for key in self.SUMMARY_RAW_DATA_KEYS
+                if key in raw_data
+            }
+            if raw_summary:
+                summary["rawData"] = raw_summary
+        return summary
 
     def _find_submission_by_id(self, submission_id):
         last_key = None

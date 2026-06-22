@@ -22,6 +22,7 @@ describe('AdminComponent', () => {
       'uploadImage',
       'resolveAssetUrl',
       'getSubmissions',
+      'getSubmissionDetail',
       'updateSubmissionAdminFields',
       'deleteSubmission',
       'getTestMode',
@@ -63,6 +64,7 @@ describe('AdminComponent', () => {
     cmsService.uploadImage.and.returnValue(of({ success: true, url: 'assets/new-flyer.png' }));
     cmsService.resolveAssetUrl.and.callFake((url: string) => url);
     cmsService.getSubmissions.and.returnValue(of({ items: [] }));
+    cmsService.getSubmissionDetail.and.returnValue(of({} as any));
     cmsService.updateSubmissionAdminFields.and.returnValue(of({} as any));
     cmsService.deleteSubmission.and.returnValue(of({ success: true, submissionId: 's1' }));
     cmsService.getTestMode.and.returnValue(of({ testMode: false }));
@@ -1080,6 +1082,95 @@ describe('AdminComponent', () => {
     expect(cmsService.getSubmissions).toHaveBeenCalled();
     expect(nativeElement.querySelector('.submissions-table')?.textContent).toContain('Volunteer Request');
     expect(nativeElement.querySelector('.submissions-table')?.textContent).toContain('Pat Halcrow');
+  });
+
+  it('loads submissions in 50 row pages and moves to the next cursor page', () => {
+    cmsService.getSubmissions.calls.reset();
+    cmsService.getSubmissions.and.returnValues(
+      of({
+        items: [{
+          submissionId: 's1',
+          submissionTitle: 'First Page',
+          submittedAt: '2026-06-05T10:00:00-07:00',
+          name: 'First Person',
+          email: 'first@example.com',
+          phone: '555-1111',
+          status: 'New',
+          assignedTo: '',
+          notes: '',
+          rawData: { formType: 'volunteerForm' },
+        }],
+        nextCursor: 'cursor-2',
+      }),
+      of({
+        items: [{
+          submissionId: 's2',
+          submissionTitle: 'Second Page',
+          submittedAt: '2026-06-06T10:00:00-07:00',
+          name: 'Second Person',
+          email: 'second@example.com',
+          phone: '555-2222',
+          status: 'New',
+          assignedTo: '',
+          notes: '',
+          rawData: { formType: 'paradeEntryForm' },
+        }],
+      })
+    );
+
+    component.loadSubmissions();
+    fixture.detectChanges();
+
+    expect(cmsService.getSubmissions.calls.first().args[0]).toEqual({ limit: 50 });
+    expect(component.submissionPageNumber).toBe(1);
+    expect(component.hasNextSubmissionPage).toBeTrue();
+    expect(component.hasPreviousSubmissionPage).toBeFalse();
+
+    component.loadNextSubmissionPage();
+    fixture.detectChanges();
+
+    expect(cmsService.getSubmissions.calls.mostRecent().args[0]).toEqual({ limit: 50, cursor: 'cursor-2' });
+    expect(component.submissionPageNumber).toBe(2);
+    expect(component.submissions[0].submissionId).toBe('s2');
+    expect(component.hasPreviousSubmissionPage).toBeTrue();
+  });
+
+  it('loads full submission details when a summary row is selected', () => {
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 's1',
+        submissionTitle: 'Volunteer Request',
+        submittedAt: '2026-06-05T10:00:00-07:00',
+        name: 'Pat Halcrow',
+        email: 'pat@example.com',
+        phone: '555-1212',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { formType: 'volunteerForm' },
+      }]
+    }));
+    cmsService.getSubmissionDetail.and.returnValue(of({
+      submissionId: 's1',
+      submissionTitle: 'Volunteer Request',
+      submittedAt: '2026-06-05T10:00:00-07:00',
+      name: 'Pat Halcrow',
+      email: 'pat@example.com',
+      phone: '555-1212',
+      status: 'New',
+      assignedTo: '',
+      notes: '',
+      rawData: { formType: 'volunteerForm', message: 'Available morning' },
+    }));
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-submissions"]')!.click();
+    fixture.detectChanges();
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="submission-details-s1"]')!.click();
+    fixture.detectChanges();
+
+    expect(cmsService.getSubmissionDetail).toHaveBeenCalledWith('s1');
+    expect(component.selectedSubmissionDetailRows.map(row => row.value)).toContain('Available morning');
   });
 
   it('defaults the submission export date range from July 5 of the previous year through today', () => {

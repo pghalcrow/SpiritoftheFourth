@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from 'src/environments/environment';
 import { FormGroup } from '@angular/forms';
@@ -105,6 +105,14 @@ export interface AdminSubmission {
 
 export interface AdminSubmissionListResponse {
   items: AdminSubmission[];
+  nextCursor?: string | null;
+  pageSize?: number;
+}
+
+export interface AdminSubmissionListOptions {
+  limit?: number;
+  cursor?: string;
+  summaryOnly?: boolean;
 }
 
 export interface AdminSubmissionUpdate {
@@ -160,10 +168,28 @@ export class CmsService {
     );
   }
 
-  getSubmissions(): Observable<AdminSubmissionListResponse> {
+  getSubmissions(options: AdminSubmissionListOptions = {}): Observable<AdminSubmissionListResponse> {
     const token = sessionStorage.getItem('adminToken');
+    let params = new HttpParams();
+    if (options.limit) {
+      params = params.set('limit', String(options.limit));
+    }
+    if (options.cursor) {
+      params = params.set('cursor', options.cursor);
+    }
+    if (options.summaryOnly === false) {
+      params = params.set('summary', 'false');
+    }
     return this.http.get<AdminSubmissionListResponse>(
       `${this.baseUrl}${this.routes.submissions}`,
+      { headers: { Authorization: `Bearer ${token}` }, params }
+    );
+  }
+
+  getSubmissionDetail(submissionId: string): Observable<AdminSubmission> {
+    const token = sessionStorage.getItem('adminToken');
+    return this.http.get<AdminSubmission>(
+      `${this.baseUrl}${this.routes.submissions}/${encodeURIComponent(submissionId)}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
   }
