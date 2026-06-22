@@ -582,6 +582,7 @@ export class AdminComponent implements OnInit {
     })).subscribe({
       next: res => this.submissions = res.items || [],
       error: err => {
+        if (this.handleAuthFailure(err)) return;
         console.error('Submissions load failed', err);
         this.showModal('Submissions unavailable', 'Could not load submissions.', 'danger');
       }

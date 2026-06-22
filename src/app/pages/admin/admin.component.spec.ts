@@ -694,6 +694,24 @@ describe('AdminComponent', () => {
     expect(fixture.nativeElement.querySelector('.admin-modal')?.textContent).not.toContain('Test mode unavailable');
   });
 
+  it('clears the admin session and redirects when the submissions token is expired', () => {
+    spyOn(console, 'error');
+    const router = TestBed.inject(Router) as jasmine.SpyObj<Router>;
+    sessionStorage.setItem('adminToken', 'expired-token');
+    sessionStorage.setItem('adminRole', 'developer');
+    sessionStorage.setItem('adminEmail', 'pghalcrow@gmail.com');
+    cmsService.getSubmissions.and.returnValue(throwError(() => ({ status: 401 })));
+
+    component.loadSubmissions();
+    fixture.detectChanges();
+
+    expect(sessionStorage.getItem('adminToken')).toBeNull();
+    expect(sessionStorage.getItem('adminRole')).toBeNull();
+    expect(sessionStorage.getItem('adminEmail')).toBeNull();
+    expect(router.navigate).toHaveBeenCalledWith(['/sign-in']);
+    expect(fixture.nativeElement.querySelector('.admin-modal')?.textContent).not.toContain('Submissions unavailable');
+  });
+
   it('allows developer test mode controls on localhost', () => {
     const originalProduction = environment.production;
     environment.production = false;
