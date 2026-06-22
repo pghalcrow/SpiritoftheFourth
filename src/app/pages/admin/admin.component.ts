@@ -329,6 +329,7 @@ export class AdminComponent implements OnInit {
         this.testModeLocalOnly = Boolean(res.localOnly || !environment.production);
       },
       error: err => {
+        if (this.handleAuthFailure(err)) return;
         console.error('Test mode status failed', err);
         this.showModal('Test mode unavailable', 'Could not load developer test mode status.', 'danger');
       }
@@ -352,6 +353,7 @@ export class AdminComponent implements OnInit {
         );
       },
       error: err => {
+        if (this.handleAuthFailure(err)) return;
         console.error('Test mode update failed', err);
         this.testModeLoading = false;
         this.showModal('Test mode update failed', 'Could not update developer test mode.', 'danger');
@@ -1331,6 +1333,12 @@ export class AdminComponent implements OnInit {
     sessionStorage.removeItem('adminRole');
     sessionStorage.removeItem('adminEmail');
     this.router.navigate(['/sign-in']);
+  }
+
+  private handleAuthFailure(error: any): boolean {
+    if (error?.status !== 401 && error?.status !== 403) return false;
+    this.logout();
+    return true;
   }
 
   uploadImage() {

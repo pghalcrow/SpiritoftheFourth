@@ -676,6 +676,24 @@ describe('AdminComponent', () => {
     }
   });
 
+  it('clears the admin session and redirects when the test mode token is expired', () => {
+    spyOn(console, 'error');
+    const router = TestBed.inject(Router) as jasmine.SpyObj<Router>;
+    sessionStorage.setItem('adminToken', 'expired-token');
+    sessionStorage.setItem('adminRole', 'developer');
+    sessionStorage.setItem('adminEmail', 'pghalcrow@gmail.com');
+    cmsService.getTestMode.and.returnValue(throwError(() => ({ status: 401 })));
+
+    component.ngOnInit();
+    fixture.detectChanges();
+
+    expect(sessionStorage.getItem('adminToken')).toBeNull();
+    expect(sessionStorage.getItem('adminRole')).toBeNull();
+    expect(sessionStorage.getItem('adminEmail')).toBeNull();
+    expect(router.navigate).toHaveBeenCalledWith(['/sign-in']);
+    expect(fixture.nativeElement.querySelector('.admin-modal')?.textContent).not.toContain('Test mode unavailable');
+  });
+
   it('allows developer test mode controls on localhost', () => {
     const originalProduction = environment.production;
     environment.production = false;
