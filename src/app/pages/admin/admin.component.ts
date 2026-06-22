@@ -729,6 +729,14 @@ export class AdminComponent implements OnInit {
           ? this.formatSubmissionExportFieldValue(submission.rawData[key], key)
           : '';
       });
+      if (this.isMotorShowSubmission(submission)) {
+        this.parseSubmissionBodyRows(submission.rawData?.body).forEach(detail => {
+          const value = detail.label.toLowerCase() === 'total'
+            ? this.formatSubmissionExportFieldValue(detail.value, 'total')
+            : detail.value;
+          row[detail.label] = value;
+        });
+      }
       return row;
     });
   }

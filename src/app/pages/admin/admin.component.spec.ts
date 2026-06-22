@@ -1382,6 +1382,61 @@ describe('AdminComponent', () => {
     expect(row[header.indexOf('Vehicle Year')]).toBe(1969);
   });
 
+  it('exports parsed motor show check payment body details', () => {
+    const writeWorkbook = spyOn<any>(component, 'writeSubmissionWorkbook').and.stub();
+    component.submissionExportFromDate = '2025-07-05';
+    component.submissionExportToDate = '2026-06-21';
+    component.submissionExportGroup = 'motorShow';
+    component.submissions = [{
+      submissionId: 'motor-check-1',
+      submissionTitle: 'New Motor Show Entry — Check Payment',
+      submittedAt: '2026-06-15T06:36:45-07:00',
+      name: 'Bill Adams',
+      email: 'thekoolguy@aol.com',
+      phone: '619-219-9630',
+      amount: null,
+      paymentStatus: 'none',
+      paymentProvider: 'none',
+      status: 'New',
+      assignedTo: '',
+      notes: '',
+      rawData: {
+        subject: 'New Motor Show Entry — Check Payment',
+        body: [
+          'New Motor Show Entry — Pay by Check',
+          '',
+          'Name: Bill Adams',
+          'Email: thekoolguy@aol.com',
+          'Phone: 619-219-9630',
+          'Address: 13502 Appaloosa Dr, Lakeside, CA 92040',
+          '',
+          'Vehicle: 1932 Ford Coupe (Orange)',
+          'Club Affiliation: East County Cruisers',
+          'T-Shirt & Plaque Bundle: No',
+          'Total: $25.00',
+          '',
+          'Customer will mail check to: The Spirit of the Fourth, P.O. Box 270736, San Diego, CA 92198 by June 15.',
+        ].join('\n'),
+      },
+    } as any];
+
+    component.exportSubmissionsToExcel();
+
+    const sheets = writeWorkbook.calls.mostRecent().args[0] as { sheet: string; data: any[][] }[];
+    const motorShowRows = sheets[0].data;
+    const header = motorShowRows[0];
+    const row = motorShowRows[1];
+
+    expect(header).toContain('Address');
+    expect(header).toContain('Vehicle');
+    expect(header).toContain('T-Shirt & Plaque Bundle');
+    expect(header).toContain('Total');
+    expect(row[header.indexOf('Address')]).toBe('13502 Appaloosa Dr, Lakeside, CA 92040');
+    expect(row[header.indexOf('Vehicle')]).toBe('1932 Ford Coupe (Orange)');
+    expect(row[header.indexOf('T-Shirt & Plaque Bundle')]).toBe('No');
+    expect(row[header.indexOf('Total')]).toBe(25);
+  });
+
   it('omits payment and internal admin fields from submission exports', () => {
     const writeWorkbook = spyOn<any>(component, 'writeSubmissionWorkbook').and.stub();
     component.submissionExportFromDate = '2025-07-05';
