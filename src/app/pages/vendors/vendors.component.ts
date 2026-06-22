@@ -4,6 +4,7 @@ import { AbstractControl, FormBuilder, FormControl, FormGroup, ValidationErrors,
 import { EmailService } from 'src/app/services/email.service';
 import { FileServerService } from 'src/app/services/file-server.service';
 import { OrderService } from 'src/app/services/order.service';
+import { buildFormEmailSubject } from 'src/app/utilities/email-subject';
 import { EmailUtlity } from 'src/app/utilities/email-utility';
 import { States } from 'src/app/utilities/states';
 import { environment } from 'src/environments/environment';
@@ -156,7 +157,11 @@ export class VendorsComponent {
         // Vendor form processing
         const formData = this.vendorApplicationForm.getRawValue();
         toAddress = environment.forms.vendorApplicationForm.toEamil;
-        subject = environment.forms.vendorApplicationForm.subject;
+        subject = buildFormEmailSubject(
+          environment.forms.vendorApplicationForm.subject,
+          formData.companyName || formData.contactName,
+          formData.email
+        );
         body = EmailUtlity.createVendorApplicationHTMLBody(this.vendorApplicationForm);
 
         const fee = this.currentFee;
@@ -182,7 +187,11 @@ export class VendorsComponent {
           ...this.artistForm.getRawValue()
         };
         toAddress = environment.forms.artistSignUpForm.toEamil;
-        subject = environment.forms.artistSignUpForm.subject;
+        subject = buildFormEmailSubject(
+          environment.forms.artistSignUpForm.subject,
+          formData.contactName || formData.organizationName,
+          formData.email
+        );
         body = EmailUtlity.createArtistFormHTMLBody(this.artistForm);
 
         // Send artist email
@@ -255,7 +264,11 @@ export class VendorsComponent {
     const formData = this.vendorApplicationForm.getRawValue();
     const fee = this.currentFee;
     const toAddress = environment.forms.vendorApplicationForm.toEamil;
-    const subject = environment.forms.vendorApplicationForm.subject;
+    const subject = buildFormEmailSubject(
+      environment.forms.vendorApplicationForm.subject,
+      formData.companyName || formData.contactName,
+      formData.email
+    );
     const replyTo = formData.email;
     const name = formData.contactName;
     const phone = formData.phone;

@@ -107,6 +107,8 @@ export interface AdminSubmissionListResponse {
   items: AdminSubmission[];
   nextCursor?: string | null;
   pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
 }
 
 export interface AdminSubmissionListOptions {

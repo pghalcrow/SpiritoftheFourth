@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { Router } from '@angular/router';
 import { UpcomingEventsComponent } from './upcoming-events.component';
 import { CmsService } from 'src/app/services/cms.service';
@@ -292,5 +292,23 @@ describe('UpcomingEventsComponent', () => {
     expect(nativeElement.querySelector('[data-testid="no-upcoming-events"]')).toBeTruthy();
     expect(nativeElement.textContent).toContain('No upcoming events are scheduled right now.');
     expect(nativeElement.textContent).not.toContain('Past Event Only');
+  });
+
+  it('does not show the no-events message while events are still loading', () => {
+    const loadingResponse = new Subject<any>();
+    cmsService.getEvents.and.returnValue(loadingResponse.asObservable());
+
+    const loadingFixture = TestBed.createComponent(UpcomingEventsComponent);
+    loadingFixture.detectChanges();
+
+    let nativeElement = loadingFixture.nativeElement as HTMLElement;
+    expect(nativeElement.querySelector('[data-testid="no-upcoming-events"]')).toBeFalsy();
+
+    loadingResponse.next({ events: [] });
+    loadingResponse.complete();
+    loadingFixture.detectChanges();
+
+    nativeElement = loadingFixture.nativeElement as HTMLElement;
+    expect(nativeElement.querySelector('[data-testid="no-upcoming-events"]')).toBeTruthy();
   });
 });

@@ -77,6 +77,8 @@ export class AdminComponent implements OnInit {
   submissionsRefreshing = false;
   submissionPageSize = 50;
   submissionPageNumber = 1;
+  submissionTotalCount = 0;
+  submissionTotalPages = 1;
   private submissionPageCursors: (string | undefined)[] = [undefined];
   private nextSubmissionCursor?: string | null;
   submissionDetailLoading = false;
@@ -268,8 +270,8 @@ export class AdminComponent implements OnInit {
 
   get availableAdminSections(): AdminSection[] {
     const sections: AdminSection[] = [];
-    if (this.canAccessEvents) sections.push('events');
     sections.push('submissions');
+    if (this.canAccessEvents) sections.push('events');
     if (this.canManageUsers) sections.push('users');
     return sections;
   }
@@ -616,6 +618,8 @@ export class AdminComponent implements OnInit {
         this.submissions = res.items || [];
         this.nextSubmissionCursor = res.nextCursor || null;
         this.submissionPageNumber = pageNumber;
+        this.submissionTotalCount = Number(res.totalCount || 0);
+        this.submissionTotalPages = Math.max(1, Number(res.totalPages || 1));
         this.clearSelectedSubmission();
       },
       error: err => {

@@ -28,5 +28,8 @@ describe('SponsorsComponent', () => {
     expect(formData.formType).toBe('sponsorshipForm');
     expect(formData.companyName).toBe('Pat Co');
     expect(formData.sponsorshipLevel).toBe('platinum');
+    expect(emailService.sendEmail.calls.mostRecent().args[2]).toBe(
+      'New Sponsorship Submission - Name: Pat Co | Email: pat@example.com'
+    );
   });
 });

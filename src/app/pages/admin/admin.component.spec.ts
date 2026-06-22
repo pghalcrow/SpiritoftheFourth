@@ -180,14 +180,14 @@ describe('AdminComponent', () => {
     expect(nativeElement.querySelector('.empty-events')).toBeTruthy();
   });
 
-  it('shows events submissions and users in the admin section selector for user managers', () => {
+  it('shows submissions events and users in the admin section selector for user managers', () => {
     sessionStorage.setItem('adminRole', 'superAdmin');
     fixture.detectChanges();
 
     const nativeElement = fixture.nativeElement as HTMLElement;
     const sectionButtons = Array.from(nativeElement.querySelectorAll<HTMLButtonElement>('.section-switcher .section-button'));
 
-    expect(sectionButtons.map(button => button.textContent?.trim())).toEqual(['Events', 'Submissions', 'Users']);
+    expect(sectionButtons.map(button => button.textContent?.trim())).toEqual(['Submissions', 'Events', 'Users']);
   });
 
   it('hides the admin section selector when the current role only has one page view', () => {
@@ -1101,6 +1101,8 @@ describe('AdminComponent', () => {
           rawData: { formType: 'volunteerForm' },
         }],
         nextCursor: 'cursor-2',
+        totalCount: 75,
+        totalPages: 2,
       }),
       of({
         items: [{
@@ -1115,6 +1117,8 @@ describe('AdminComponent', () => {
           notes: '',
           rawData: { formType: 'paradeEntryForm' },
         }],
+        totalCount: 75,
+        totalPages: 2,
       })
     );
 
@@ -1123,8 +1127,12 @@ describe('AdminComponent', () => {
 
     expect(cmsService.getSubmissions.calls.first().args[0]).toEqual({ limit: 50 });
     expect(component.submissionPageNumber).toBe(1);
+    expect(component.submissionTotalPages).toBe(2);
     expect(component.hasNextSubmissionPage).toBeTrue();
     expect(component.hasPreviousSubmissionPage).toBeFalse();
+    let nativeElement = fixture.nativeElement as HTMLElement;
+    expect(Array.from(nativeElement.querySelectorAll('[data-testid="submission-pagination"]')).length).toBe(2);
+    expect(nativeElement.textContent).toContain('Page 1 of 2');
 
     component.loadNextSubmissionPage();
     fixture.detectChanges();
@@ -1133,6 +1141,8 @@ describe('AdminComponent', () => {
     expect(component.submissionPageNumber).toBe(2);
     expect(component.submissions[0].submissionId).toBe('s2');
     expect(component.hasPreviousSubmissionPage).toBeTrue();
+    nativeElement = fixture.nativeElement as HTMLElement;
+    expect(nativeElement.textContent).toContain('Page 2 of 2');
   });
 
   it('loads full submission details when a summary row is selected', () => {
@@ -1196,6 +1206,24 @@ describe('AdminComponent', () => {
     expect(toInput.value).toBe(component.submissionExportToDate);
     expect(Array.from(groupSelect.options).map(option => option.textContent?.trim())).toContain('All categories');
     expect(exportButton.textContent).toContain('Export Excel');
+  });
+
+  it('orders submission controls with export first and search immediately before the table', () => {
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const workspace = nativeElement.querySelector('.submissions-workspace')!;
+    const exportPanel = nativeElement.querySelector('.submission-export-panel')!;
+    const groupTabs = nativeElement.querySelector('.submission-group-tabs')!;
+    const searchTools = nativeElement.querySelector('.submissions-tools')!;
+    const tableWrap = nativeElement.querySelector('.submissions-table-wrap')!;
+    const children = Array.from(workspace.children);
+
+    expect(children.indexOf(exportPanel)).toBeLessThan(children.indexOf(groupTabs));
+    expect(children.indexOf(groupTabs)).toBeLessThan(children.indexOf(searchTools));
+    expect(children.indexOf(searchTools)).toBeLessThan(children.indexOf(tableWrap));
+    expect(exportPanel.querySelector('[data-testid="submission-export-button"]')?.classList)
+      .toContain('submission-export-button');
   });
 
   it('exports one workbook with a worksheet for each submission category', () => {

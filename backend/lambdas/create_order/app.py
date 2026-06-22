@@ -436,26 +436,31 @@ def send_vendor_emails_direct(form_data, submission_id):
     existing_folder = raw_attachments if isinstance(raw_attachments, str) and len(raw_attachments) > 3 else None
     s3_attachments_key = generate_vendor_form_pdf(seller_ctx, s3_folder=existing_folder)
 
-    subject = "New Vendor Application Submission"
-    email_sender.send_email(body=buyers_body, subject=subject, mail_to=buyer_email, mail_from=sotf_representative)
+    storage_subject = "New Vendor Application Submission"
+    email_subject = build_form_email_subject(
+        storage_subject,
+        form_data.get("companyName") or buyer_full_name,
+        buyer_email,
+    )
+    email_sender.send_email(body=buyers_body, subject=email_subject, mail_to=buyer_email, mail_from=sotf_representative)
 
     seller_recipients = {resa_email, sotf_representative, form_data.get("toContact")}
     for recipient in seller_recipients:
         if recipient:
             if s3_attachments_key:
-                email_sender.send_email_with_s3_attachments(body=sellers_body, subject=subject, mail_to=recipient, mail_from=sotf_representative, s3_folder_key=s3_attachments_key)
+                email_sender.send_email_with_s3_attachments(body=sellers_body, subject=email_subject, mail_to=recipient, mail_from=sotf_representative, s3_folder_key=s3_attachments_key)
             else:
-                email_sender.send_email(body=sellers_body, subject=subject, mail_to=recipient, mail_from=sotf_representative)
+                email_sender.send_email(body=sellers_body, subject=email_subject, mail_to=recipient, mail_from=sotf_representative)
 
     update_google_sheet(
-        form=subject,
+        form=storage_subject,
         name=buyer_full_name,
         email=buyer_email,
         phone=form_data.get("phone", ""),
         sheet_name="Event Submissions",
     )
     create_submission_record(
-        form=subject,
+        form=storage_subject,
         name=buyer_full_name,
         email=buyer_email,
         phone=form_data.get("phone", ""),
@@ -660,6 +665,18 @@ def get_form_full_name(form_data):
     return " ".join(part for part in (first_name, last_name) if part)
 
 
+def build_form_email_subject(form_title, name="", email=""):
+    clean_title = str(form_title or "").strip()
+    details = []
+    clean_name = str(name or "").strip()
+    clean_email = str(email or "").strip()
+    if clean_name:
+        details.append(f"Name: {clean_name}")
+    if clean_email:
+        details.append(f"Email: {clean_email}")
+    return f"{clean_title} - {' | '.join(details)}" if details else clean_title
+
+
 def get_stripe_buyer_info(session, form_data):
     customer_email = session.get("customer_email") or form_data.get("email", "")
     full_name = get_form_full_name(form_data) or customer_email
@@ -773,7 +790,12 @@ def process_paypal_order_completion(resource, event_create_time=None):
             sellers_body = email_sender.format_email("emails/vender__application_form.html", seller_ctx)
             sotf_representative = os.environ.get("PO_VENDOR_EMAIL", resa_email)
             seller_recipients = {resa_email, sotf_representative, form_data.get("toContact")}
-            email_subject = "New Vendor Application Submission"
+            storage_subject = "New Vendor Application Submission"
+            email_subject = build_form_email_subject(
+                storage_subject,
+                form_data.get("companyName") or get_form_full_name(form_data) or buyer_info["full_name"],
+                form_data.get("email", buyer_info["email"]),
+            )
             raw_attachments = form_data.get("attachments", "")
             existing_folder = raw_attachments if isinstance(raw_attachments, str) and len(raw_attachments) > 3 else None
             s3_attachments_key = generate_vendor_form_pdf(seller_ctx, s3_folder=existing_folder)
@@ -790,7 +812,12 @@ def process_paypal_order_completion(resource, event_create_time=None):
                 motor_show_email1 = os.environ.get("PO_MOTOR_SHOW_EMAIL_1")
                 motor_show_email2 = os.environ.get("PO_MOTOR_SHOW_EMAIL_2")
                 seller_recipients = {resa_email, motor_show_email1, motor_show_email2}
-            email_subject = f"{event_meta['event_title']} Order"
+            storage_subject = f"{event_meta['event_title']} Order"
+            email_subject = build_form_email_subject(
+                storage_subject,
+                get_form_full_name(form_data) or buyer_info["full_name"],
+                form_data.get("email", buyer_info["email"]),
+            )
             s3_attachments_key = None
 
         if submission_id:
@@ -803,7 +830,7 @@ def process_paypal_order_completion(resource, event_create_time=None):
                         email_sender.send_email(body=sellers_body, subject=email_subject, mail_to=recipient, mail_from=sotf_representative)
 
             update_google_sheet(
-                form=email_subject,
+                form=storage_subject,
                 name=get_form_full_name(form_data) or buyer_info["full_name"],
                 email=form_data.get("email", buyer_info["email"]),
                 phone=form_data.get("phone", ""),
@@ -811,7 +838,7 @@ def process_paypal_order_completion(resource, event_create_time=None):
                 add_ons=format_motor_show_add_ons(form_data) if order_type == "Motor Show Event" else "",
             )
             create_submission_record(
-                form=email_subject,
+                form=storage_subject,
                 name=get_form_full_name(form_data) or buyer_info["full_name"],
                 email=form_data.get("email", buyer_info["email"]),
                 phone=form_data.get("phone", ''),
@@ -893,7 +920,8 @@ def process_free_event_signup(form_data, submission_id=None):
     sellers_body = email_sender.format_email("emails/seller__po.html", context_data)
     sotf_representative = os.environ.get(f"PO_{event_type.upper()}_EMAIL", resa_email)
     seller_recipients = get_event_seller_recipients(event_meta, resa_email)
-    email_subject = f"{event_meta['event_title']} Signup"
+    storage_subject = f"{event_meta['event_title']} Signup"
+    email_subject = build_form_email_subject(storage_subject, full_name, form_data.get("email", ""))
 
     if buyer_info["email"]:
         email_sender.send_email(body=buyers_body, subject=email_subject, mail_to=buyer_info["email"], mail_from=sotf_representative)
@@ -902,14 +930,14 @@ def process_free_event_signup(form_data, submission_id=None):
             email_sender.send_email(body=sellers_body, subject=email_subject, mail_to=recipient, mail_from=sotf_representative)
 
     update_google_sheet(
-        form=email_subject,
+        form=storage_subject,
         name=full_name,
         email=form_data.get("email", ""),
         phone=form_data.get("phone", ""),
         sheet_name="Event Submissions",
     )
     create_submission_record(
-        form=email_subject,
+        form=storage_subject,
         name=full_name,
         email=form_data.get("email", ""),
         phone=form_data.get("phone", ""),
@@ -1371,7 +1399,12 @@ def lambda_handler(event, context):
                     sellers_body = email_sender.format_email("emails/vender__application_form.html", seller_ctx)
                     sotf_representative = os.environ.get("PO_VENDOR_EMAIL", resa_email)
                     seller_recipients = {resa_email, sotf_representative, form_data.get("toContact")}
-                    email_subject = "New Vendor Application Submission"
+                    storage_subject = "New Vendor Application Submission"
+                    email_subject = build_form_email_subject(
+                        storage_subject,
+                        form_data.get("companyName") or get_form_full_name(form_data) or buyer_info["full_name"],
+                        form_data.get("email", buyer_info["email"]),
+                    )
                     raw_attachments = form_data.get("attachments", "")
                     existing_folder = raw_attachments if isinstance(raw_attachments, str) and len(raw_attachments) > 3 else None
                     s3_attachments_key = generate_vendor_form_pdf(seller_ctx, s3_folder=existing_folder)
@@ -1384,7 +1417,12 @@ def lambda_handler(event, context):
                         motor_show_email1 = os.environ.get("PO_MOTOR_SHOW_EMAIL_1")
                         motor_show_email2 = os.environ.get("PO_MOTOR_SHOW_EMAIL_2")
                         seller_recipients = {resa_email, motor_show_email1, motor_show_email2}
-                    email_subject = f"{event_meta['event_title']} Order"
+                    storage_subject = "Motor Show Event Order" if event_type == "motorShowOrder" else f"{event_meta['event_title']} Order"
+                    email_subject = build_form_email_subject(
+                        storage_subject,
+                        get_form_full_name(form_data) or buyer_info["full_name"],
+                        form_data.get("email", buyer_info["email"]),
+                    )
                     s3_attachments_key = None
 
                 email_sender.send_email(body=buyers_body, subject=email_subject, mail_to=buyer_info["email"], mail_from=sotf_representative)
@@ -1395,9 +1433,8 @@ def lambda_handler(event, context):
                         else:
                             email_sender.send_email(body=sellers_body, subject=email_subject, mail_to=recipient, mail_from=sotf_representative)
 
-                sheet_form_name = "Motor Show Event Order" if event_type == "motorShowOrder" else email_subject
                 update_google_sheet(
-                    form=sheet_form_name,
+                    form=storage_subject,
                     name=get_form_full_name(form_data) or buyer_info["full_name"],
                     email=form_data.get("email", buyer_info["email"]),
                     phone=form_data.get("phone", ""),
@@ -1405,7 +1442,7 @@ def lambda_handler(event, context):
                     add_ons=format_motor_show_add_ons(form_data) if event_type in ("Motor Show Event", "motorShowOrder") else "",
                 )
                 create_submission_record(
-                    form=email_subject,
+                    form=storage_subject,
                     name=get_form_full_name(form_data) or buyer_info["full_name"],
                     email=form_data.get("email", buyer_info["email"]),
                     phone=form_data.get("phone", ""),

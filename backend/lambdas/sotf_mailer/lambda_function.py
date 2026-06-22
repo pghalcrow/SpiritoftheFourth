@@ -65,7 +65,6 @@ def create_submission_record(form, name, email, phone, source, raw_data):
 
 
 def record_submission_parallel(form, name, email, phone, source, raw_data):
-    update_google_sheet(form, name, email, phone)
     create_submission_record(
         form=form,
         name=name,
@@ -74,15 +73,25 @@ def record_submission_parallel(form, name, email, phone, source, raw_data):
         source=source,
         raw_data=raw_data,
     )
+    try:
+        update_google_sheet(form, name, email, phone)
+    except Exception as error:
+        print(f"⚠️ Google Sheet update failed after submission record was saved: {error}")
 
 
 def storage_form_title(subject, form_type):
-    parade_titles = {
+    form_titles = {
         "paradeEntryForm": "New Parade Entry Request - Parade",
         "carEntryForm": "New Parade Entry Request - Car",
         "vipEntryForm": "New Parade Entry Request - VIP",
+        "volunteerForm": "New Volunteer Request",
+        "vendorApplicationForm": "New Vendor Application Submission",
+        "artistSignUpForm": "New Artist Sign-Up",
+        "sponsorshipForm": "New Sponsorship Submission",
     }
-    return parade_titles.get(form_type, subject)
+    if form_type in form_titles:
+        return form_titles[form_type]
+    return str(subject or "").split(" - Name:", 1)[0].strip()
 
 
 def should_record_submission(subject, event_body):
@@ -474,7 +483,7 @@ def lambda_handler(event, context):
             success = send_vender_email(host, port, username, password, subject, attachments, mail_to, username, reply_to)
             send_email(host, port, username, password, subject, body=vendor_body, attachments=None, mail_to=email, mail_from=username, reply_to=reply_to)
             record_submission_parallel(
-                form=subject[4:],
+                form=storage_form_title(subject, event_body.get("formType", "vendorApplicationForm")),
                 name=contact_name,
                 email=reply_to,
                 phone=contact_phone,

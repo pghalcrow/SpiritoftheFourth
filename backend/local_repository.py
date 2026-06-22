@@ -70,6 +70,9 @@ class LocalSubmissionsRepository:
         last_key = {"offset": next_offset} if next_offset < len(items) else None
         return {"items": page, "lastEvaluatedKey": last_key}
 
+    def count_submissions(self):
+        return len(self._read())
+
     def get_submission(self, submission_id):
         for item in self._read():
             if item.get("submissionId") == submission_id:

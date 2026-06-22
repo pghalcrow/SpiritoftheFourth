@@ -53,6 +53,8 @@ class FakeTable:
         pk_value = kwargs["ExpressionAttributeValues"][":pk"]
         rows = [item for (pk, _), item in self.items.items() if pk == pk_value]
         rows.sort(key=lambda row: row["sk"], reverse=kwargs.get("ScanIndexForward") is False)
+        if kwargs.get("Select") == "COUNT":
+            return {"Count": len(rows)}
         exclusive_start_key = kwargs.get("ExclusiveStartKey")
         if exclusive_start_key:
             start_key = (exclusive_start_key["pk"], exclusive_start_key["sk"])
@@ -335,6 +337,25 @@ class RepositoryTests(unittest.TestCase):
         )
 
         self.assertEqual([item["submissionId"] for item in result["items"]], ["s1"])
+
+    def test_count_submissions_returns_total_submission_rows(self):
+        for index in range(3):
+            self.repo.create_submission({
+                "pk": "SUBMISSION",
+                "sk": f"2026-06-05T10:0{index}:00-07:00#s{index}",
+                "recordType": "submission",
+                "submissionId": f"s{index}",
+                "submissionTitle": f"Submission {index}",
+                "name": "Pat",
+                "email": "pat@example.com",
+                "phone": "555",
+                "status": "New",
+                "assignedTo": "",
+                "notes": "",
+            })
+        self.table.items[("SETTINGS", "RUNTIME")] = {"pk": "SETTINGS", "sk": "RUNTIME"}
+
+        self.assertEqual(self.repo.count_submissions(), 3)
 
     def test_get_submission_returns_full_raw_data(self):
         self.repo.create_submission({

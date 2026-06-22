@@ -65,6 +65,9 @@ class FakeRepo:
             "lastEvaluatedKey": {"pk": "SUBMISSION", "sk": "2026-06-05T10:00:00-07:00#s1"},
         }
 
+    def count_submissions(self):
+        return 125
+
     def get_submission(self, submission_id):
         if submission_id == "missing":
             raise KeyError(f"Submission not found: {submission_id}")
@@ -97,6 +100,9 @@ class DecimalRepo:
 
     def list_submissions_page(self, limit=50, cursor=None, summary_only=True):
         return {"items": [{"submissionId": "s1", "amount": Decimal("125"), "rawData": {"rowNumber": Decimal("4")}}]}
+
+    def count_submissions(self):
+        return 1
 
 
 class FakeAuthService:
@@ -264,6 +270,8 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         self.assertIsNone(repo_factory.return_value.last_list_cursor)
         self.assertTrue(repo_factory.return_value.last_list_summary_only)
         self.assertIn("nextCursor", body)
+        self.assertEqual(body["totalCount"], 125)
+        self.assertEqual(body["totalPages"], 3)
 
     @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
     def test_list_submissions_accepts_limit_and_cursor(self, repo_factory):

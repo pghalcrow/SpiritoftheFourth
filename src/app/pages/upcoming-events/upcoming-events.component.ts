@@ -30,6 +30,7 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
   showSponsorStripeCheckout: boolean = false;
   stripeCheckout: any = null;
   stripeIsLoading: boolean = false;
+  eventsLoading: boolean = true;
 
 
   constructor(
@@ -61,6 +62,7 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
       phone: ['', Validators.required]
     });
 
+    this.eventsLoading = true;
     this.cmsService.getEvents().subscribe({
       next: (data) => {
         this.events = data.events.filter(event => this.isVisibleEvent(event)).map(event => {
@@ -104,8 +106,13 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
             fieldMap: fieldMap
           };
         });
+        this.eventsLoading = false;
       },
-      error: (err) => console.error('Failed to load events', err)
+      error: (err) => {
+        console.error('Failed to load events', err);
+        this.events = [];
+        this.eventsLoading = false;
+      }
     });
   }
 

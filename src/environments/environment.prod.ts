@@ -2,7 +2,7 @@ export const environment = {
   production: true,
   email: {
     url: "https://z2l2bnbbsh2i2oa37bhgvooyhe0wbegl.lambda-url.us-west-2.on.aws/",
-    fromEmail: "adm.spiritofthefourth@gmail.com"
+    fromEmail: "no-reply@spiritofthefourth.org"
   },
   stripe: {
     pk: "pk_live_51N6ITZCtYBFkGDnFjqlCYuxO0JKLaoNHBmq1I56Hde6k4QbSMqDk15NtZf6gyzi9Wnwem6K0zLpxO3D8Ypab6Qks00de6HVbgz"

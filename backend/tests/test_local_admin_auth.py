@@ -1,3 +1,4 @@
+import importlib
 import sys
 import tempfile
 import types
@@ -14,7 +15,11 @@ class FakeBoto3Client:
 boto3 = types.ModuleType("boto3")
 boto3.client = lambda *args, **kwargs: FakeBoto3Client()
 sys.modules.setdefault("boto3", boto3)
-sys.modules.setdefault("stripe", types.ModuleType("stripe"))
+if "stripe" not in sys.modules:
+    try:
+        importlib.import_module("stripe")
+    except ImportError:
+        sys.modules["stripe"] = types.ModuleType("stripe")
 
 from backend.local_server import LocalAdminAuthService
 

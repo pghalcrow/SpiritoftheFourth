@@ -7,6 +7,15 @@
     <div class="toolbar-actions">
       <div *ngIf="showAdminSectionSwitcher" class="section-switcher" aria-label="Admin section">
         <button
+          type="button"
+          class="section-button"
+          [class.active]="adminSection === 'submissions'"
+          data-testid="admin-section-submissions"
+          (click)="selectAdminSection('submissions')"
+        >
+          Submissions
+        </button>
+        <button
           *ngIf="canAccessEvents"
           type="button"
           class="section-button"
@@ -15,15 +24,6 @@
           (click)="selectAdminSection('events')"
         >
           Events
-        </button>
-        <button
-          type="button"
-          class="section-button"
-          [class.active]="adminSection === 'submissions'"
-          data-testid="admin-section-submissions"
-          (click)="selectAdminSection('submissions')"
-        >
-          Submissions
         </button>
         <button
           *ngIf="canManageUsers"
@@ -620,23 +620,6 @@
   </section>
 
   <section *ngIf="adminSection === 'submissions'" class="submissions-workspace">
-    <div class="submissions-tools">
-      <label class="control-group submissions-search">
-        <span>Search</span>
-        <input class="admin-input" [(ngModel)]="submissionSearch" placeholder="Search submissions" />
-      </label>
-      <button
-        type="button"
-        class="action-button secondary"
-        data-testid="refresh-submissions-button"
-        [disabled]="submissionsLoading || submissionsRefreshing"
-        (click)="refreshSubmissions()"
-      >
-        <span *ngIf="submissionsRefreshing" class="button-spinner" aria-hidden="true"></span>
-        {{ submissionsRefreshing ? 'Refreshing...' : 'Refresh' }}
-      </button>
-    </div>
-
     <div class="submission-export-panel">
       <label class="control-group">
         <span>Export From</span>
@@ -693,7 +676,49 @@
       <span>Loading submissions...</span>
     </div>
 
+    <div class="submissions-tools">
+      <label class="control-group submissions-search">
+        <span>Search</span>
+        <input class="admin-input" [(ngModel)]="submissionSearch" placeholder="Search submissions" />
+      </label>
+      <button
+        type="button"
+        class="action-button secondary"
+        data-testid="refresh-submissions-button"
+        [disabled]="submissionsLoading || submissionsRefreshing"
+        (click)="refreshSubmissions()"
+      >
+        <span *ngIf="submissionsRefreshing" class="button-spinner" aria-hidden="true"></span>
+        {{ submissionsRefreshing ? 'Refreshing...' : 'Refresh' }}
+      </button>
+    </div>
+
+    <ng-template #submissionPaginationControls>
+      <div class="submission-pagination" data-testid="submission-pagination">
+        <button
+          type="button"
+          class="action-button secondary"
+          data-testid="submission-page-previous"
+          [disabled]="!hasPreviousSubmissionPage || submissionsLoading || submissionsRefreshing"
+          (click)="loadPreviousSubmissionPage()"
+        >
+          Previous
+        </button>
+        <span class="submission-page-status">Page {{ submissionPageNumber }} of {{ submissionTotalPages }}</span>
+        <button
+          type="button"
+          class="action-button secondary"
+          data-testid="submission-page-next"
+          [disabled]="!hasNextSubmissionPage || submissionsLoading || submissionsRefreshing"
+          (click)="loadNextSubmissionPage()"
+        >
+          Next
+        </button>
+      </div>
+    </ng-template>
+
     <div *ngIf="!submissionsLoading || submissionsRefreshing" class="submissions-table-wrap">
+      <ng-container *ngTemplateOutlet="submissionPaginationControls"></ng-container>
       <table class="submissions-table">
         <thead>
           <tr>
@@ -730,27 +755,7 @@
           </tr>
         </tbody>
       </table>
-      <div class="submission-pagination" data-testid="submission-pagination">
-        <button
-          type="button"
-          class="action-button secondary"
-          data-testid="submission-page-previous"
-          [disabled]="!hasPreviousSubmissionPage || submissionsLoading || submissionsRefreshing"
-          (click)="loadPreviousSubmissionPage()"
-        >
-          Previous
-        </button>
-        <span class="submission-page-status">Page {{ submissionPageNumber }}</span>
-        <button
-          type="button"
-          class="action-button secondary"
-          data-testid="submission-page-next"
-          [disabled]="!hasNextSubmissionPage || submissionsLoading || submissionsRefreshing"
-          (click)="loadNextSubmissionPage()"
-        >
-          Next
-        </button>
-      </div>
+      <ng-container *ngTemplateOutlet="submissionPaginationControls"></ng-container>
     </div>
   </section>
 

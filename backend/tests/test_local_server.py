@@ -14,6 +14,7 @@ from backend.local_server import (
     create_test_submission,
     get_local_submissions_repository,
     get_local_worksheet,
+    hydrate_local_integration_env,
     process_local_stripe_session,
     seed_local_payment_hold_from_worksheet,
 )
@@ -47,7 +48,8 @@ class LocalServerTests(unittest.TestCase):
 
             with tempfile.TemporaryDirectory() as tmp:
                 LOCAL_REPOSITORY.path = LOCAL_REPOSITORY.path.__class__(tmp) / "submissions.json"
-                record = create_test_submission({"submissionId": "local-1", "name": "Pat"})
+                with patch.dict(os.environ, {"LOCAL_WRITE_GOOGLE_SHEET": "false"}):
+                    record = create_test_submission({"submissionId": "local-1", "name": "Pat"})
 
                 self.assertEqual(record["submissionId"], "local-1")
                 self.assertEqual(LOCAL_REPOSITORY.list_submissions()["items"][0]["name"], "Pat")
@@ -101,8 +103,72 @@ class LocalServerTests(unittest.TestCase):
             create_app()
 
             self.assertEqual(os.environ["WEBHOOK_SECRET"], "local-dev-webhook-secret")
+            self.assertEqual(os.environ["EMAIL_TRANSPORT"], "smtp")
+            self.assertEqual(os.environ["TEST_MODE_EMAIL"], "pghalcrow@gmail.com")
+            self.assertEqual(os.environ["EMAIL_OVERRIDE_TO"], "pghalcrow@gmail.com")
+            self.assertEqual(os.environ["LOCAL_WRITE_GOOGLE_SHEET"], "true")
             self.assertEqual(os.environ["S3_ATTACHMENT_BUCKET"], "sotf-file-upload-470065668628-us-west-2")
             self.assertEqual(os.environ["LOCAL_TEST_MODE"], "true")
+
+    def test_hydrate_local_integration_env_uses_lambda_exports_without_overriding_explicit_values(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            export_dir = Path(tmp)
+            (export_dir / "sotf_mailer").mkdir()
+            (export_dir / "sotf_mailer" / "creds-sa.json").write_text("{}")
+            (export_dir / "sotf_mailer.get-function.json").write_text(json.dumps({
+                "Configuration": {
+                    "Environment": {
+                        "Variables": {
+                            "USERNAME": "mailer@example.com",
+                            "PASSWORD": "secret",
+                            "SMTPHOST": "smtp.example.com",
+                            "SMTPPORT": "587",
+                        }
+                    }
+                }
+            }))
+
+            with patch.dict(os.environ, {
+                "LOCAL_LAMBDA_EXPORT_DIR": str(export_dir),
+                "USERNAME": "explicit@example.com",
+            }, clear=True):
+                hydrate_local_integration_env()
+
+                self.assertEqual(os.environ["USERNAME"], "explicit@example.com")
+                self.assertEqual(os.environ["PASSWORD"], "secret")
+                self.assertEqual(os.environ["SMTPHOST"], "smtp.example.com")
+                self.assertEqual(os.environ["SMTPPORT"], "587")
+                self.assertEqual(os.environ["GOOGLE_SHEET_CREDENTIALS"], str(export_dir / "sotf_mailer" / "creds-sa.json"))
+
+    def test_hydrate_local_integration_env_loads_create_order_stripe_test_keys(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            export_dir = Path(tmp)
+            (export_dir / "create_order.get-function.json").write_text(json.dumps({
+                "Environment": {
+                    "Variables": {
+                        "STRIPE_API_KEY": "sk_live_real",
+                        "STRIPE_TEST_API_KEY": "sk_test_real",
+                        "STRIPE_PUBLISHABLE_KEY": "pk_live_real",
+                        "STRIPE_TEST_PUBLISHABLE_KEY": "pk_test_real",
+                        "STRIPE_TEST_WEBHOOK_SECRET": "whsec_test",
+                        "WEBHOOK_SECRET": "whsec_live",
+                    }
+                }
+            }))
+
+            with patch.dict(os.environ, {"LOCAL_LAMBDA_EXPORT_DIR": str(export_dir)}, clear=True):
+                hydrate_local_integration_env()
+
+                self.assertEqual(os.environ["STRIPE_API_KEY"], "sk_live_real")
+                self.assertEqual(os.environ["STRIPE_TEST_API_KEY"], "sk_test_real")
+                self.assertEqual(os.environ["STRIPE_PUBLISHABLE_KEY"], "pk_live_real")
+                self.assertEqual(os.environ["STRIPE_TEST_PUBLISHABLE_KEY"], "pk_test_real")
+                self.assertEqual(os.environ["STRIPE_TEST_WEBHOOK_SECRET"], "whsec_test")
+                self.assertEqual(os.environ["WEBHOOK_SECRET"], "whsec_live")
 
     def test_local_admin_test_mode_is_always_enabled_and_local_only(self):
         client = create_app().test_client()
@@ -270,6 +336,7 @@ class LocalServerTests(unittest.TestCase):
                 "RETURN_URL": "http://localhost:4200",
                 "STRIPE_API_KEY": "sk_test_local",
                 "SUBMISSIONS_TABLE": "sotf-submissions-local",
+                "LOCAL_WRITE_GOOGLE_SHEET": "false",
             },
         ), patch("backend.local_server.create_order_app.StripeOrderService", FakeStripeOrderService):
             client = create_app().test_client()
@@ -415,7 +482,11 @@ class LocalServerTests(unittest.TestCase):
                     }),
                 }
 
-        with patch.dict(os.environ, {"STRIPE_API_KEY": "sk_test_local"}), patch(
+        with patch.dict(os.environ, {
+            "LOCAL_TEST_MODE": "true",
+            "STRIPE_API_KEY": "sk_live_local",
+            "STRIPE_TEST_API_KEY": "sk_test_local",
+        }), patch(
             "backend.local_server.create_order_app.StripeOrderService",
             FakeStripeOrderService,
         ), patch("backend.local_server.create_order_app.lambda_handler") as lambda_handler:

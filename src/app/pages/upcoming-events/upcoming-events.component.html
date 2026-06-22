@@ -5,7 +5,7 @@
     </header>
 
     <div class="events-list">
-      <section *ngIf="!events.length" class="empty-events" data-testid="no-upcoming-events">
+      <section *ngIf="!eventsLoading && !events.length" class="empty-events" data-testid="no-upcoming-events">
         <h2>No upcoming events are scheduled right now.</h2>
         <p>Please check back soon for new Spirit of the Fourth events.</p>
       </section>

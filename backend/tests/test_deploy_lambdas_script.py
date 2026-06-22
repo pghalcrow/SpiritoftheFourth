@@ -61,6 +61,29 @@ class DeployLambdasScriptTests(unittest.TestCase):
             self.assertIn("lambda_function.py", zip_listing)
             self.assertNotIn("stale.pyc", zip_listing)
 
+    def test_package_lambda_excludes_local_submission_data(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            zip_path = tmp_path / "events_service.zip"
+
+            env = os.environ.copy()
+            env["LAMBDA_VENDOR_DEPS"] = "false"
+
+            result = subprocess.run(
+                ["backend/scripts/package_lambda.sh", "backend/lambdas/events_service", str(zip_path), "3.14"],
+                cwd=Path(__file__).resolve().parents[2],
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            zip_listing = subprocess.check_output(["unzip", "-Z1", str(zip_path)], text=True)
+            self.assertNotIn("backend/.local/submissions.json", zip_listing)
+            self.assertNotIn(".local/submissions.json", zip_listing)
+            self.assertNotIn("submissions.json", zip_listing)
+
     def test_package_lambda_vendors_function_requirements(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

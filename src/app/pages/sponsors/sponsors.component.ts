@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
 import { EmailService } from 'src/app/services/email.service';
+import { buildFormEmailSubject } from 'src/app/utilities/email-subject';
 import { EmailUtlity } from 'src/app/utilities/email-utility';
 import { States } from 'src/app/utilities/states';
 import { environment } from 'src/environments/environment';
@@ -58,9 +59,13 @@ export class SponsorsComponent implements OnInit {
       this.isLoading = true
       this.sponsorForm.disable()
       let toAddress = environment.forms.sponsorshipForm.toEamil
-      let subject = environment.forms.sponsorshipForm.subject
       let body = EmailUtlity.createSponsorshipHTMLBody(this.sponsorForm)
       let replyTo = this.sponsorForm.get('email')!.value
+      let subject = buildFormEmailSubject(
+        environment.forms.sponsorshipForm.subject,
+        this.sponsorForm.get('companyName')!.value || this.sponsorForm.get('contactName')!.value,
+        replyTo
+      )
       const formData = {
         formType: 'sponsorshipForm',
         ...this.sponsorForm.getRawValue()

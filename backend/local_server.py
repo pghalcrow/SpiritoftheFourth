@@ -24,6 +24,7 @@ import backend.lambdas.sotf_mailer.lambda_function as sotf_mailer
 
 LOCAL_EVENTS_FILE = Path(os.environ.get("LOCAL_EVENTS_FILE", "backend/.local/events.json"))
 LOCAL_REPOSITORY = LocalSubmissionsRepository(os.environ.get("LOCAL_SUBMISSIONS_FILE", "backend/.local/submissions.json"))
+LOCAL_LAMBDA_EXPORT_DIR = Path(os.environ.get("LOCAL_LAMBDA_EXPORT_DIR", "aws-export/lambda"))
 
 
 class LocalAdminAuthService:
@@ -150,6 +151,50 @@ def get_local_submissions_repository():
     return LOCAL_REPOSITORY
 
 
+def hydrate_local_integration_env():
+    export_dir = Path(os.environ.get("LOCAL_LAMBDA_EXPORT_DIR", str(LOCAL_LAMBDA_EXPORT_DIR)))
+    export_env_keys = {
+        "sotf_mailer": ("USERNAME", "PASSWORD", "SMTPHOST", "SMTPPORT", "PDFSHIFTAPIKEY"),
+        "create_order": (
+            "STRIPE_API_KEY",
+            "STRIPE_TEST_API_KEY",
+            "STRIPE_PUBLISHABLE_KEY",
+            "STRIPE_TEST_PUBLISHABLE_KEY",
+            "WEBHOOK_SECRET",
+            "STRIPE_TEST_WEBHOOK_SECRET",
+            "PAYPAL_CLIENT_ID",
+            "PAYPAL_CLIENT_SECRET",
+            "PAYPAL_TEST_CLIENT_ID",
+            "PAYPAL_TEST_CLIENT_SECRET",
+        ),
+    }
+
+    for function_name, keys in export_env_keys.items():
+        config_path = export_dir / f"{function_name}.get-function.json"
+        if not config_path.exists():
+            continue
+        try:
+            config = json.loads(config_path.read_text() or "{}")
+            variables = (
+                ((config.get("Configuration") or {}).get("Environment") or {}).get("Variables")
+                or ((config.get("Environment") or {}).get("Variables") or {})
+            )
+            for key in keys:
+                if variables.get(key):
+                    os.environ.setdefault(key, str(variables[key]))
+        except Exception as error:
+            print(f"Could not hydrate local environment from {config_path}: {error}")
+
+    if not os.environ.get("GOOGLE_SHEET_CREDENTIALS"):
+        for credentials_path in (
+            export_dir / "sotf_mailer" / "creds-sa.json",
+            export_dir / "create_order" / "creds-sa.json",
+        ):
+            if credentials_path.exists():
+                os.environ["GOOGLE_SHEET_CREDENTIALS"] = str(credentials_path)
+                break
+
+
 def create_lambda_event(method, path, body=None, headers=None, query_string_parameters=None):
     return {
         "requestContext": {"http": {"method": method}},
@@ -171,11 +216,15 @@ def create_app():
     os.environ.setdefault("RETURN_URL", "http://localhost:4200")
     os.environ.setdefault("SUBMISSIONS_TABLE", "sotf-submissions-local")
     os.environ.setdefault("WEBHOOK_SECRET", "local-dev-webhook-secret")
-    os.environ.setdefault("EMAIL_TRANSPORT", "local")
+    os.environ.setdefault("EMAIL_TRANSPORT", "smtp")
+    os.environ.setdefault("TEST_MODE_EMAIL", "pghalcrow@gmail.com")
+    os.environ.setdefault("EMAIL_OVERRIDE_TO", "pghalcrow@gmail.com")
+    os.environ.setdefault("LOCAL_WRITE_GOOGLE_SHEET", "true")
     os.environ.setdefault("RESA_EMAIL", "local@example.com")
     os.environ.setdefault("PO_MOTOR_SHOW_EMAIL_1", "local@example.com")
     os.environ.setdefault("PO_MOTOR_SHOW_EMAIL_2", "local@example.com")
     os.environ.setdefault("S3_ATTACHMENT_BUCKET", "sotf-file-upload-470065668628-us-west-2")
+    hydrate_local_integration_env()
     events_service.ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
     events_service.DEVELOPER_PASSWORD = os.environ.get("DEVELOPER_PASSWORD")
     events_service.get_submissions_repository = get_local_submissions_repository
@@ -315,7 +364,7 @@ def process_local_stripe_session(session_id):
     if not session_id:
         return {"statusCode": 400, "body": json.dumps({"error": "Missing sessionId"})}
 
-    stripe_service = create_order_app.StripeOrderService(os.environ["STRIPE_API_KEY"])
+    stripe_service = create_order_app.StripeOrderService(create_order_app.get_stripe_secret_key())
     session_response = stripe_service.retrieve_session(session_id)
     if session_response.get("statusCode") != 200:
         return session_response

@@ -41,6 +41,9 @@ describe('VolunteersComponent', () => {
     expect(formData.contactName).toBe('Pat Halcrow');
     expect(formData.availability).toBe('Morning setup');
     expect(formData.message).toBe('Happy to help');
+    expect(emailService.sendEmail.calls.mostRecent().args[2]).toBe(
+      'New Volunteer Request - Name: Pat Halcrow | Email: pat@example.com'
+    );
   });
 
   it('stops loading and shows an error when volunteer submission fails', async () => {

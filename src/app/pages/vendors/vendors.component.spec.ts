@@ -147,6 +147,36 @@ describe('VendorsComponent', () => {
     expect(formData.contactName).toBe('Pat Artist');
     expect(formData.message).toBe('Interested in performing');
   });
+
+  it('adds artist name and email to the artist email subject', async () => {
+    const emailService = (component as any).emailService;
+    component.artistForm.setValue({
+      contactName: 'Pat Artist',
+      organizationName: 'Studio Test',
+      email: 'artist@example.com',
+      phone: '555-121-2121',
+      message: 'Interested in performing',
+    });
+
+    await component.onSubmit(component.artistForm, 'artist');
+
+    expect(emailService.sendEmail.calls.mostRecent().args[2]).toBe(
+      'New Artist Sign-Up - Name: Pat Artist | Email: artist@example.com'
+    );
+  });
+
+  it('adds vendor company/contact and email to vendor payment payload subjects', fakeAsync(() => {
+    component.vendorApplicationForm.patchValue(validVendorForm());
+
+    component.onVendorStripeClick();
+    tick(60);
+
+    expect(orderService.createStripeEmbeddedSession.calls.mostRecent().args[0]).toEqual(
+      jasmine.objectContaining({
+        subject: 'New Vendor Application Submission - Name: Test Company | Email: pat@example.com'
+      })
+    );
+  }));
 });
 
 function validVendorForm() {

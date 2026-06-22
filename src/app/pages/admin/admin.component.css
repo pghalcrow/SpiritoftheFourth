@@ -268,7 +268,7 @@ h4 {
 
 .submission-export-panel {
   display: grid;
-  grid-template-columns: minmax(150px, 190px) minmax(150px, 190px) minmax(190px, 240px) auto;
+  grid-template-columns: minmax(150px, 190px) minmax(150px, 190px) minmax(190px, 240px) max-content;
   gap: 12px;
   align-items: end;
   padding: 14px;

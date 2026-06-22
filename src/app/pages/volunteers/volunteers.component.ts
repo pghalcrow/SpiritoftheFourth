@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
 import { EmailService } from 'src/app/services/email.service';
+import { buildFormEmailSubject } from 'src/app/utilities/email-subject';
 import { EmailUtlity } from 'src/app/utilities/email-utility';
 import { States } from 'src/app/utilities/states';
 import { environment } from 'src/environments/environment';
@@ -45,10 +46,10 @@ export class VolunteersComponent {
       this.isLoading = true
       this.volunteerForm.disable()
       let toAddress = environment.forms.volunteerForm.toEamil
-      let subject = environment.forms.volunteerForm.subject
       let body = EmailUtlity.createVolunteerFormHTMLBody(this.volunteerForm)
       let replyTo = this.volunteerForm.get("email")!.value
       let name = this.volunteerForm.get("contactName")!.value
+      let subject = buildFormEmailSubject(environment.forms.volunteerForm.subject, name, replyTo)
       let phone = this.volunteerForm.get("phone")!.value
       let formData = {
         formType: "volunteerForm",

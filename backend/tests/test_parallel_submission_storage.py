@@ -12,7 +12,11 @@ from boto3.dynamodb.types import TypeSerializer
 def import_create_order_app():
     module_dir = Path(__file__).resolve().parents[1] / "lambdas" / "create_order"
     sys.path.insert(0, str(module_dir))
-    sys.modules.setdefault("stripe", types.SimpleNamespace())
+    if "stripe" not in sys.modules:
+        try:
+            importlib.import_module("stripe")
+        except ImportError:
+            sys.modules["stripe"] = types.SimpleNamespace()
     return importlib.import_module("app")
 
 
@@ -24,6 +28,10 @@ def import_sotf_mailer():
 
 
 class FakeEmailSender:
+    def __init__(self):
+        self.sent = []
+        self.sent_with_attachments = []
+
     def format_email(self, _template, _context):
         return "<html></html>"
 
@@ -31,9 +39,11 @@ class FakeEmailSender:
         return "<table></table>"
 
     def send_email(self, **_kwargs):
+        self.sent.append(_kwargs)
         return True
 
     def send_email_with_s3_attachments(self, **_kwargs):
+        self.sent_with_attachments.append(_kwargs)
         return True
 
 
@@ -95,23 +105,58 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
         self.assertEqual(recipients["header_to"], "pghalcrow@gmail.com")
         self.assertEqual(recipients["original_to"], "live@example.com, reply@example.com")
 
+    def test_mailer_records_submission_even_when_google_sheet_append_fails(self):
+        mailer = import_sotf_mailer()
+        event = {
+            "body": json.dumps({
+                "toContact": "pghalcrow@gmail.com",
+                "subject": "New Volunteer Request - Name: Pat Halcrow | Email: pat@example.com",
+                "replyTo": "pat@example.com",
+                "name": "Pat Halcrow",
+                "phone": "555-1212",
+                "body": "<html>Volunteer details</html>",
+                "formType": "volunteerForm",
+            })
+        }
+
+        with patch.object(mailer, "send_email", return_value=True), \
+            patch.object(mailer, "update_google_sheet", side_effect=RuntimeError("sheet unavailable")), \
+            patch.object(mailer, "create_submission_record") as create_submission_record, \
+            patch.dict(mailer.os.environ, {
+                "USERNAME": "sender@example.com",
+                "PASSWORD": "password",
+                "SMTPHOST": "smtp.example.com",
+                "SMTPPORT": "587",
+            }):
+            response = mailer.lambda_handler(event, None)
+
+        self.assertEqual(response["statusCode"], 200)
+        create_submission_record.assert_called_once()
+        self.assertEqual(create_submission_record.call_args.kwargs["form"], "New Volunteer Request")
+
     def test_no_payment_vendor_updates_google_sheet_and_dynamodb(self):
         app = import_create_order_app()
+        email_sender = FakeEmailSender()
         form_data = {
             "contactName": "Pat Halcrow",
+            "companyName": "Pat Booth",
             "email": "pat@example.com",
             "phone": "555-1212",
             "toContact": "vendor@example.com",
             "vendorType": "Non-Profit",
         }
 
-        with patch.object(app, "EmailSender", return_value=FakeEmailSender()), \
+        with patch.object(app, "EmailSender", return_value=email_sender), \
             patch.object(app, "generate_vendor_form_pdf", return_value=None), \
             patch.object(app, "update_google_sheet") as update_google_sheet, \
             patch.object(app, "create_submission_record") as create_submission_record, \
             patch.dict(app.os.environ, {"RESA_EMAIL": "resa@example.com", "PO_VENDOR_EMAIL": "vendor-po@example.com"}):
             app.send_vendor_emails_direct(form_data, "submission-1")
 
+        self.assertTrue(all(
+            message["subject"] == "New Vendor Application Submission - Name: Pat Booth | Email: pat@example.com"
+            for message in [*email_sender.sent, *email_sender.sent_with_attachments]
+        ))
         update_google_sheet.assert_called_once_with(
             form="New Vendor Application Submission",
             name="Pat Halcrow",
@@ -390,6 +435,7 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
 
     def test_free_dynamic_event_signup_updates_google_sheet_and_dynamodb(self):
         app = import_create_order_app()
+        email_sender = FakeEmailSender()
         form_data = {
             "type": "freePicnic",
             "eventTitle": "Community Picnic",
@@ -401,7 +447,7 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
             "teamMembers": [],
         }
 
-        with patch.object(app, "EmailSender", return_value=FakeEmailSender()), \
+        with patch.object(app, "EmailSender", return_value=email_sender), \
             patch.object(app, "get_event_config", return_value={
                 "title": "Community Picnic",
                 "eventMeta": {
@@ -418,6 +464,10 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
 
         self.assertEqual(response["status"], "submitted")
         self.assertEqual(response["submission_id"], "free-1")
+        self.assertTrue(all(
+            message["subject"] == "Community Picnic Signup - Name: Pat Halcrow | Email: pat@example.com"
+            for message in email_sender.sent
+        ))
         update_google_sheet.assert_called_once_with(
             form="Community Picnic Signup",
             name="Pat Halcrow",
@@ -459,7 +509,7 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
         event = {
             "body": json.dumps({
                 "toContact": "pghalcrow@gmail.com",
-                "subject": "New Volunteer Request",
+                "subject": "New Volunteer Request - Name: Pat Halcrow | Email: pat@example.com",
                 "replyTo": "pat@example.com",
                 "name": "Pat Halcrow",
                 "phone": "555-1212",

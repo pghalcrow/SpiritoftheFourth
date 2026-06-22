@@ -257,6 +257,19 @@ class SubmissionsRepository:
             items = [self._summarize_submission(item) for item in items]
         return {"items": items, "lastEvaluatedKey": result.get("LastEvaluatedKey")}
 
+    def count_submissions(self):
+        total = 0
+        last_key = None
+
+        while True:
+            result = self._query_submissions(exclusive_start_key=last_key, select="COUNT")
+            total += int(result.get("Count", 0))
+            last_key = result.get("LastEvaluatedKey")
+            if not last_key:
+                break
+
+        return total
+
     def get_submission(self, submission_id):
         submission = self._find_submission_by_id(submission_id)
         if submission is None:
@@ -360,7 +373,7 @@ class SubmissionsRepository:
                 break
         return None
 
-    def _query_submissions(self, scan_index_forward=None, limit=None, exclusive_start_key=None):
+    def _query_submissions(self, scan_index_forward=None, limit=None, exclusive_start_key=None, select=None):
         kwargs = {
             "KeyConditionExpression": "pk = :pk",
             "ExpressionAttributeValues": {":pk": "SUBMISSION"},
@@ -371,6 +384,8 @@ class SubmissionsRepository:
             kwargs["Limit"] = limit
         if exclusive_start_key is not None:
             kwargs["ExclusiveStartKey"] = exclusive_start_key
+        if select is not None:
+            kwargs["Select"] = select
         return self.table.query(**kwargs)
 
     def _is_conditional_check_failed(self, error):

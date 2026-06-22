@@ -56,6 +56,8 @@ describe('CmsService', () => {
     service.getSubmissions({ limit: 50, cursor: 'next-page', summaryOnly: false }).subscribe(res => {
       expect(res.items[0].submissionId).toBe('s1');
       expect(res.nextCursor).toBe('cursor-2');
+      expect(res.totalCount).toBe(125);
+      expect(res.totalPages).toBe(3);
     });
 
     const req = httpMock.expectOne(request =>
@@ -66,7 +68,7 @@ describe('CmsService', () => {
     );
     expect(req.request.method).toBe('GET');
     expect(req.request.headers.get('Authorization')).toBe('Bearer cms-admin-token');
-    req.flush({ items: [{ submissionId: 's1', submissionTitle: 'Volunteer', status: 'New' }], nextCursor: 'cursor-2' });
+    req.flush({ items: [{ submissionId: 's1', submissionTitle: 'Volunteer', status: 'New' }], nextCursor: 'cursor-2', totalCount: 125, totalPages: 3 });
   });
 
   it('gets one admin submission detail row', () => {

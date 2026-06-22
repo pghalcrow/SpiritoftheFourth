@@ -449,10 +449,14 @@ def list_submissions(event):
     summary_only = str(query.get("summary", "true")).lower() != "false"
     result = repo.list_submissions_page(limit=limit, cursor=cursor, summary_only=summary_only)
     last_key = result.get("lastEvaluatedKey")
+    total_count = repo.count_submissions()
+    total_pages = max(1, (total_count + limit - 1) // limit)
     return json_response(200, {
         "items": result.get("items", []),
         "nextCursor": encode_submission_cursor(last_key) if last_key else None,
         "pageSize": limit,
+        "totalCount": total_count,
+        "totalPages": total_pages,
     })
 
 
