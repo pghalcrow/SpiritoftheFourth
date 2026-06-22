@@ -1183,6 +1183,78 @@ describe('AdminComponent', () => {
     expect(component.selectedSubmissionDetailRows.map(row => row.value)).toContain('Available morning');
   });
 
+  it('prefetches full submission details for the visible submissions page after summaries load', () => {
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 's1',
+        submissionTitle: 'Volunteer Request',
+        submittedAt: '2026-06-05T10:00:00-07:00',
+        name: 'Pat Halcrow',
+        email: 'pat@example.com',
+        phone: '555-1212',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { formType: 'volunteerForm' },
+      }, {
+        submissionId: 's2',
+        submissionTitle: 'Parade Entry',
+        submittedAt: '2026-06-06T10:00:00-07:00',
+        name: 'Parade Group',
+        email: 'parade@example.com',
+        phone: '555-3434',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { formType: 'paradeEntryForm' },
+      }]
+    }));
+    cmsService.getSubmissionDetail.and.callFake((submissionId: string) => of({
+      submissionId,
+      submissionTitle: submissionId === 's1' ? 'Volunteer Request' : 'Parade Entry',
+      submittedAt: '2026-06-05T10:00:00-07:00',
+      name: submissionId === 's1' ? 'Pat Halcrow' : 'Parade Group',
+      email: submissionId === 's1' ? 'pat@example.com' : 'parade@example.com',
+      phone: submissionId === 's1' ? '555-1212' : '555-3434',
+      status: 'New',
+      assignedTo: '',
+      notes: '',
+      rawData: { formType: submissionId === 's1' ? 'volunteerForm' : 'paradeEntryForm', message: `Detail ${submissionId}` },
+    } as any));
+
+    component.loadSubmissions();
+
+    expect(cmsService.getSubmissionDetail.calls.allArgs()).toEqual([['s1'], ['s2']]);
+    expect(component.submissions.map(row => row.rawData?.message)).toEqual(['Detail s1', 'Detail s2']);
+  });
+
+  it('opens prefetched submission details from cache without another detail request', () => {
+    const summary = {
+      submissionId: 's1',
+      submissionTitle: 'Volunteer Request',
+      submittedAt: '2026-06-05T10:00:00-07:00',
+      name: 'Pat Halcrow',
+      email: 'pat@example.com',
+      phone: '555-1212',
+      status: 'New',
+      assignedTo: '',
+      notes: '',
+      rawData: { formType: 'volunteerForm' },
+    } as any;
+    cmsService.getSubmissions.and.returnValue(of({ items: [summary] }));
+    cmsService.getSubmissionDetail.and.returnValue(of({
+      ...summary,
+      rawData: { formType: 'volunteerForm', message: 'Available morning' },
+    }));
+
+    component.loadSubmissions();
+    cmsService.getSubmissionDetail.calls.reset();
+    component.selectSubmission(component.submissions[0]);
+
+    expect(cmsService.getSubmissionDetail).not.toHaveBeenCalled();
+    expect(component.selectedSubmissionDetailRows.map(row => row.value)).toContain('Available morning');
+  });
+
   it('defaults the submission export date range from July 5 of the previous year through today', () => {
     const today = new Date();
     const pad = (part: number) => String(part).padStart(2, '0');

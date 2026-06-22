@@ -84,6 +84,7 @@ export class AdminComponent implements OnInit {
   submissionDetailLoading = false;
   submissionExportLoading = false;
   private submissionDetailCache: Record<string, AdminSubmission> = {};
+  private submissionDetailPrefetching = new Set<string>();
   submissionGroupTabs: SubmissionGroupTab[] = [
     { key: 'all', label: 'All' },
     { key: 'vendor', label: 'Vendors' },
@@ -621,6 +622,7 @@ export class AdminComponent implements OnInit {
         this.submissionTotalCount = Number(res.totalCount || 0);
         this.submissionTotalPages = Math.max(1, Number(res.totalPages || 1));
         this.clearSelectedSubmission();
+        this.prefetchVisibleSubmissionDetails();
       },
       error: err => {
         if (this.handleAuthFailure(err)) return;
@@ -693,6 +695,39 @@ export class AdminComponent implements OnInit {
     const rawData = submission.rawData;
     if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) return true;
     return Object.keys(rawData).some(key => !SUBMISSION_SUMMARY_RAW_KEYS.has(key));
+  }
+
+  private prefetchVisibleSubmissionDetails() {
+    this.submissions
+      .filter(submission => submission.submissionId)
+      .filter(submission => !this.submissionDetailCache[submission.submissionId])
+      .filter(submission => !this.submissionDetailPrefetching.has(submission.submissionId))
+      .filter(submission => !this.submissionHasFullExportData(submission))
+      .forEach(submission => {
+        this.submissionDetailPrefetching.add(submission.submissionId);
+        this.cmsService.getSubmissionDetail(submission.submissionId)
+          .pipe(finalize(() => this.submissionDetailPrefetching.delete(submission.submissionId)))
+          .subscribe({
+            next: detail => {
+              this.submissionDetailCache[submission.submissionId] = detail;
+              this.submissions = this.submissions.map(row =>
+                row.submissionId === detail.submissionId ? { ...row, ...detail } : row
+              );
+              if (this.selectedSubmission?.submissionId === detail.submissionId) {
+                this.applySelectedSubmission(detail);
+              }
+            },
+            error: err => {
+              if (this.handleAuthFailure(err)) return;
+              console.warn('Submission detail prefetch failed', submission.submissionId, err);
+            },
+            complete: () => {
+              if (this.selectedSubmission?.submissionId === submission.submissionId) {
+                this.submissionDetailLoading = false;
+              }
+            },
+          });
+      });
   }
 
   private writeSubmissionWorkbook(sheets: SubmissionExportSheet[], filename: string) {
@@ -1065,6 +1100,10 @@ export class AdminComponent implements OnInit {
     const cachedSubmission = this.submissionDetailCache[submission.submissionId];
     this.applySelectedSubmission(cachedSubmission || submission);
     if (cachedSubmission || this.submissionHasFullExportData(submission)) {
+      return;
+    }
+    if (this.submissionDetailPrefetching.has(submission.submissionId)) {
+      this.submissionDetailLoading = true;
       return;
     }
 
