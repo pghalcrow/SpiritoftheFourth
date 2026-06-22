@@ -730,6 +730,7 @@ export class AdminComponent implements OnInit {
           : '';
       });
       if (this.isMotorShowSubmission(submission)) {
+        row['Submitted Date'] = this.formatSubmissionExportDate(submission.submittedAt);
         this.addMotorShowExportDefaults(row, submission.rawData);
         this.addMotorShowBodyExportFields(row, submission.rawData?.body);
       }
@@ -741,6 +742,12 @@ export class AdminComponent implements OnInit {
     const total = this.hasDisplayValue(rawData?.grandTotal) ? rawData.grandTotal : rawData?.total;
     if (!this.hasDisplayValue(row['Amount']) && this.hasDisplayValue(total)) {
       row['Amount'] = this.formatSubmissionExportFieldValue(total, 'total');
+    }
+    if (!this.hasDisplayValue(row['Total']) && this.hasDisplayValue(total)) {
+      row['Total'] = this.formatSubmissionExportFieldValue(total, 'total');
+    }
+    if (!this.hasDisplayValue(row['Plaque & T-shirt']) && this.hasDisplayValue(rawData?.comboSize)) {
+      row['Plaque & T-shirt'] = String(rawData.comboSize);
     }
 
     [
@@ -757,6 +764,13 @@ export class AdminComponent implements OnInit {
         ? this.formatSubmissionExportFieldValue(rawData[field], field)
         : 0;
     });
+  }
+
+  private formatSubmissionExportDate(value?: string): string {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toISOString().slice(0, 10);
   }
 
   private addMotorShowBodyExportFields(row: Record<string, string | number | boolean>, body: any) {
@@ -820,7 +834,7 @@ export class AdminComponent implements OnInit {
     const bundle = byLabel.get('t-shirt & plaque bundle');
     if (bundle) {
       fields['T-Shirt & Plaque Bundle'] = bundle;
-      fields['Combo Size'] = bundle;
+      fields['Plaque & T-shirt'] = bundle;
     }
 
     const total = byLabel.get('total') || byLabel.get('total due');
@@ -836,7 +850,7 @@ export class AdminComponent implements OnInit {
 
   private buildSubmissionExportSheet(sheetName: string, submissions: AdminSubmission[], group: SubmissionGroupKey): SubmissionExportSheet {
     const rows = this.buildSubmissionExportRows(submissions, group);
-    const headers = this.getSubmissionExportHeaders(rows);
+    const headers = this.getSubmissionExportHeaders(rows, group);
     return {
       sheet: sheetName,
       data: [
@@ -846,7 +860,7 @@ export class AdminComponent implements OnInit {
     };
   }
 
-  private getSubmissionExportHeaders(rows: Record<string, string | number | boolean>[]): string[] {
+  private getSubmissionExportHeaders(rows: Record<string, string | number | boolean>[], group?: SubmissionGroupKey): string[] {
     if (!rows.length) {
       const headers = [
         'Submission',
@@ -859,7 +873,50 @@ export class AdminComponent implements OnInit {
     }
     const headers = new Set<string>();
     rows.forEach(row => Object.keys(row).forEach(header => headers.add(header)));
-    return Array.from(headers);
+    const headerList = Array.from(headers);
+    return group === 'motorShow' ? this.orderMotorShowExportHeaders(headerList) : headerList;
+  }
+
+  private orderMotorShowExportHeaders(headers: string[]): string[] {
+    const excludedHeaders = new Set([
+      'Submission',
+      'Amount',
+      'Address',
+      'Combo Size',
+      'Grand Total',
+      'Vehicle',
+      'T-Shirt & Plaque Bundle',
+    ]);
+    const preferredOrder = [
+      'Name',
+      'Email',
+      'Phone',
+      'Submitted Date',
+      'Total',
+      'Vehicle Year',
+      'Make',
+      'Model',
+      'Color',
+      'Street Address',
+      'Zip Code',
+      'State',
+      'City',
+      'Club Affiliation',
+      'Plaque & T-shirt',
+      'Additional Large',
+      'Additional Medium',
+      'Additional Plaques',
+      'Additional Small',
+      'Additional XLarge',
+      'Additional XXLarge',
+      'Additional XXXLarge',
+    ];
+    const headerSet = new Set(headers.filter(header => !excludedHeaders.has(header)));
+    const orderedHeaders = preferredOrder.filter(header => headerSet.delete(header));
+    return [
+      ...orderedHeaders,
+      ...Array.from(headerSet),
+    ];
   }
 
   private getSubmissionExportRawKeys(submissions: AdminSubmission[], group: SubmissionGroupKey): string[] {

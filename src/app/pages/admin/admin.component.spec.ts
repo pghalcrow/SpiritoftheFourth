@@ -1373,8 +1373,9 @@ describe('AdminComponent', () => {
     const header = motorShowRows[0];
     const row = motorShowRows[1];
 
-    expect(row[header.indexOf('Amount')]).toBe(125);
-    expect(row[header.indexOf('Grand Total')]).toBe(89.5);
+    expect(header).not.toContain('Amount');
+    expect(header).not.toContain('Grand Total');
+    expect(row[header.indexOf('Total')]).toBe(89.5);
     expect(row[header.indexOf('Additional Plaques')]).toBe(2);
     expect(row[header.indexOf('Additional Small')]).toBe(1);
     expect(row[header.indexOf('Phone')]).toBe('555-1212');
@@ -1427,10 +1428,12 @@ describe('AdminComponent', () => {
     const header = motorShowRows[0];
     const row = motorShowRows[1];
 
-    expect(header).toContain('Address');
-    expect(header).toContain('Vehicle');
-    expect(header).toContain('T-Shirt & Plaque Bundle');
+    expect(header).not.toContain('Submission');
+    expect(header).not.toContain('Address');
+    expect(header).not.toContain('Vehicle');
+    expect(header).not.toContain('T-Shirt & Plaque Bundle');
     expect(header).toContain('Total');
+    expect(header).toContain('Submitted Date');
     expect(header).toContain('Street Address');
     expect(header).toContain('City');
     expect(header).toContain('State');
@@ -1439,8 +1442,9 @@ describe('AdminComponent', () => {
     expect(header).toContain('Make');
     expect(header).toContain('Model');
     expect(header).toContain('Color');
-    expect(header).toContain('Combo Size');
-    expect(header).toContain('Amount');
+    expect(header).not.toContain('Combo Size');
+    expect(header).toContain('Plaque & T-shirt');
+    expect(header).not.toContain('Amount');
     expect(header).toContain('Additional Large');
     expect(header).toContain('Additional Medium');
     expect(header).toContain('Additional Plaques');
@@ -1448,10 +1452,16 @@ describe('AdminComponent', () => {
     expect(header).toContain('Additional XLarge');
     expect(header).toContain('Additional XXLarge');
     expect(header).toContain('Additional XXXLarge');
-    expect(header).toContain('Grand Total');
-    expect(row[header.indexOf('Address')]).toBe('13502 Appaloosa Dr, Lakeside, CA 92040');
-    expect(row[header.indexOf('Vehicle')]).toBe('1932 Ford Coupe (Orange)');
-    expect(row[header.indexOf('T-Shirt & Plaque Bundle')]).toBe('No');
+    expect(header).not.toContain('Grand Total');
+    expect(header.indexOf('Submitted Date')).toBe(header.indexOf('Phone') + 1);
+    expect(header.indexOf('Total')).toBe(header.indexOf('Submitted Date') + 1);
+    expect(header.indexOf('Zip Code')).toBe(header.indexOf('Street Address') + 1);
+    expect(header.indexOf('State')).toBe(header.indexOf('Street Address') + 2);
+    expect(header.indexOf('City')).toBe(header.indexOf('State') + 1);
+    expect(header.indexOf('Vehicle Year')).toBe(header.indexOf('Total') + 1);
+    expect(header.indexOf('Make')).toBe(header.indexOf('Vehicle Year') + 1);
+    expect(header.indexOf('Color')).toBe(header.indexOf('Model') + 1);
+    expect(row[header.indexOf('Submitted Date')]).toBe('2026-06-15');
     expect(row[header.indexOf('Total')]).toBe(25);
     expect(row[header.indexOf('Street Address')]).toBe('13502 Appaloosa Dr');
     expect(row[header.indexOf('City')]).toBe('Lakeside');
@@ -1461,8 +1471,7 @@ describe('AdminComponent', () => {
     expect(row[header.indexOf('Make')]).toBe('Ford');
     expect(row[header.indexOf('Model')]).toBe('Coupe');
     expect(row[header.indexOf('Color')]).toBe('Orange');
-    expect(row[header.indexOf('Combo Size')]).toBe('No');
-    expect(row[header.indexOf('Amount')]).toBe(25);
+    expect(row[header.indexOf('Plaque & T-shirt')]).toBe('No');
     expect(row[header.indexOf('Additional Large')]).toBe(0);
     expect(row[header.indexOf('Additional Medium')]).toBe(0);
     expect(row[header.indexOf('Additional Plaques')]).toBe(0);
@@ -1470,7 +1479,6 @@ describe('AdminComponent', () => {
     expect(row[header.indexOf('Additional XLarge')]).toBe(0);
     expect(row[header.indexOf('Additional XXLarge')]).toBe(0);
     expect(row[header.indexOf('Additional XXXLarge')]).toBe(0);
-    expect(row[header.indexOf('Grand Total')]).toBe(25);
   });
 
   it('omits payment and internal admin fields from submission exports', () => {
