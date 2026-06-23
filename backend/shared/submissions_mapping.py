@@ -16,6 +16,7 @@ EXACT_SUBMISSION_TITLE_REPLACEMENTS = {
     "motorShowOrder Order": MOTOR_SHOW_ADMIN_TITLE,
     "Motor Show Event Order": MOTOR_SHOW_ADMIN_TITLE,
     "Freedom Club Donation Order": "Freedom Club Donation",
+    "New Vendor Application Submission": "Vendor Application",
 }
 
 

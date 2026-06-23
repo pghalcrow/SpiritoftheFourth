@@ -137,6 +137,7 @@ class SubmissionsMappingTest(unittest.TestCase):
         self.assertEqual(record["paymentStatus"], "none")
         self.assertEqual(record["paymentProvider"], "none")
         self.assertEqual(record["status"], "New")
+        self.assertEqual(record["submissionTitle"], "Vendor Application")
         self.assertEqual(record["updatedBy"], "system")
         self.assertEqual(record["createdAt"], record["submittedAt"])
         self.assertEqual(record["updatedAt"], record["submittedAt"])
