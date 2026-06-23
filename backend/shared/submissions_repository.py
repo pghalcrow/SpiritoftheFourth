@@ -291,7 +291,7 @@ class SubmissionsRepository:
         }
 
     def count_submissions(self, group=None):
-        if group:
+        if group and group != "all":
             result = self._query_submission_group(group, select="COUNT")
             return int(result.get("Count", 0))
 

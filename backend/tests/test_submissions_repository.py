@@ -239,6 +239,7 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual([item["submissionId"] for item in result["items"]], ["s1"])
         self.assertIn("SUBMISSION", self.table.query_pks)
         self.assertNotIn("SUBMISSION_GROUP#all", self.table.query_pks)
+        self.assertEqual(self.repo.count_submissions("all"), 1)
 
     def test_get_submission_uses_submission_id_lookup_record(self):
         self.repo.create_submission({
