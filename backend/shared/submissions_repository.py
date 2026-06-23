@@ -15,6 +15,15 @@ def _now_iso():
 
 
 class SubmissionsRepository:
+    SUBMISSION_GROUPS = (
+        "vendor",
+        "artist",
+        "sponsor",
+        "motorShow",
+        "parade",
+        "volunteer",
+        "specialEvents",
+    )
     SUMMARY_RAW_DATA_KEYS = (
         "formType",
         "eventTitle",
@@ -35,18 +44,22 @@ class SubmissionsRepository:
         self.table = boto3.resource("dynamodb").Table(resolved_table_name)
 
     def create_submission(self, record):
+        self._prepare_submission_record(record)
         self.table.put_item(Item=record)
+        self.reindex_submission(record)
         return record
 
     def create_submission_if_missing(self, record):
         if self._find_submission_by_id(record["submissionId"]):
             return False
 
+        self._prepare_submission_record(record)
         try:
             self.table.put_item(
                 Item=record,
                 ConditionExpression="attribute_not_exists(pk)",
             )
+            self.reindex_submission(record)
             return True
         except Exception as error:
             if self._is_conditional_check_failed(error):
@@ -262,22 +275,25 @@ class SubmissionsRepository:
         return {"items": items, "lastEvaluatedKey": result.get("LastEvaluatedKey")}
 
     def list_submissions_group_page(self, group, limit=50, cursor=None, summary_only=True):
-        items = [
-            item for item in self.list_submissions()["items"]
-            if self.submission_matches_group(item, group)
-        ]
-        total_count = len(items)
-        offset = self._cursor_offset(cursor)
-        page = items[offset:offset + limit]
+        result = self._query_submission_group(
+            group,
+            scan_index_forward=False,
+            limit=limit,
+            exclusive_start_key=cursor,
+        )
+        page = result.get("Items", [])
         if summary_only:
             page = [self._summarize_submission(item) for item in page]
-        next_offset = offset + len(page)
-        last_key = {"offset": next_offset, "group": group} if next_offset < len(items) else None
-        return {"items": page, "lastEvaluatedKey": last_key, "totalCount": total_count}
+        return {
+            "items": page,
+            "lastEvaluatedKey": result.get("LastEvaluatedKey"),
+            "totalCount": self.count_submissions(group=group),
+        }
 
     def count_submissions(self, group=None):
         if group:
-            return sum(1 for item in self.list_submissions()["items"] if self.submission_matches_group(item, group))
+            result = self._query_submission_group(group, select="COUNT")
+            return int(result.get("Count", 0))
 
         total = 0
         last_key = None
@@ -312,6 +328,63 @@ class SubmissionsRepository:
             return self._is_sponsorship_submission(submission)
 
         return True
+
+    def submission_groups(self, submission):
+        return [
+            group
+            for group in self.SUBMISSION_GROUPS
+            if self.submission_matches_group(submission, group)
+        ]
+
+    def reindex_submission(self, submission):
+        self._delete_submission_indexes(submission)
+        self._write_submission_indexes(submission)
+
+    def _prepare_submission_record(self, record):
+        record["submissionGroups"] = self.submission_groups(record)
+        return record
+
+    def _write_submission_indexes(self, submission):
+        submission_id = submission.get("submissionId")
+        if not submission_id:
+            return
+
+        self.table.put_item(Item={
+            "pk": "SUBMISSION_ID",
+            "sk": submission_id,
+            "recordType": "submission_lookup",
+            "submissionId": submission_id,
+            "submissionPk": submission.get("pk"),
+            "submissionSk": submission.get("sk"),
+        })
+
+        groups = submission.get("submissionGroups") or self.submission_groups(submission)
+        for group in groups:
+            self.table.put_item(Item={
+                **self._summarize_submission(submission),
+                "pk": self._submission_group_pk(group),
+                "sk": submission.get("sk"),
+                "recordType": "submission_group",
+                "group": group,
+                "submissionId": submission_id,
+                "submissionPk": submission.get("pk"),
+                "submissionSk": submission.get("sk"),
+                "submissionGroups": groups,
+            })
+
+    def _delete_submission_indexes(self, submission):
+        submission_id = submission.get("submissionId")
+        if submission_id:
+            self.table.delete_item(Key={"pk": "SUBMISSION_ID", "sk": submission_id})
+
+        submission_sk = submission.get("sk")
+        if not submission_sk:
+            return
+        for group in self.SUBMISSION_GROUPS:
+            self.table.delete_item(Key={"pk": self._submission_group_pk(group), "sk": submission_sk})
+
+    def _submission_group_pk(self, group):
+        return f"SUBMISSION_GROUP#{group}"
 
     def _is_sponsorship_submission(self, submission):
         text = self._submission_group_text(submission)
@@ -413,7 +486,10 @@ class SubmissionsRepository:
             if self._is_conditional_check_failed(error):
                 raise KeyError(f"Submission not found: {submission_id}") from error
             raise
-        return result["Attributes"]
+        updated = result["Attributes"]
+        self._prepare_submission_record(updated)
+        self.reindex_submission(updated)
+        return updated
 
     def delete_submission(self, submission_id):
         submission = self._find_submission_by_id(submission_id)
@@ -429,6 +505,7 @@ class SubmissionsRepository:
             if self._is_conditional_check_failed(error):
                 raise KeyError(f"Submission not found: {submission_id}") from error
             raise
+        self._delete_submission_indexes(submission)
         return submission
 
     def _summarize_submission(self, submission):
@@ -449,6 +526,15 @@ class SubmissionsRepository:
         return summary
 
     def _find_submission_by_id(self, submission_id):
+        lookup = self.table.get_item(Key={"pk": "SUBMISSION_ID", "sk": submission_id}).get("Item")
+        if lookup:
+            result = self.table.get_item(Key={
+                "pk": lookup.get("submissionPk", "SUBMISSION"),
+                "sk": lookup.get("submissionSk", ""),
+            })
+            if result.get("Item"):
+                return result["Item"]
+
         last_key = None
 
         while True:
@@ -461,6 +547,21 @@ class SubmissionsRepository:
             if not last_key:
                 break
         return None
+
+    def _query_submission_group(self, group, scan_index_forward=None, limit=None, exclusive_start_key=None, select=None):
+        kwargs = {
+            "KeyConditionExpression": "pk = :pk",
+            "ExpressionAttributeValues": {":pk": self._submission_group_pk(group)},
+        }
+        if scan_index_forward is not None:
+            kwargs["ScanIndexForward"] = scan_index_forward
+        if limit is not None:
+            kwargs["Limit"] = limit
+        if exclusive_start_key is not None:
+            kwargs["ExclusiveStartKey"] = exclusive_start_key
+        if select is not None:
+            kwargs["Select"] = select
+        return self.table.query(**kwargs)
 
     def _query_submissions(self, scan_index_forward=None, limit=None, exclusive_start_key=None, select=None):
         kwargs = {

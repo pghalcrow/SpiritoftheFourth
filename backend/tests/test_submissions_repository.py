@@ -8,6 +8,7 @@ class FakeTable:
         self.items = {}
         self.page_size = None
         self.delete_before_update_keys = set()
+        self.query_pks = []
 
     def put_item(self, **kwargs):
         item = kwargs["Item"]
@@ -51,6 +52,7 @@ class FakeTable:
 
     def query(self, **kwargs):
         pk_value = kwargs["ExpressionAttributeValues"][":pk"]
+        self.query_pks.append(pk_value)
         rows = [item for (pk, _), item in self.items.items() if pk == pk_value]
         rows.sort(key=lambda row: row["sk"], reverse=kwargs.get("ScanIndexForward") is False)
         if kwargs.get("Select") == "COUNT":
@@ -194,6 +196,48 @@ class RepositoryTests(unittest.TestCase):
         self.assertFalse(self.repo.submission_matches_group(sponsorship, "sponsor"))
         self.assertTrue(self.repo.submission_matches_group(sponsorship, "specialEvents"))
         self.assertFalse(self.repo.submission_matches_group(special_event, "specialEvents"))
+
+    def test_grouped_page_uses_persisted_category_index(self):
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:00:00-07:00#s1",
+            "recordType": "submission",
+            "submissionId": "s1",
+            "submissionTitle": "Freedom Club Donation",
+            "submittedAt": "2026-06-05T10:00:00-07:00",
+            "name": "Pat",
+            "email": "pat@example.com",
+            "phone": "555",
+            "status": "New",
+            "assignedTo": "",
+            "notes": "",
+            "paymentProvider": "stripe",
+            "rawData": {"eventTitle": "Freedom Club Donation"},
+        })
+        self.table.query_pks.clear()
+
+        result = self.repo.list_submissions_group_page("sponsor", limit=10)
+
+        self.assertEqual([item["submissionId"] for item in result["items"]], ["s1"])
+        self.assertEqual(result["totalCount"], 1)
+        self.assertNotIn("SUBMISSION", self.table.query_pks)
+        self.assertIn("SUBMISSION_GROUP#sponsor", self.table.query_pks)
+
+    def test_get_submission_uses_submission_id_lookup_record(self):
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:00:00-07:00#s1",
+            "recordType": "submission",
+            "submissionId": "s1",
+            "submissionTitle": "Volunteer",
+            "submittedAt": "2026-06-05T10:00:00-07:00",
+        })
+        self.table.query_pks.clear()
+
+        submission = self.repo.get_submission("s1")
+
+        self.assertEqual(submission["submissionId"], "s1")
+        self.assertNotIn("SUBMISSION", self.table.query_pks)
 
     def test_runtime_test_mode_round_trip(self):
         updated = self.repo.set_runtime_test_mode(True, "developer")
