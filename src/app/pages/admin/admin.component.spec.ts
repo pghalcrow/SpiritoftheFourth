@@ -245,6 +245,40 @@ describe('AdminComponent', () => {
     expect(cmsService.updateSubmissionAdminFields).not.toHaveBeenCalled();
   });
 
+  it('shows the payment provider in submission details for paid submissions', () => {
+    const paypalRows = component.getSubmissionDetailRows({
+      submissionId: 'paypal-1',
+      submissionTitle: 'Vendor Application',
+      submittedAt: '2026-06-05T10:00:00-07:00',
+      name: 'Pat Halcrow',
+      email: 'pat@example.com',
+      phone: '555-1212',
+      paymentStatus: 'paid',
+      paymentProvider: 'paypal',
+      status: 'New',
+      assignedTo: '',
+      notes: '',
+      rawData: { companyName: 'Fourth Booth' },
+    });
+    const stripeRows = component.getSubmissionDetailRows({
+      submissionId: 'stripe-1',
+      submissionTitle: 'Motor Show Event',
+      submittedAt: '2026-06-05T10:00:00-07:00',
+      name: 'Pat Halcrow',
+      email: 'pat@example.com',
+      phone: '555-1212',
+      paymentStatus: 'paid',
+      paymentProvider: 'stripe',
+      status: 'New',
+      assignedTo: '',
+      notes: '',
+      rawData: { year: '1969', make: 'Chevrolet', model: 'Camaro' },
+    });
+
+    expect(paypalRows).toContain(jasmine.objectContaining({ label: 'Payment Provider', value: 'PayPal' }));
+    expect(stripeRows).toContain(jasmine.objectContaining({ label: 'Payment Provider', value: 'Stripe' }));
+  });
+
   it('does not show an artist submission group tab', () => {
     const nativeElement = fixture.nativeElement as HTMLElement;
     const tabLabels = Array.from(nativeElement.querySelectorAll<HTMLButtonElement>('.submission-group-tab'))

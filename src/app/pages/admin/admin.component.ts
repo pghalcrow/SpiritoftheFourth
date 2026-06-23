@@ -1265,14 +1265,15 @@ export class AdminComponent implements OnInit {
   }
 
   getSubmissionDetailRows(submission?: AdminSubmission): SubmissionDisplayRow[] {
+    const paymentProviderRows = this.getSubmissionPaymentProviderRows(submission);
     const rawData = submission?.rawData;
     if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) {
-      return [];
+      return paymentProviderRows;
     }
 
     if (this.isMotorShowSubmission(submission)) {
       const motorShowRows = this.getMotorShowDetailRows(rawData);
-      if (motorShowRows.length) return motorShowRows;
+      if (motorShowRows.length) return [...motorShowRows, ...paymentProviderRows];
     }
 
     const excludedFields = new Set([
@@ -1347,9 +1348,22 @@ export class AdminComponent implements OnInit {
       label: this.formatSubmissionFieldLabel(key),
       value: this.formatSubmissionFieldValue(rawData[key], key),
     }));
-    if (rows.length) return rows;
+    if (rows.length) return [...rows, ...paymentProviderRows];
 
-    return this.parseSubmissionBodyRows(rawData.body);
+    return [...this.parseSubmissionBodyRows(rawData.body), ...paymentProviderRows];
+  }
+
+  private getSubmissionPaymentProviderRows(submission?: AdminSubmission): SubmissionDisplayRow[] {
+    const provider = this.formatSubmissionPaymentProvider(submission);
+    return provider ? [{ label: 'Payment Provider', value: provider }] : [];
+  }
+
+  private formatSubmissionPaymentProvider(submission?: AdminSubmission): string {
+    const rawData = submission?.rawData || {};
+    const provider = String(submission?.paymentProvider || rawData.paymentProvider || '').trim().toLowerCase();
+    if (provider === 'stripe') return 'Stripe';
+    if (provider === 'paypal') return 'PayPal';
+    return '';
   }
 
   private isMotorShowSubmission(submission?: AdminSubmission): boolean {
