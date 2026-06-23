@@ -213,6 +213,38 @@ describe('AdminComponent', () => {
     expect(nativeElement.querySelector('[data-testid="delete-submission-button"]')).toBeFalsy();
   });
 
+  it('does not allow viewers to edit submission admin fields from the detail panel', () => {
+    sessionStorage.setItem('adminRole', 'viewer');
+    component.submissions = [{
+      submissionId: 's1',
+      submissionTitle: 'Volunteer Request',
+      submittedAt: '2026-06-05T10:00:00-07:00',
+      name: 'Pat Halcrow',
+      email: 'pat@example.com',
+      phone: '555-1212',
+      paymentStatus: 'none',
+      paymentProvider: 'none',
+      status: 'New',
+      assignedTo: '',
+      notes: 'Internal note',
+      rawData: { message: 'Available morning' },
+    }];
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLTableRowElement>('[data-testid="submission-row-s1"]')!.click();
+    fixture.detectChanges();
+
+    expect(nativeElement.querySelector('.submission-detail-panel')).toBeTruthy();
+    expect(nativeElement.querySelector('.admin-textarea')).toBeFalsy();
+    expect(nativeElement.querySelector('[data-testid="payment-received-checkbox"]')).toBeFalsy();
+    expect(nativeElement.querySelector('[data-testid="save-submission-button"]')).toBeFalsy();
+
+    component.saveSelectedSubmission();
+
+    expect(cmsService.updateSubmissionAdminFields).not.toHaveBeenCalled();
+  });
+
   it('does not show an artist submission group tab', () => {
     const nativeElement = fixture.nativeElement as HTMLElement;
     const tabLabels = Array.from(nativeElement.querySelectorAll<HTMLButtonElement>('.submission-group-tab'))

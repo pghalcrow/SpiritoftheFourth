@@ -258,6 +258,10 @@ export class AdminComponent implements OnInit {
     return this.canAccessEvents;
   }
 
+  get canEditSubmissions(): boolean {
+    return ['developer', 'superAdmin', 'admin'].includes(this.currentRole);
+  }
+
   get canAccessEvents(): boolean {
     return ['developer', 'superAdmin'].includes(this.currentRole);
   }
@@ -1687,6 +1691,7 @@ export class AdminComponent implements OnInit {
 
   saveSelectedSubmission() {
     if (!this.selectedSubmission || this.submissionActionLoading) return;
+    if (!this.canEditSubmissions) return;
     const { submissionId, notes } = this.selectedSubmission;
     const update = this.isCheckPaymentSubmission(this.selectedSubmission)
       ? { notes, paymentReceived: this.selectedSubmission.paymentReceived === true }

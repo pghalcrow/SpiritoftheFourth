@@ -818,7 +818,7 @@
         </ng-container>
       </section>
 
-      <label *ngIf="isCheckPaymentSubmission(selectedSubmission)" class="payment-received-toggle">
+      <label *ngIf="canEditSubmissions && isCheckPaymentSubmission(selectedSubmission)" class="payment-received-toggle">
         <input
           type="checkbox"
           data-testid="payment-received-checkbox"
@@ -827,7 +827,7 @@
         <span>Payment Received</span>
       </label>
 
-      <label class="control-group">
+      <label *ngIf="canEditSubmissions" class="control-group">
         <span>Notes</span>
         <textarea class="admin-textarea" [(ngModel)]="selectedSubmission.notes" rows="5"></textarea>
       </label>
@@ -845,6 +845,7 @@
           {{ submissionActionLoading === 'delete' ? 'Deleting...' : 'Delete Submission' }}
         </button>
         <button
+          *ngIf="canEditSubmissions"
           type="button"
           class="action-button primary"
           data-testid="save-submission-button"
