@@ -24,7 +24,7 @@ def lambda_handler(event, context):
             f"<p>Temporary password: <strong>{code_parameter}</strong></p>"
             f'<p><a href="{SIGN_IN_URL}">Open the admin sign-in page</a></p>'
             f"<p>If the button does not work, copy and paste this URL into your browser:<br>{SIGN_IN_URL}</p>"
-            "<p>This temporary password is valid for 48 hours. After signing in, you will be prompted to set your own password.</p>"
+            "<p>This temporary password is valid for 7 days. After signing in, you will be prompted to set your own password.</p>"
         )
         return event
 

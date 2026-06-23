@@ -53,7 +53,7 @@ class CognitoCustomMessageTests(unittest.TestCase):
         self.assertEqual(result["response"]["emailSubject"], "Spirit of the Fourth admin account setup")
         self.assertIn("viewer@example.com", result["response"]["emailMessage"])
         self.assertIn("{####}", result["response"]["emailMessage"])
-        self.assertIn("48 hours", result["response"]["emailMessage"])
+        self.assertIn("7 days", result["response"]["emailMessage"])
         self.assertIn("https://spiritofthefourth.org/sign-in", result["response"]["emailMessage"])
 
 
