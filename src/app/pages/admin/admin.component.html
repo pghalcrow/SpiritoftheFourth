@@ -565,9 +565,14 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let user of adminUsers">
+          <tr *ngFor="let user of adminUsers" [class.current-admin-user-row]="isCurrentAdminUser(user)">
             <td>{{ user.email }}</td>
-            <td>
+            <td
+              class="user-role-cell"
+              [class.current-admin-user-cell]="isCurrentAdminUser(user)"
+              [style.vertical-align]="isCurrentAdminUser(user) ? 'middle' : null"
+              [attr.data-testid]="'user-role-cell-' + user.email"
+            >
               <select
                 *ngIf="canChangeAdminUserRole(user); else readOnlyRole"
                 class="admin-select compact-select"
@@ -585,7 +590,12 @@
               </select>
               <ng-template #readOnlyRole>{{ formatRole(user.role) }}</ng-template>
             </td>
-            <td>{{ formatAccountStatus(user.status) }}</td>
+            <td
+              class="user-account-status-cell"
+              [class.current-admin-user-cell]="isCurrentAdminUser(user)"
+              [style.vertical-align]="isCurrentAdminUser(user) ? 'middle' : null"
+              [attr.data-testid]="'user-account-status-cell-' + user.email"
+            >{{ formatAccountStatus(user.status) }}</td>
             <td>
               <label
                 *ngIf="canToggleAdminUserEnabled(user); else readOnlyEnabled"

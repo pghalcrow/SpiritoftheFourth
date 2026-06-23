@@ -619,6 +619,27 @@ describe('AdminComponent', () => {
     expect(nativeElement.querySelector('[data-testid="user-enabled-toggle-viewer@example.com"]')).toBeTruthy();
   });
 
+  it('marks the signed-in user role and account status cells for centered alignment', () => {
+    sessionStorage.setItem('adminRole', 'admin');
+    sessionStorage.setItem('adminEmail', 'admin@example.com');
+    cmsService.getAdminUsers.and.returnValue(of({
+      items: [
+        { email: 'admin@example.com', role: 'admin', enabled: true, status: 'CONFIRMED' },
+        { email: 'viewer@example.com', role: 'viewer', enabled: true, status: 'CONFIRMED' },
+      ]
+    }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    expect(nativeElement.querySelector('[data-testid="user-role-cell-admin@example.com"]')?.classList).toContain('current-admin-user-cell');
+    expect(nativeElement.querySelector('[data-testid="user-account-status-cell-admin@example.com"]')?.classList).toContain('current-admin-user-cell');
+    expect(nativeElement.querySelector('[data-testid="user-role-cell-viewer@example.com"]')?.classList).not.toContain('current-admin-user-cell');
+    expect(nativeElement.querySelector('[data-testid="user-account-status-cell-viewer@example.com"]')?.classList).not.toContain('current-admin-user-cell');
+  });
+
   it('automatically saves enabled changes for scoped users', () => {
     sessionStorage.setItem('adminRole', 'superAdmin');
     sessionStorage.setItem('adminEmail', 'super@example.com');

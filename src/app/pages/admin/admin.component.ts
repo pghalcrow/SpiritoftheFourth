@@ -307,6 +307,11 @@ export class AdminComponent implements OnInit {
     return false;
   }
 
+  isCurrentAdminUser(user: AdminUser): boolean {
+    const targetEmail = (user.email || user.username || '').trim().toLowerCase();
+    return Boolean(targetEmail && targetEmail === this.currentEmail);
+  }
+
   getRoleOptionsForUser(user: AdminUser): AdminRole[] {
     if (!this.canManageAdminUser(user)) return [];
     return this.creatableRoles;
