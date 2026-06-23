@@ -1226,18 +1226,32 @@ describe('AdminComponent', () => {
         totalPages: 2,
       }),
       of({
-        items: [{
-          submissionId: 'search-1',
-          submissionTitle: 'Volunteer Request',
-          submittedAt: '2026-06-05T10:00:00-07:00',
-          name: 'Alpha Person 1',
-          email: 'alpha@example.com',
-          phone: '555-1111',
-          status: 'New',
-          assignedTo: '',
-          notes: '',
-          rawData: { formType: 'volunteerForm' },
-        }],
+        items: [
+          {
+            submissionId: 'search-1',
+            submissionTitle: 'Volunteer Request',
+            submittedAt: '2026-06-05T10:00:00-07:00',
+            name: 'Alpha Person 1',
+            email: 'alpha@example.com',
+            phone: '555-1111',
+            status: 'New',
+            assignedTo: '',
+            notes: '',
+            rawData: { formType: 'volunteerForm' },
+          },
+          {
+            submissionId: 'search-hidden-match',
+            submissionTitle: 'Volunteer Request',
+            submittedAt: '2026-06-05T10:01:00-07:00',
+            name: 'Person matched by backend raw data',
+            email: 'hidden@example.com',
+            phone: '555-1112',
+            status: 'New',
+            assignedTo: '',
+            notes: '',
+            rawData: { message: 'Alpha is only in raw details' },
+          },
+        ],
         nextCursor: 'search-cursor-2',
         totalCount: 125,
         totalPages: 3,
@@ -1275,6 +1289,10 @@ describe('AdminComponent', () => {
     expect(component.displayedSubmissionPageNumber).toBe(1);
     expect(component.displayedSubmissionTotalPages).toBe(3);
     expect(component.displayedHasNextSubmissionPage).toBeTrue();
+    expect(component.filteredSubmissions.map(submission => submission.submissionId)).toEqual([
+      'search-1',
+      'search-hidden-match',
+    ]);
     expect(fixture.nativeElement.textContent).toContain('Page 1 of 3');
 
     component.loadNextSubmissionPage();

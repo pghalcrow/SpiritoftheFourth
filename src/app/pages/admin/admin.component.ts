@@ -1091,16 +1091,9 @@ export class AdminComponent implements OnInit {
   }
 
   get filteredSubmissions(): AdminSubmission[] {
-    const groupedSubmissions = this.selectedSubmissionGroup !== 'all'
+    return this.selectedSubmissionGroup !== 'all'
       ? this.submissions.filter(row => this.submissionMatchesGroup(row, this.selectedSubmissionGroup))
       : this.submissions;
-    const query = this.submissionSearch.trim().toLowerCase();
-    if (!query) return groupedSubmissions;
-    return groupedSubmissions.filter(row =>
-      [this.formatSubmissionTitle(row), row.submissionTitle, row.name, row.email, row.phone, row.status, row.assignedTo, row.notes]
-        .filter(Boolean)
-        .some(value => String(value).toLowerCase().includes(query))
-    );
   }
 
   get showSubmissionColumn(): boolean {
