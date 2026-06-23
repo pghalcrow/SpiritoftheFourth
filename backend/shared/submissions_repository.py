@@ -441,18 +441,10 @@ class SubmissionsRepository:
                 return items
 
     def _submission_search_text(self, submission):
-        raw_data = submission.get("rawData") or {}
-        raw_values = raw_data.values() if isinstance(raw_data, dict) else []
         values = [
-            submission.get("submissionTitle"),
             submission.get("name"),
             submission.get("email"),
             submission.get("phone"),
-            submission.get("status"),
-            submission.get("assignedTo"),
-            submission.get("notes"),
-            submission.get("source"),
-            *raw_values,
         ]
         return " ".join(str(value).lower() for value in values if value is not None)
 

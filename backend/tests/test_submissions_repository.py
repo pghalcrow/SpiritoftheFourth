@@ -330,6 +330,43 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(result["totalCount"], 1)
         self.assertEqual([item["submissionId"] for item in result["items"]], ["vendor"])
 
+    def test_search_submissions_only_matches_name_email_and_phone(self):
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:00:00-07:00#hidden",
+            "recordType": "submission",
+            "submissionId": "hidden",
+            "submissionTitle": "Motor Show Event",
+            "submittedAt": "2026-06-05T10:00:00-07:00",
+            "name": "Cruise Club",
+            "email": "club@example.org",
+            "phone": "555",
+            "status": "New",
+            "assignedTo": "",
+            "notes": "",
+            "rawData": {"clubAffiliation": "East County Cruisers"},
+        })
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:01:00-07:00#visible",
+            "recordType": "submission",
+            "submissionId": "visible",
+            "submissionTitle": "Motor Show Event",
+            "submittedAt": "2026-06-05T10:01:00-07:00",
+            "name": "Dean Driver",
+            "email": "driver@example.org",
+            "phone": "555",
+            "status": "New",
+            "assignedTo": "",
+            "notes": "",
+            "rawData": {"clubAffiliation": "North County Cruisers"},
+        })
+
+        result = self.repo.list_submissions_page(limit=10, search="ea")
+
+        self.assertEqual(result["totalCount"], 1)
+        self.assertEqual([item["submissionId"] for item in result["items"]], ["visible"])
+
     def test_get_submission_uses_submission_id_lookup_record(self):
         self.repo.create_submission({
             "pk": "SUBMISSION",
