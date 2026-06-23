@@ -1436,16 +1436,31 @@ describe('AdminComponent', () => {
         notes: '',
         rawData: { formType: 'communityPicnicForm', eventTitle: 'Community Picnic', mealPreference: 'Vegetarian' },
       },
+      {
+        submissionId: 'sponsor-1',
+        submissionTitle: 'Sponsorship Submission',
+        submittedAt: '2026-06-09T10:00:00-07:00',
+        name: 'Sponsor Person',
+        email: 'sponsor@example.com',
+        phone: '555-5000',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { formType: 'sponsorshipForm', sponsorshipLevel: 'Platinum' },
+      },
     ];
 
     component.exportSubmissionsToExcel();
 
     expect(writeWorkbook).toHaveBeenCalled();
     const sheets = writeWorkbook.calls.mostRecent().args[0] as { sheet: string; data: any[][] }[];
-    expect(sheets.map(sheet => sheet.sheet)).toEqual(['Vendors', 'Artists', 'Sponsors', 'Motor Show', 'Parade', 'Volunteers', 'Special Events']);
+    expect(sheets.map(sheet => sheet.sheet)).toEqual(['Vendors', 'Artists', 'Freedom Club', 'Motor Show', 'Parade', 'Volunteers', 'Special Events']);
     const vendorRows = sheets.find(sheet => sheet.sheet === 'Vendors')!.data;
     const paradeRows = sheets.find(sheet => sheet.sheet === 'Parade')!.data;
     const volunteerRows = sheets.find(sheet => sheet.sheet === 'Volunteers')!.data;
+    const freedomClubRows = sheets.find(sheet => sheet.sheet === 'Freedom Club')!.data;
     const specialEventRows = sheets.find(sheet => sheet.sheet === 'Special Events')!.data;
 
     expect(vendorRows[0]).toContain('Company Name');
@@ -1467,9 +1482,11 @@ describe('AdminComponent', () => {
     expect(volunteerRows[0]).toContain('Availability');
     expect(volunteerRows[0]).not.toContain('Form Type');
     expect(volunteerRows[1]).toContain('Morning');
-    expect(specialEventRows[0]).toContain('Event Title');
+    expect(freedomClubRows[0]).toContain('Event Title');
+    expect(freedomClubRows[1]).toContain('Community Picnic');
+    expect(specialEventRows[0]).toContain('Sponsorship Level');
     expect(specialEventRows[0]).not.toContain('Form Type');
-    expect(specialEventRows[1]).toContain('Community Picnic');
+    expect(specialEventRows[1]).toContain('Platinum');
 
     sheets.forEach(sheet => {
       expect(sheet.data[0]).not.toContain('Submitted At');
@@ -2001,6 +2018,11 @@ describe('AdminComponent', () => {
     fixture.detectChanges();
 
     let tableText = nativeElement.querySelector('.submissions-table')?.textContent || '';
+    const tabLabels = Array.from(nativeElement.querySelectorAll<HTMLButtonElement>('.submission-group-tab'))
+      .map(tab => tab.textContent?.trim());
+    expect(tabLabels).toContain('Freedom Club');
+    expect(tabLabels).toContain('Special Events');
+    expect(tabLabels).not.toContain('Sponsors');
     expect(component.selectedSubmissionGroup).toBe('all');
     expect(nativeElement.querySelectorAll('.submission-group-tab.active').length).toBe(1);
     expect(nativeElement.querySelector('[data-testid="submission-group-all"]')?.classList).toContain('active');
@@ -2033,15 +2055,28 @@ describe('AdminComponent', () => {
     expect(tableText).toContain('Motor Show Event');
     expect(tableText).toContain('Community Picnic Signup');
 
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="submission-group-sponsor"]')!.click();
+    fixture.detectChanges();
+
+    tableText = nativeElement.querySelector('.submissions-table')?.textContent || '';
+    expect(component.selectedSubmissionGroup).toBe('sponsor');
+    expect(tableText).toContain('Community Picnic Signup');
+    expect(tableText).not.toContain('New Vendor Application Submission');
+    expect(tableText).not.toContain('New Artist Sign-Up');
+    expect(tableText).not.toContain('Sponsorship Submission');
+    expect(tableText).not.toContain('Motor Show Event');
+    expect(tableText).not.toContain('New Parade Entry Request - Parade');
+    expect(tableText).not.toContain('New Volunteer Request');
+
     nativeElement.querySelector<HTMLButtonElement>('[data-testid="submission-group-specialEvents"]')!.click();
     fixture.detectChanges();
 
     tableText = nativeElement.querySelector('.submissions-table')?.textContent || '';
     expect(component.selectedSubmissionGroup).toBe('specialEvents');
-    expect(tableText).toContain('Community Picnic Signup');
+    expect(tableText).toContain('Sponsorship Submission');
+    expect(tableText).not.toContain('Community Picnic Signup');
     expect(tableText).not.toContain('New Vendor Application Submission');
     expect(tableText).not.toContain('New Artist Sign-Up');
-    expect(tableText).not.toContain('Sponsorship Submission');
     expect(tableText).not.toContain('Motor Show Event');
     expect(tableText).not.toContain('New Parade Entry Request - Parade');
     expect(tableText).not.toContain('New Volunteer Request');

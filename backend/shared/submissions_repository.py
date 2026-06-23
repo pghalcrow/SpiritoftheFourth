@@ -301,7 +301,7 @@ class SubmissionsRepository:
         if group == "artist":
             return "artist" in text or "artistsignup" in text
         if group == "sponsor":
-            return "sponsor" in text or "sponsorship" in text
+            return self._is_freedom_club_submission(submission)
         if group == "motorShow":
             return "motor show" in text or "motorshow" in text or "car show" in text
         if group == "parade":
@@ -309,15 +309,20 @@ class SubmissionsRepository:
         if group == "volunteer":
             return "volunteer" in text
         if group == "specialEvents":
-            return self._is_special_event_submission(submission)
+            return self._is_sponsorship_submission(submission)
 
         return True
 
-    def _is_special_event_submission(self, submission):
-        if any(
-            self.submission_matches_group(submission, group)
-            for group in ("vendor", "artist", "sponsor", "motorShow", "parade", "volunteer")
-        ):
+    def _is_sponsorship_submission(self, submission):
+        text = self._submission_group_text(submission)
+        return "sponsor" in text or "sponsorship" in text
+
+    def _is_freedom_club_submission(self, submission):
+        if self._is_sponsorship_submission(submission):
+            return False
+
+        excluded_groups = ("vendor", "artist", "motorShow", "parade", "volunteer")
+        if any(self.submission_matches_group(submission, group) for group in excluded_groups):
             return False
 
         raw_data = submission.get("rawData") or {}

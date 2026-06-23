@@ -82,6 +82,25 @@ class LocalSubmissionsRepositoryTests(unittest.TestCase):
             updated_statuses = repo.list_admin_user_setup_statuses()
             self.assertFalse(updated_statuses["viewer@example.com"]["passwordSetupRequired"])
 
+    def test_submission_groups_treat_special_events_as_freedom_club_and_sponsors_as_special_events(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = LocalSubmissionsRepository(Path(tmp) / "submissions.json")
+            sponsorship = {
+                "submissionTitle": "Sponsorship Submission",
+                "source": "sponsorshipForm",
+                "rawData": {"formType": "sponsorshipForm"},
+            }
+            special_event = {
+                "submissionTitle": "Community Picnic Signup",
+                "source": "communityPicnic",
+                "rawData": {"eventTitle": "Community Picnic", "pricing": {"pricePerPlayer": 0}},
+            }
+
+            self.assertTrue(repo.submission_matches_group(special_event, "sponsor"))
+            self.assertFalse(repo.submission_matches_group(sponsorship, "sponsor"))
+            self.assertTrue(repo.submission_matches_group(sponsorship, "specialEvents"))
+            self.assertFalse(repo.submission_matches_group(special_event, "specialEvents"))
+
 
 if __name__ == "__main__":
     unittest.main()

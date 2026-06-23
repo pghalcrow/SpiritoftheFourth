@@ -88,7 +88,7 @@ export class AdminComponent implements OnInit {
   submissionGroupTabs: SubmissionGroupTab[] = [
     { key: 'all', label: 'All' },
     { key: 'vendor', label: 'Vendors' },
-    { key: 'sponsor', label: 'Sponsors' },
+    { key: 'sponsor', label: 'Freedom Club' },
     { key: 'motorShow', label: 'Motor Show' },
     { key: 'parade', label: 'Parade' },
     { key: 'volunteer', label: 'Volunteers' },
@@ -101,7 +101,7 @@ export class AdminComponent implements OnInit {
   submissionExportCategories: SubmissionExportCategory[] = [
     { key: 'vendor', label: 'Vendors', sheetName: 'Vendors' },
     { key: 'artist', label: 'Artists', sheetName: 'Artists' },
-    { key: 'sponsor', label: 'Sponsors', sheetName: 'Sponsors' },
+    { key: 'sponsor', label: 'Freedom Club', sheetName: 'Freedom Club' },
     { key: 'motorShow', label: 'Motor Show', sheetName: 'Motor Show' },
     { key: 'parade', label: 'Parade', sheetName: 'Parade' },
     { key: 'volunteer', label: 'Volunteers', sheetName: 'Volunteers' },
@@ -1088,7 +1088,7 @@ export class AdminComponent implements OnInit {
       return text.includes('artist') || text.includes('artistsignup');
     }
     if (group === 'sponsor') {
-      return text.includes('sponsor') || text.includes('sponsorship');
+      return this.isFreedomClubSubmission(submission);
     }
     if (group === 'motorShow') {
       return text.includes('motor show') || text.includes('motorshow') || text.includes('car show');
@@ -1100,14 +1100,22 @@ export class AdminComponent implements OnInit {
       return text.includes('volunteer');
     }
 
-    return this.isSpecialEventSubmission(submission);
+    return this.isSponsorshipSubmission(submission);
   }
 
-  private isSpecialEventSubmission(submission: AdminSubmission): boolean {
+  private isSponsorshipSubmission(submission: AdminSubmission): boolean {
+    const text = this.getSubmissionGroupText(submission);
+    return text.includes('sponsor') || text.includes('sponsorship');
+  }
+
+  private isFreedomClubSubmission(submission: AdminSubmission): boolean {
+    if (this.isSponsorshipSubmission(submission)) {
+      return false;
+    }
+
     if (
       this.submissionMatchesGroup(submission, 'vendor') ||
       this.submissionMatchesGroup(submission, 'artist') ||
-      this.submissionMatchesGroup(submission, 'sponsor') ||
       this.submissionMatchesGroup(submission, 'motorShow') ||
       this.submissionMatchesGroup(submission, 'parade') ||
       this.submissionMatchesGroup(submission, 'volunteer')

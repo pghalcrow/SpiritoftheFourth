@@ -178,6 +178,23 @@ class RepositoryTests(unittest.TestCase):
 
         self.assertFalse(settings["testMode"])
 
+    def test_submission_groups_treat_special_events_as_freedom_club_and_sponsors_as_special_events(self):
+        sponsorship = {
+            "submissionTitle": "Sponsorship Submission",
+            "source": "sponsorshipForm",
+            "rawData": {"formType": "sponsorshipForm"},
+        }
+        special_event = {
+            "submissionTitle": "Community Picnic Signup",
+            "source": "communityPicnic",
+            "rawData": {"eventTitle": "Community Picnic", "pricing": {"pricePerPlayer": 0}},
+        }
+
+        self.assertTrue(self.repo.submission_matches_group(special_event, "sponsor"))
+        self.assertFalse(self.repo.submission_matches_group(sponsorship, "sponsor"))
+        self.assertTrue(self.repo.submission_matches_group(sponsorship, "specialEvents"))
+        self.assertFalse(self.repo.submission_matches_group(special_event, "specialEvents"))
+
     def test_runtime_test_mode_round_trip(self):
         updated = self.repo.set_runtime_test_mode(True, "developer")
 
