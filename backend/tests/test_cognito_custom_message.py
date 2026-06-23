@@ -41,6 +41,7 @@ class CognitoCustomMessageTests(unittest.TestCase):
             "triggerSource": "CustomMessage_AdminCreateUser",
             "request": {
                 "codeParameter": "{####}",
+                "usernameParameter": "{username}",
                 "userAttributes": {"email": "viewer@example.com"},
             },
             "response": {},
@@ -49,7 +50,11 @@ class CognitoCustomMessageTests(unittest.TestCase):
         result = lambda_handler(event, None)
 
         self.assertIs(result, event)
-        self.assertEqual(result["response"], {})
+        self.assertEqual(result["response"]["emailSubject"], "Spirit of the Fourth admin account setup")
+        self.assertIn("viewer@example.com", result["response"]["emailMessage"])
+        self.assertIn("{####}", result["response"]["emailMessage"])
+        self.assertIn("48 hours", result["response"]["emailMessage"])
+        self.assertIn("https://spiritofthefourth.org/sign-in", result["response"]["emailMessage"])
 
 
 if __name__ == "__main__":

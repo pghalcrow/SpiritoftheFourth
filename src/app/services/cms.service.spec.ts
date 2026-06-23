@@ -186,6 +186,14 @@ describe('CmsService', () => {
     expect(confirm.request.method).toBe('POST');
     expect(confirm.request.body).toEqual({ email: 'admin@example.com', code: '123456', password: 'secret7' });
     confirm.flush({ success: true });
+
+    service.completeNewPasswordChallenge('admin@example.com', 'Bubbles123!', 'challenge-session').subscribe(res => {
+      expect(res.success).toBeTrue();
+    });
+    const newPassword = httpMock.expectOne(`${environment.cms.baseUrl}${environment.cms.routes.newPassword}`);
+    expect(newPassword.request.method).toBe('POST');
+    expect(newPassword.request.body).toEqual({ email: 'admin@example.com', password: 'Bubbles123!', session: 'challenge-session' });
+    newPassword.flush({ success: true });
   });
 
   it('manages admin users with bearer auth', () => {

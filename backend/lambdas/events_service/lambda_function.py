@@ -63,6 +63,10 @@ def lambda_handler(event, context):
         body = json.loads(event.get("body", "{}"))
         return confirm_password_reset(body)
 
+    if http_method == "POST" and raw_path == "/admin/new-password":
+        body = json.loads(event.get("body", "{}"))
+        return complete_new_password_challenge(body)
+
     if raw_path == "/admin/test-mode":
         user = get_authorized_user(event)
         if not user:
@@ -276,6 +280,27 @@ def confirm_password_reset(body):
             return json_response(400, {"error": RESET_CODE_ERROR_MESSAGE})
         if code == "InvalidPasswordException":
             return json_response(400, {"error": PASSWORD_POLICY_ERROR_MESSAGE})
+        raise
+
+
+def complete_new_password_challenge(body):
+    email = str(body.get("email", "")).strip()
+    password = str(body.get("password", ""))
+    session = str(body.get("session", "")).strip()
+    if not email or not password or not session:
+        return json_response(400, {"error": "Email, password, and session are required"})
+    try:
+        result = get_admin_auth_service().complete_new_password_challenge(email, password, session)
+        mark_admin_user_password_setup_complete(email)
+        return json_response(200, result)
+    except ValueError as error:
+        return json_response(400, {"error": str(error)})
+    except ClientError as error:
+        code = error.response.get("Error", {}).get("Code", "")
+        if code in {"InvalidPasswordException"}:
+            return json_response(400, {"error": PASSWORD_POLICY_ERROR_MESSAGE})
+        if code in {"NotAuthorizedException", "InvalidParameterException"}:
+            return json_response(400, {"error": "Invalid or expired setup session. Sign in with the temporary password from the newest setup email."})
         raise
 
 

@@ -158,6 +158,14 @@ class FakeAuthService:
     def confirm_password_reset(self, email, code, password):
         return {"success": True}
 
+    def complete_new_password_challenge(self, email, password, session):
+        return {
+            "success": True,
+            "token": "role:viewer",
+            "role": ROLE_VIEWER,
+            "email": email,
+        }
+
 
 class InvalidResetCodeAuthService(FakeAuthService):
     def confirm_password_reset(self, email, code, password):
@@ -486,6 +494,28 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         updated_users = json.loads(updated_list_response["body"])["items"]
         updated_admin_user = next(user for user in updated_users if user["email"] == "admin@example.com")
         self.assertEqual(updated_admin_user["status"], "CONFIRMED")
+
+    @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
+    def test_new_password_challenge_marks_password_setup_complete(self, _auth):
+        repo = FakeRepo()
+        repo.password_setup_required.add("viewer@example.com")
+
+        with patch.object(events_service, "get_submissions_repository", return_value=repo):
+            response = events_service.lambda_handler(
+                make_event(
+                    "POST",
+                    "/admin/new-password",
+                    {"email": "viewer@example.com", "password": "Bubbles123!", "session": "challenge-session"},
+                    token=None,
+                ),
+                None,
+            )
+
+        self.assertEqual(response["statusCode"], 200)
+        body = json.loads(response["body"])
+        self.assertEqual(body["email"], "viewer@example.com")
+        self.assertEqual(body["role"], ROLE_VIEWER)
+        self.assertNotIn("viewer@example.com", repo.password_setup_required)
 
     @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
     def test_only_developer_can_list_developer_users(self, _auth):

@@ -49,6 +49,8 @@ export interface AdminLoginResponse {
   role?: AdminRole;
   email?: string;
   reason?: 'disabled';
+  challenge?: 'NEW_PASSWORD_REQUIRED';
+  session?: string;
 }
 
 export type AdminRole = 'developer' | 'superAdmin' | 'admin' | 'viewer';
@@ -83,6 +85,8 @@ export interface AdminPasswordResetResponse {
   resetUrl?: string;
   resetCode?: string;
 }
+
+export interface AdminNewPasswordResponse extends AdminLoginResponse {}
 
 export interface AdminSubmission {
   submissionId: string;
@@ -318,6 +322,13 @@ export class CmsService {
     return this.http.post<AdminPasswordResetResponse>(
       `${this.baseUrl}${this.routes.passwordResetConfirm}`,
       { email, code, password }
+    );
+  }
+
+  completeNewPasswordChallenge(email: string, password: string, session: string): Observable<AdminNewPasswordResponse> {
+    return this.http.post<AdminNewPasswordResponse>(
+      `${this.baseUrl}${this.routes.newPassword}`,
+      { email, password, session }
     );
   }
 

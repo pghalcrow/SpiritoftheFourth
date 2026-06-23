@@ -122,6 +122,13 @@ class AdminAuthService:
             if self._is_bad_login_error(error):
                 return {"success": False}
             raise
+        if response.get("ChallengeName") == "NEW_PASSWORD_REQUIRED":
+            return {
+                "success": False,
+                "challenge": "NEW_PASSWORD_REQUIRED",
+                "session": response.get("Session", ""),
+                "email": email,
+            }
         auth_result = response.get("AuthenticationResult", {})
         access_token = auth_result.get("AccessToken", "")
         user = self.get_current_user(access_token)
@@ -207,24 +214,17 @@ class AdminAuthService:
                     {"Name": "email_verified", "Value": "true"},
                 ],
                 TemporaryPassword=temporary_password,
-                MessageAction="SUPPRESS",
+                DesiredDeliveryMediums=["EMAIL"],
             )
         except Exception as error:
             if self._is_existing_user_error(error):
                 raise ValueError("An account using that email already exists.")
             raise
-        self.client.admin_set_user_password(
-            UserPoolId=self.user_pool_id,
-            Username=email,
-            Password=temporary_password,
-            Permanent=True,
-        )
         self.client.admin_add_user_to_group(
             UserPoolId=self.user_pool_id,
             Username=email,
             GroupName=ROLE_GROUPS[normalized_role],
         )
-        self.request_password_reset(email)
         return {"email": email, "role": normalized_role}
 
     def delete_user(self, email):
@@ -298,6 +298,33 @@ class AdminAuthService:
             **kwargs,
         )
         return {"success": True}
+
+    def complete_new_password_challenge(self, email, password, session):
+        if not password_meets_policy(password):
+            raise ValueError("Password does not meet policy")
+        challenge_responses = {
+            "USERNAME": email,
+            "NEW_PASSWORD": password,
+        }
+        secret_hash = self._secret_hash(email)
+        if secret_hash:
+            challenge_responses["SECRET_HASH"] = secret_hash
+        response = self.client.respond_to_auth_challenge(
+            ClientId=self.client_id,
+            ChallengeName="NEW_PASSWORD_REQUIRED",
+            Session=session,
+            ChallengeResponses=challenge_responses,
+        )
+        auth_result = response.get("AuthenticationResult", {})
+        access_token = auth_result.get("AccessToken", "")
+        user = self.get_current_user(access_token)
+        return {
+            "success": True,
+            "token": access_token,
+            "idToken": auth_result.get("IdToken", ""),
+            "role": user["role"],
+            "email": user["email"],
+        }
 
     def _highest_role(self, groups):
         group_names = {group.get("GroupName", "") for group in groups}

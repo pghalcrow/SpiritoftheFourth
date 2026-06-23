@@ -64,6 +64,13 @@ class LocalAdminAuthService:
             return {"success": False, "reason": "disabled"}
         if not user or user.get("password") != password:
             return {"success": False}
+        if user.get("status") == "RESET_REQUIRED":
+            return {
+                "success": False,
+                "challenge": "NEW_PASSWORD_REQUIRED",
+                "session": "local-new-password",
+                "email": email,
+            }
         return {
             "success": True,
             "token": f"local-admin-token:{email}",
@@ -136,6 +143,19 @@ class LocalAdminAuthService:
         self.users[email]["status"] = "CONFIRMED"
         self._save_users()
         return {"success": True}
+
+    def complete_new_password_challenge(self, email, password, session):
+        if email not in self.users or session != "local-new-password":
+            raise ValueError("Invalid or expired setup session")
+        self.users[email]["password"] = password
+        self.users[email]["status"] = "CONFIRMED"
+        self._save_users()
+        return {
+            "success": True,
+            "token": f"local-admin-token:{email}",
+            "role": self.users[email]["role"],
+            "email": email,
+        }
 
 
 LOCAL_ADMIN_AUTH = LocalAdminAuthService()

@@ -1,9 +1,9 @@
 <main class="admin-login-shell">
-  <form class="admin-login-card" (ngSubmit)="authMode === 'login' ? login() : requestReset()">
+  <form class="admin-login-card" (ngSubmit)="authMode === 'login' ? login() : (authMode === 'reset' ? requestReset() : completeNewPassword())">
     <p class="login-eyebrow">CMS Access</p>
-    <h2>{{ authMode === 'login' ? 'Admin Sign In' : 'Reset Password' }}</h2>
+    <h2>{{ authMode === 'login' ? 'Admin Sign In' : (authMode === 'reset' ? 'Reset Password' : 'Set Password') }}</h2>
 
-    <div class="auth-mode-switch" aria-label="Authentication mode">
+    <div class="auth-mode-switch" aria-label="Authentication mode" *ngIf="authMode !== 'newPassword'">
       <button type="button" [class.active]="authMode === 'login'" (click)="setMode('login')">Log in</button>
       <button type="button" [class.active]="authMode === 'reset'" (click)="setMode('reset')">Reset password</button>
     </div>
@@ -50,8 +50,35 @@
       </div>
     </label>
 
+    <label class="password-field" *ngIf="authMode === 'newPassword'">
+      <span>New password</span>
+      <input
+        type="password"
+        name="newPassword"
+        [(ngModel)]="newPassword"
+        placeholder="Enter new password"
+        autocomplete="new-password"
+        required
+      />
+    </label>
+
+    <label class="password-field" *ngIf="authMode === 'newPassword'">
+      <span>Confirm new password</span>
+      <input
+        type="password"
+        name="confirmNewPassword"
+        [(ngModel)]="confirmNewPassword"
+        placeholder="Confirm new password"
+        autocomplete="new-password"
+        required
+      />
+    </label>
+
     <button type="submit" class="login-button" [disabled]="isLoading">
-      {{ isLoading ? 'Working...' : (authMode === 'login' ? 'Sign In' : 'Send Reset Link') }}
+      {{ isLoading ? 'Working...' : (authMode === 'login' ? 'Sign In' : (authMode === 'reset' ? 'Send Reset Link' : 'Set Password')) }}
+    </button>
+    <button type="button" class="secondary-login-button" *ngIf="authMode === 'newPassword'" (click)="setMode('login')">
+      Back to sign in
     </button>
     <p *ngIf="infoMessage" class="login-info">{{ infoMessage }}</p>
     <a *ngIf="localResetUrl" class="local-reset-link" [href]="localResetUrl">Open reset page</a>

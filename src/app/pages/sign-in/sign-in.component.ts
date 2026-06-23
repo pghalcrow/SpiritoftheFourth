@@ -10,7 +10,10 @@ import { CmsService } from 'src/app/services/cms.service';
 export class SignInComponent {
   email: string = '';
   password: string = '';
-  authMode: 'login' | 'reset' = 'login';
+  authMode: 'login' | 'reset' | 'newPassword' = 'login';
+  newPassword: string = '';
+  confirmNewPassword: string = '';
+  newPasswordSession: string = '';
   errorMessage: string = '';
   infoMessage: string = '';
   localResetUrl: string = '';
@@ -27,11 +30,16 @@ export class SignInComponent {
     this.cmsService.login(this.email, this.password).subscribe({
         next: (res) => {
           this.isLoading = false;
+          if (res.challenge === 'NEW_PASSWORD_REQUIRED' && res.session) {
+            this.authMode = 'newPassword';
+            this.newPasswordSession = res.session;
+            this.email = res.email || this.email;
+            this.password = '';
+            this.infoMessage = 'Set a new password to finish activating this admin account.';
+            return;
+          }
           if (res.success) {
-            sessionStorage.setItem('adminToken', res.token!);
-            sessionStorage.setItem('adminRole', res.role || 'admin');
-            if (res.email) sessionStorage.setItem('adminEmail', res.email);
-            this.router.navigate(['/admin']);
+            this.finishLogin(res);
           } else {
             this.errorMessage = res.reason === 'disabled' ? 'Account Disabled' : 'Incorrect email or password.';
           }
@@ -41,6 +49,30 @@ export class SignInComponent {
           this.errorMessage = 'Login failed.';
         }
       });
+  }
+
+  completeNewPassword() {
+    this.errorMessage = '';
+    this.infoMessage = '';
+    if (!this.passwordMeetsPolicy(this.newPassword)) {
+      this.errorMessage = 'Password must be at least 8 characters and include uppercase, lowercase, number, and symbol.';
+      return;
+    }
+    if (this.newPassword !== this.confirmNewPassword) {
+      this.errorMessage = 'Passwords must match.';
+      return;
+    }
+    this.isLoading = true;
+    this.cmsService.completeNewPasswordChallenge(this.email, this.newPassword, this.newPasswordSession).subscribe({
+      next: (res) => {
+        this.isLoading = false;
+        this.finishLogin(res);
+      },
+      error: error => {
+        this.isLoading = false;
+        this.errorMessage = error?.error?.error || 'Password setup failed.';
+      }
+    });
   }
 
   requestReset() {
@@ -70,6 +102,9 @@ export class SignInComponent {
     this.errorMessage = '';
     this.infoMessage = '';
     this.localResetUrl = '';
+    this.newPassword = '';
+    this.confirmNewPassword = '';
+    this.newPasswordSession = '';
     this.showPassword = false;
   }
 
@@ -79,5 +114,16 @@ export class SignInComponent {
 
   concealPassword() {
     this.showPassword = false;
+  }
+
+  private finishLogin(res: { token?: string; role?: any; email?: string }) {
+    sessionStorage.setItem('adminToken', res.token!);
+    sessionStorage.setItem('adminRole', res.role || 'admin');
+    if (res.email) sessionStorage.setItem('adminEmail', res.email);
+    this.router.navigate(['/admin']);
+  }
+
+  private passwordMeetsPolicy(password: string): boolean {
+    return password.length >= 8 && /[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password) && /[^A-Za-z0-9]/.test(password);
   }
 }

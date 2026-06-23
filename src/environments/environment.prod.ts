@@ -74,7 +74,8 @@ export const environment = {
       testMode: "/admin/test-mode",
       adminUsers: "/admin/users",
       passwordReset: "/admin/password-reset",
-      passwordResetConfirm: "/admin/password-reset/confirm"
+      passwordResetConfirm: "/admin/password-reset/confirm",
+      newPassword: "/admin/new-password"
     }
   }
 };

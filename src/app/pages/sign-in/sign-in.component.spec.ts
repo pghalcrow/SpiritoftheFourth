@@ -13,9 +13,10 @@ describe('SignInComponent', () => {
 
   beforeEach(async () => {
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
-    cmsService = jasmine.createSpyObj<CmsService>('CmsService', ['login', 'requestPasswordReset']);
+    cmsService = jasmine.createSpyObj<CmsService>('CmsService', ['login', 'requestPasswordReset', 'completeNewPasswordChallenge']);
     cmsService.login.and.returnValue(of({ success: true, token: 'cms-admin-token', role: 'admin', email: 'admin@example.com' }));
     cmsService.requestPasswordReset.and.returnValue(of({ success: true }));
+    cmsService.completeNewPasswordChallenge.and.returnValue(of({ success: true, token: 'cms-viewer-token', role: 'viewer', email: 'viewer@example.com' }));
 
     await TestBed.configureTestingModule({
       declarations: [SignInComponent],
@@ -83,6 +84,34 @@ describe('SignInComponent', () => {
     const nativeElement = fixture.nativeElement as HTMLElement;
     expect(component.errorMessage).toBe('Account Disabled');
     expect(nativeElement.querySelector('.login-error')?.textContent).toContain('Account Disabled');
+  });
+
+  it('prompts invited users to set a new password and signs them in after completion', () => {
+    cmsService.login.and.returnValue(of({
+      success: false,
+      challenge: 'NEW_PASSWORD_REQUIRED',
+      session: 'challenge-session',
+      email: 'viewer@example.com',
+    }));
+    const component = fixture.componentInstance;
+
+    component.email = 'viewer@example.com';
+    component.password = 'Temporary123!';
+    component.login();
+    fixture.detectChanges();
+
+    expect(component.authMode).toBe('newPassword');
+    expect(component.infoMessage).toContain('Set a new password');
+
+    component.newPassword = 'Bubbles123!';
+    component.confirmNewPassword = 'Bubbles123!';
+    component.completeNewPassword();
+
+    expect(cmsService.completeNewPasswordChallenge).toHaveBeenCalledWith('viewer@example.com', 'Bubbles123!', 'challenge-session');
+    expect(sessionStorage.getItem('adminToken')).toBe('cms-viewer-token');
+    expect(sessionStorage.getItem('adminRole')).toBe('viewer');
+    expect(sessionStorage.getItem('adminEmail')).toBe('viewer@example.com');
+    expect(router.navigate).toHaveBeenCalledWith(['/admin']);
   });
 
   it('requests a reset email from reset mode', () => {

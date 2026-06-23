@@ -32,6 +32,7 @@ class FakeLoginClient:
     def __init__(self, error_code=None, message=""):
         self.error_code = error_code
         self.message = message
+        self.respond_to_challenge_calls = []
 
     def initiate_auth(self, **kwargs):
         if self.error_code:
@@ -46,6 +47,18 @@ class FakeLoginClient:
 
     def admin_list_groups_for_user(self, **kwargs):
         return {"Groups": [{"GroupName": "Viewer"}]}
+
+    def respond_to_auth_challenge(self, **kwargs):
+        self.respond_to_challenge_calls.append(kwargs)
+        return {"AuthenticationResult": {"AccessToken": "new-access-token", "IdToken": "new-id-token"}}
+
+
+class FakeNewPasswordRequiredClient(FakeLoginClient):
+    def initiate_auth(self, **kwargs):
+        return {
+            "ChallengeName": "NEW_PASSWORD_REQUIRED",
+            "Session": "challenge-session",
+        }
 
 
 class FakeCreateClient:
@@ -130,6 +143,38 @@ class AdminAuthServiceTests(unittest.TestCase):
 
         self.assertEqual(response, {"success": False, "reason": "disabled"})
 
+    def test_login_returns_new_password_challenge_for_invited_users(self):
+        client = FakeNewPasswordRequiredClient()
+        service = AdminAuthService(client=client, client_id="client-id")
+
+        response = service.login("viewer@example.com", "temporary-password")
+
+        self.assertEqual(response, {
+            "success": False,
+            "challenge": "NEW_PASSWORD_REQUIRED",
+            "session": "challenge-session",
+            "email": "viewer@example.com",
+        })
+
+    def test_complete_new_password_challenge_returns_tokens_and_role(self):
+        client = FakeLoginClient()
+        service = AdminAuthService(client=client, client_id="client-id")
+
+        response = service.complete_new_password_challenge(
+            "viewer@example.com",
+            "Bubbles123!",
+            "challenge-session",
+        )
+
+        self.assertEqual(response["success"], True)
+        self.assertEqual(response["token"], "new-access-token")
+        self.assertEqual(response["idToken"], "new-id-token")
+        self.assertEqual(response["role"], ROLE_VIEWER)
+        self.assertEqual(response["email"], "viewer@example.com")
+        self.assertEqual(client.respond_to_challenge_calls[0]["ChallengeName"], "NEW_PASSWORD_REQUIRED")
+        self.assertEqual(client.respond_to_challenge_calls[0]["Session"], "challenge-session")
+        self.assertEqual(client.respond_to_challenge_calls[0]["ChallengeResponses"]["NEW_PASSWORD"], "Bubbles123!")
+
     def test_password_reset_does_not_reveal_unknown_cognito_users(self):
         client = FakeResetClient(error_code="UserNotFoundException")
         service = AdminAuthService(client=client, client_id="client-id")
@@ -153,20 +198,18 @@ class AdminAuthServiceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "already exists"):
             service.create_user("viewer@example.com", ROLE_VIEWER)
 
-    def test_create_user_confirms_user_before_sending_password_reset(self):
+    def test_create_user_sends_cognito_invite_without_consuming_reset_flow(self):
         client = FakeCreateClient()
         service = AdminAuthService(client=client, user_pool_id="pool-id", client_id="client-id")
 
         response = service.create_user("viewer@example.com", ROLE_VIEWER)
 
         self.assertEqual(response, {"email": "viewer@example.com", "role": ROLE_VIEWER})
-        self.assertEqual(client.create_user_calls[0]["MessageAction"], "SUPPRESS")
-        self.assertTrue(client.set_password_calls)
-        self.assertEqual(client.set_password_calls[0]["Username"], "viewer@example.com")
-        self.assertTrue(client.set_password_calls[0]["Permanent"])
-        self.assertTrue(password_meets_policy(client.set_password_calls[0]["Password"]))
+        self.assertNotIn("MessageAction", client.create_user_calls[0])
+        self.assertEqual(client.create_user_calls[0]["DesiredDeliveryMediums"], ["EMAIL"])
+        self.assertFalse(client.set_password_calls)
         self.assertEqual(client.group_calls[0]["GroupName"], "Viewer")
-        self.assertEqual(client.forgot_password_calls[0]["Username"], "viewer@example.com")
+        self.assertFalse(client.forgot_password_calls)
 
 
 if __name__ == "__main__":
