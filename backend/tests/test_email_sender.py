@@ -14,6 +14,22 @@ class EmailSenderTests(unittest.TestCase):
         self.assertIn("Hi Local {buyers_last_name}", body)
         self.assertIn("<html", body.lower())
 
+    def test_vendor_receipt_uses_vendor_spelling_and_no_dollar_before_no_fee(self):
+        sender = EmailSender.__new__(EmailSender)
+
+        body = sender.format_email("emails/vender__application_receipt.html", {
+            "buyers_full_name": "Pat",
+            "payment_warning": "",
+            "vendor_type": "Non-Profit",
+            "price": "No Fee",
+        })
+
+        self.assertIn("Thank you for applying to be a vendor", body)
+        self.assertIn("Vendor Type", body)
+        self.assertIn(">No Fee<", body)
+        self.assertNotIn("vender", body.lower())
+        self.assertNotIn("$No Fee", body)
+
     def test_local_transport_does_not_require_smtp_environment(self):
         with patch.dict("os.environ", {"EMAIL_TRANSPORT": "local"}, clear=True):
             sender = EmailSender()

@@ -370,6 +370,10 @@ def send_order_emails(email_sender, buyers_body, sellers_body, buyers_email, sel
         if recipient:
             email_sender.send_email(body=sellers_body, subject=subject, mail_to=recipient, mail_from=mail_from)
 
+def format_vendor_receipt_price(total_price):
+    amount = float(total_price or 0)
+    return "No Fee" if amount == 0 else f"${amount:.2f}"
+
 def build_vendor_email_contexts(form_data, purchased_date, total_price, buyer_full_name):
     vendor_type = form_data.get("vendorType", "")
     check_map = {
@@ -389,7 +393,7 @@ def build_vendor_email_contexts(form_data, purchased_date, total_price, buyer_fu
         "buyers_full_name": buyer_full_name,
         "payment_warning": "<p style='color:#c00;font-weight:bold;'>No payment required for Non-Profit vendors.</p>" if is_free else "",
         "vendor_type": vendor_type,
-        "price": "No Fee" if is_free else total_price,
+        "price": format_vendor_receipt_price(total_price),
     }
     seller_context = {
         "LOGO_SRC": "https://spiritofthefourth.org/assets/logo.png",

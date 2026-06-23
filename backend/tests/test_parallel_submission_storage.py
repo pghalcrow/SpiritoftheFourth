@@ -174,6 +174,15 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
         )
         create_submission_record.assert_called_once()
 
+    def test_vendor_receipt_price_formats_free_and_paid_amounts(self):
+        app = import_create_order_app()
+        mailer = import_sotf_mailer()
+
+        self.assertEqual(app.format_vendor_receipt_price("0.00"), "No Fee")
+        self.assertEqual(app.format_vendor_receipt_price("40.00"), "$40.00")
+        self.assertEqual(mailer.format_vendor_receipt_price(0), "No Fee")
+        self.assertEqual(mailer.format_vendor_receipt_price(55), "$55.00")
+
     def test_dynamic_submission_hold_updates_google_sheet_and_dynamodb(self):
         app = import_create_order_app()
         appended_rows = []

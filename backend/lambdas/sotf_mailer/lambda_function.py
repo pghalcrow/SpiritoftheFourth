@@ -131,6 +131,10 @@ def format_email(email_file: str, variables: dict) -> str:
             html_body = file.read()
         return html_body.format(**variables)
 
+def format_vendor_receipt_price(price):
+    amount = float(price or 0)
+    return "No Fee" if amount == 0 else f"${amount:.2f}"
+
 
 def resolve_email_recipients(mail_to, extra_recipients=None):
     override_to = os.environ.get("EMAIL_OVERRIDE_TO", "").strip()
@@ -467,7 +471,7 @@ def lambda_handler(event, context):
             context = {
                 "buyers_full_name" : contact_form_name,
                 "vendor_type" : vendor_type,
-                "price" : price,
+                "price" : format_vendor_receipt_price(price),
                 "payment_warning": payment_warning,
             }
 

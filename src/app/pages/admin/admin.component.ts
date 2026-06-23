@@ -594,6 +594,27 @@ export class AdminComponent implements OnInit {
     return this.submissionPageNumber > 1;
   }
 
+  get hasActiveSubmissionSearch(): boolean {
+    return this.submissionSearch.trim().length > 0;
+  }
+
+  get displayedSubmissionPageNumber(): number {
+    return this.hasActiveSubmissionSearch ? 1 : this.submissionPageNumber;
+  }
+
+  get displayedSubmissionTotalPages(): number {
+    if (!this.hasActiveSubmissionSearch) return this.submissionTotalPages;
+    return Math.max(1, Math.ceil(this.filteredSubmissions.length / this.submissionPageSize));
+  }
+
+  get displayedHasPreviousSubmissionPage(): boolean {
+    return !this.hasActiveSubmissionSearch && this.hasPreviousSubmissionPage;
+  }
+
+  get displayedHasNextSubmissionPage(): boolean {
+    return !this.hasActiveSubmissionSearch && this.hasNextSubmissionPage;
+  }
+
   loadNextSubmissionPage() {
     if (!this.nextSubmissionCursor || this.submissionsLoading || this.submissionsRefreshing) return;
     this.submissionPageCursors[this.submissionPageNumber] = this.nextSubmissionCursor;

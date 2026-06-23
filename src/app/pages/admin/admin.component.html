@@ -699,17 +699,17 @@
           type="button"
           class="action-button secondary"
           data-testid="submission-page-previous"
-          [disabled]="!hasPreviousSubmissionPage || submissionsLoading || submissionsRefreshing"
+          [disabled]="!displayedHasPreviousSubmissionPage || submissionsLoading || submissionsRefreshing"
           (click)="loadPreviousSubmissionPage()"
         >
           Previous
         </button>
-        <span class="submission-page-status">Page {{ submissionPageNumber }} of {{ submissionTotalPages }}</span>
+        <span class="submission-page-status">Page {{ displayedSubmissionPageNumber }} of {{ displayedSubmissionTotalPages }}</span>
         <button
           type="button"
           class="action-button secondary"
           data-testid="submission-page-next"
-          [disabled]="!hasNextSubmissionPage || submissionsLoading || submissionsRefreshing"
+          [disabled]="!displayedHasNextSubmissionPage || submissionsLoading || submissionsRefreshing"
           (click)="loadNextSubmissionPage()"
         >
           Next

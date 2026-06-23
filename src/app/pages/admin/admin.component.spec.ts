@@ -1205,6 +1205,56 @@ describe('AdminComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Page 1 of 1');
   });
 
+  it('updates the displayed pagination count when search narrows the visible submissions', () => {
+    cmsService.getSubmissions.calls.reset();
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [
+        {
+          submissionId: 's1',
+          submissionTitle: 'Volunteer Request',
+          submittedAt: '2026-06-05T10:00:00-07:00',
+          name: 'Alpha Person',
+          email: 'alpha@example.com',
+          phone: '555-1111',
+          status: 'New',
+          assignedTo: '',
+          notes: '',
+          rawData: { formType: 'volunteerForm' },
+        },
+        {
+          submissionId: 's2',
+          submissionTitle: 'Parade Entry Request - Parade',
+          submittedAt: '2026-06-06T10:00:00-07:00',
+          name: 'Beta Person',
+          email: 'beta@example.com',
+          phone: '555-2222',
+          status: 'New',
+          assignedTo: '',
+          notes: '',
+          rawData: { formType: 'paradeEntryForm' },
+        },
+      ],
+      nextCursor: 'cursor-2',
+      totalCount: 75,
+      totalPages: 2,
+    }));
+
+    component.loadSubmissions();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Page 1 of 2');
+    expect(component.displayedHasNextSubmissionPage).toBeTrue();
+
+    component.submissionSearch = 'Alpha';
+    fixture.detectChanges();
+
+    expect(component.filteredSubmissions.length).toBe(1);
+    expect(component.displayedSubmissionPageNumber).toBe(1);
+    expect(component.displayedSubmissionTotalPages).toBe(1);
+    expect(component.displayedHasNextSubmissionPage).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain('Page 1 of 1');
+  });
+
   it('syncs the export category dropdown when a submission group filter is selected', () => {
     cmsService.getSubmissions.calls.reset();
     cmsService.getSubmissions.and.returnValue(of({ items: [], totalCount: 0, totalPages: 1 }));
