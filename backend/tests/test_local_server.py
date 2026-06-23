@@ -103,7 +103,9 @@ class LocalServerTests(unittest.TestCase):
             create_app()
 
             self.assertEqual(os.environ["WEBHOOK_SECRET"], "local-dev-webhook-secret")
-            self.assertEqual(os.environ["EMAIL_TRANSPORT"], "smtp")
+            self.assertEqual(os.environ["EMAIL_TRANSPORT"], "ses")
+            self.assertEqual(os.environ["SES_SOURCE_EMAIL"], "no-reply@spiritofthefourth.org")
+            self.assertEqual(os.environ["SES_REGION"], "us-east-1")
             self.assertEqual(os.environ["TEST_MODE_EMAIL"], "pghalcrow@gmail.com")
             self.assertEqual(os.environ["EMAIL_OVERRIDE_TO"], "pghalcrow@gmail.com")
             self.assertEqual(os.environ["LOCAL_WRITE_GOOGLE_SHEET"], "true")

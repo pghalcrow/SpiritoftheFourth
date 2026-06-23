@@ -56,7 +56,7 @@ class FakeRepo:
         self.last_list_cursor = cursor
         self.last_list_summary_only = summary_only
         self.last_list_group = group
-        return {
+        result = {
             "items": [{
                 "submissionId": "s1",
                 "submissionTitle": "Volunteer",
@@ -65,6 +65,9 @@ class FakeRepo:
             }],
             "lastEvaluatedKey": {"pk": "SUBMISSION", "sk": "2026-06-05T10:00:00-07:00#s1"},
         }
+        if group:
+            result["totalCount"] = 12
+        return result
 
     def count_submissions(self, group=None):
         self.last_count_group = group
@@ -299,7 +302,7 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         self.assertEqual(response["statusCode"], 200)
         body = json.loads(response["body"])
         self.assertEqual(repo_factory.return_value.last_list_group, "vendor")
-        self.assertEqual(repo_factory.return_value.last_count_group, "vendor")
+        self.assertFalse(hasattr(repo_factory.return_value, "last_count_group"))
         self.assertEqual(body["totalCount"], 12)
         self.assertEqual(body["totalPages"], 3)
 

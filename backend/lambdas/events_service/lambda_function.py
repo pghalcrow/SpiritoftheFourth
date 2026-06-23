@@ -450,7 +450,9 @@ def list_submissions(event):
     group = query.get("group")
     result = repo.list_submissions_page(limit=limit, cursor=cursor, summary_only=summary_only, group=group)
     last_key = result.get("lastEvaluatedKey")
-    total_count = repo.count_submissions(group=group)
+    total_count = result.get("totalCount")
+    if total_count is None:
+        total_count = repo.count_submissions(group=group)
     total_pages = max(1, (total_count + limit - 1) // limit)
     return json_response(200, {
         "items": result.get("items", []),

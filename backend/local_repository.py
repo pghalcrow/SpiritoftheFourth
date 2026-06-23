@@ -60,13 +60,14 @@ class LocalSubmissionsRepository:
         group = group or (cursor.get("group") if isinstance(cursor, dict) else None)
         if group and group != "all":
             items = [item for item in items if self.submission_matches_group(item, group)]
+        total_count = len(items)
         offset = self._cursor_offset(cursor)
         page = items[offset:offset + limit]
         if summary_only:
             page = [self._summarize_submission(item) for item in page]
         next_offset = offset + len(page)
         last_key = {"offset": next_offset, "group": group} if next_offset < len(items) else None
-        return {"items": page, "lastEvaluatedKey": last_key}
+        return {"items": page, "lastEvaluatedKey": last_key, "totalCount": total_count}
 
     def count_submissions(self, group=None):
         if not group or group == "all":
