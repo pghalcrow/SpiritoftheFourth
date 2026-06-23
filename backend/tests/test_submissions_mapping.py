@@ -195,6 +195,7 @@ class SubmissionsMappingTest(unittest.TestCase):
     def test_normalizes_paid_event_order_titles_for_admin_storage(self):
         self.assertEqual(normalize_submission_title("Freedom Club Donation Order"), "Freedom Club Donation")
         self.assertEqual(normalize_submission_title("Motor Show Event Order"), "Motor Show Event")
+        self.assertEqual(normalize_submission_title("Vendor Application Submission"), "Vendor Application")
         self.assertEqual(normalize_submission_title("Golf Fundraiser Order"), "Golf Fundraiser")
 
 

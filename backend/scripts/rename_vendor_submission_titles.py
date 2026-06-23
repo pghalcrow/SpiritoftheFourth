@@ -8,7 +8,10 @@ from boto3.dynamodb.conditions import Key
 from backend.shared.submissions_repository import SubmissionsRepository
 
 
-OLD_TITLE = "New Vendor Application Submission"
+OLD_TITLES = {
+    "New Vendor Application Submission",
+    "Vendor Application Submission",
+}
 NEW_TITLE = "Vendor Application"
 
 
@@ -36,7 +39,7 @@ def main():
     table = boto3.resource("dynamodb", region_name=args.region).Table(args.table)
     repo = SubmissionsRepository(table=table)
     submissions = query_all_submissions(table)
-    matches = [item for item in submissions if item.get("submissionTitle") == OLD_TITLE]
+    matches = [item for item in submissions if item.get("submissionTitle") in OLD_TITLES]
 
     updated = 0
     for item in matches:
