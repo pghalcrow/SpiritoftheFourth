@@ -97,11 +97,28 @@ def get_paypal_token(is_test):
         raise
 
 def parse_custom_data(purchase_unit):
-    custom_id_str = purchase_unit.get("custom_id", "{}")
+    custom_id_str = purchase_unit.get("custom_id")
+    if not custom_id_str:
+        captures = purchase_unit.get("payments", {}).get("captures", [])
+        if captures:
+            custom_id_str = captures[0].get("custom_id")
+    custom_id_str = custom_id_str or "{}"
     try:
         return json.loads(custom_id_str)
     except json.JSONDecodeError:
         return {}
+
+
+def get_paypal_purchase_amount(purchase_unit):
+    amount = purchase_unit.get("amount", {})
+    if amount.get("value") is not None:
+        return amount["value"]
+    captures = purchase_unit.get("payments", {}).get("captures", [])
+    if captures:
+        capture_amount = captures[0].get("amount", {})
+        if capture_amount.get("value") is not None:
+            return capture_amount["value"]
+    raise KeyError("amount")
 
 def get_buyer_info(payer):
     return {
@@ -796,12 +813,12 @@ def process_paypal_order_completion(resource, event_create_time=None):
             items_html = build_motor_show_items_html(form_data)
             participants_table_rows = build_motor_show_table(clean_form_data)
         elif order_type == "freedomClubDonation":
-            participants_table_rows = build_freedom_club_admin_details_rows(form_data, purchase_unit["amount"]["value"])
+            participants_table_rows = build_freedom_club_admin_details_rows(form_data, get_paypal_purchase_amount(purchase_unit))
             admin_details_heading = ""
 
         purchased_date = format_paypal_date(event_create_time or resource.get("update_time") or resource.get("create_time"))
         submitted_at = paypal_timestamp_to_iso(event_create_time or resource.get("update_time") or resource.get("create_time"))
-        total_price = purchase_unit["amount"]["value"]
+        total_price = get_paypal_purchase_amount(purchase_unit)
 
         context = build_email_context(
             event_meta["event_title"], order_id, event_meta, buyer_info,

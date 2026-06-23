@@ -385,6 +385,25 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
         self.assertEqual(appended_rows[0][0], "new-submission")
         self.assertEqual(len(appended_rows), 1)
 
+    def test_paypal_capture_response_reads_custom_data_and_amount_from_capture(self):
+        app = import_create_order_app()
+        purchase_unit = {
+            "payments": {
+                "captures": [
+                    {
+                        "custom_id": '{"type": "Motor Show Event", "submission_id": "hold-1"}',
+                        "amount": {"currency_code": "USD", "value": "25.00"},
+                    }
+                ]
+            }
+        }
+
+        self.assertEqual(app.parse_custom_data(purchase_unit), {
+            "type": "Motor Show Event",
+            "submission_id": "hold-1",
+        })
+        self.assertEqual(app.get_paypal_purchase_amount(purchase_unit), "25.00")
+
     def test_create_order_sheet_timestamps_use_pacific_time(self):
         app = import_create_order_app()
         appended_rows = []
