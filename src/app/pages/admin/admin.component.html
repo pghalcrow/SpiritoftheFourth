@@ -674,7 +674,12 @@
     <div class="submissions-tools">
       <label class="control-group submissions-search">
         <span>Search</span>
-        <input class="admin-input" [(ngModel)]="submissionSearch" placeholder="Search submissions" />
+        <input
+          class="admin-input"
+          [(ngModel)]="submissionSearch"
+          (ngModelChange)="onSubmissionSearchChange()"
+          placeholder="Search submissions"
+        />
       </label>
       <button
         type="button"

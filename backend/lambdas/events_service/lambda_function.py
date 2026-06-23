@@ -448,7 +448,8 @@ def list_submissions(event):
     cursor = decode_submission_cursor(query.get("cursor"))
     summary_only = str(query.get("summary", "true")).lower() != "false"
     group = query.get("group")
-    result = repo.list_submissions_page(limit=limit, cursor=cursor, summary_only=summary_only, group=group)
+    search = query.get("search")
+    result = repo.list_submissions_page(limit=limit, cursor=cursor, summary_only=summary_only, group=group, search=search)
     last_key = result.get("lastEvaluatedKey")
     total_count = result.get("totalCount")
     if total_count is None:

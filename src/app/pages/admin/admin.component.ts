@@ -81,6 +81,7 @@ export class AdminComponent implements OnInit {
   submissionTotalPages = 1;
   private submissionPageCursors: (string | undefined)[] = [undefined];
   private nextSubmissionCursor?: string | null;
+  private submissionSearchTimer?: ReturnType<typeof setTimeout>;
   submissionDetailLoading = false;
   submissionExportLoading = false;
   private submissionDetailCache: Record<string, AdminSubmission> = {};
@@ -599,20 +600,30 @@ export class AdminComponent implements OnInit {
   }
 
   get displayedSubmissionPageNumber(): number {
-    return this.hasActiveSubmissionSearch ? 1 : this.submissionPageNumber;
+    return this.submissionPageNumber;
   }
 
   get displayedSubmissionTotalPages(): number {
-    if (!this.hasActiveSubmissionSearch) return this.submissionTotalPages;
-    return Math.max(1, Math.ceil(this.filteredSubmissions.length / this.submissionPageSize));
+    return this.submissionTotalPages;
   }
 
   get displayedHasPreviousSubmissionPage(): boolean {
-    return !this.hasActiveSubmissionSearch && this.hasPreviousSubmissionPage;
+    return this.hasPreviousSubmissionPage;
   }
 
   get displayedHasNextSubmissionPage(): boolean {
-    return !this.hasActiveSubmissionSearch && this.hasNextSubmissionPage;
+    return this.hasNextSubmissionPage;
+  }
+
+  onSubmissionSearchChange() {
+    if (this.submissionSearchTimer) {
+      clearTimeout(this.submissionSearchTimer);
+    }
+    this.submissionSearchTimer = setTimeout(() => {
+      this.submissionPageCursors = [undefined];
+      this.clearSelectedSubmission();
+      this.loadSubmissions('filter', undefined, 1);
+    }, 250);
   }
 
   loadNextSubmissionPage() {
@@ -634,11 +645,13 @@ export class AdminComponent implements OnInit {
     } else {
       this.submissionsLoading = true;
     }
-    const options: { limit: number; cursor?: string; group?: SubmissionGroupKey } = {
+    const options: { limit: number; cursor?: string; group?: SubmissionGroupKey; search?: string } = {
       limit: this.submissionPageSize,
     };
     if (cursor) options.cursor = cursor;
     if (this.selectedSubmissionGroup !== 'all') options.group = this.selectedSubmissionGroup;
+    const search = this.submissionSearch.trim();
+    if (search) options.search = search;
     this.cmsService.getSubmissions(options).pipe(finalize(() => {
       if (isRefresh) {
         this.submissionsRefreshing = false;

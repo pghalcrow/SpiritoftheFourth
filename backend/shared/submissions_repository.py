@@ -259,8 +259,17 @@ class SubmissionsRepository:
 
         return {"items": items, "lastEvaluatedKey": last_key}
 
-    def list_submissions_page(self, limit=50, cursor=None, summary_only=True, group=None):
+    def list_submissions_page(self, limit=50, cursor=None, summary_only=True, group=None, search=None):
         group = group or (cursor.get("group") if isinstance(cursor, dict) else None)
+        search = search if search is not None else (cursor.get("search") if isinstance(cursor, dict) else None)
+        if search and str(search).strip():
+            return self.list_submissions_search_page(
+                str(search).strip(),
+                limit=limit,
+                cursor=cursor,
+                summary_only=summary_only,
+                group=group,
+            )
         if group and group != "all":
             return self.list_submissions_group_page(group, limit=limit, cursor=cursor, summary_only=summary_only)
 
@@ -288,6 +297,36 @@ class SubmissionsRepository:
             "items": page,
             "lastEvaluatedKey": result.get("LastEvaluatedKey"),
             "totalCount": self.count_submissions(group=group),
+        }
+
+    def list_submissions_search_page(self, search, limit=50, cursor=None, summary_only=True, group=None):
+        normalized_query = str(search or "").strip().lower()
+        if not normalized_query:
+            return self.list_submissions_page(limit=limit, cursor=cursor, summary_only=summary_only, group=group)
+
+        group = group or (cursor.get("group") if isinstance(cursor, dict) else None)
+        offset = self._cursor_offset(cursor)
+        source_items = self._all_submissions_for_search(group=group)
+        matching_items = [
+            item
+            for item in source_items
+            if normalized_query in self._submission_search_text(item)
+        ]
+        page = matching_items[offset:offset + limit]
+        if summary_only:
+            page = [self._summarize_submission(item) for item in page]
+        next_offset = offset + limit
+        last_key = None
+        if next_offset < len(matching_items):
+            last_key = {
+                "offset": next_offset,
+                "group": group,
+                "search": normalized_query,
+            }
+        return {
+            "items": page,
+            "lastEvaluatedKey": last_key,
+            "totalCount": len(matching_items),
         }
 
     def count_submissions(self, group=None):
@@ -385,6 +424,37 @@ class SubmissionsRepository:
 
     def _submission_group_pk(self, group):
         return f"SUBMISSION_GROUP#{group}"
+
+    def _all_submissions_for_search(self, group=None):
+        items = []
+        last_key = None
+        query = self._query_submission_group if group and group != "all" else None
+
+        while True:
+            if query is not None:
+                result = query(group, scan_index_forward=False, exclusive_start_key=last_key)
+            else:
+                result = self._query_submissions(scan_index_forward=False, exclusive_start_key=last_key)
+            items.extend(result.get("Items", []))
+            last_key = result.get("LastEvaluatedKey")
+            if not last_key:
+                return items
+
+    def _submission_search_text(self, submission):
+        raw_data = submission.get("rawData") or {}
+        raw_values = raw_data.values() if isinstance(raw_data, dict) else []
+        values = [
+            submission.get("submissionTitle"),
+            submission.get("name"),
+            submission.get("email"),
+            submission.get("phone"),
+            submission.get("status"),
+            submission.get("assignedTo"),
+            submission.get("notes"),
+            submission.get("source"),
+            *raw_values,
+        ]
+        return " ".join(str(value).lower() for value in values if value is not None)
 
     def _is_sponsorship_submission(self, submission):
         text = self._submission_group_text(submission)

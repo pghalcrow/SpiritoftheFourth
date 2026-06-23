@@ -51,22 +51,26 @@ class LocalSubmissionsRepository:
         )
         return {"items": items[:limit] if limit is not None else items}
 
-    def list_submissions_page(self, limit=50, cursor=None, summary_only=True, group=None):
+    def list_submissions_page(self, limit=50, cursor=None, summary_only=True, group=None, search=None):
         items = sorted(
             self._read(),
             key=lambda item: item.get("submittedAt") or item.get("createdAt") or "",
             reverse=True,
         )
         group = group or (cursor.get("group") if isinstance(cursor, dict) else None)
+        search = search if search is not None else (cursor.get("search") if isinstance(cursor, dict) else None)
         if group and group != "all":
             items = [item for item in items if self.submission_matches_group(item, group)]
+        if search and str(search).strip():
+            normalized_query = str(search).strip().lower()
+            items = [item for item in items if normalized_query in self._submission_search_text(item)]
         total_count = len(items)
         offset = self._cursor_offset(cursor)
         page = items[offset:offset + limit]
         if summary_only:
             page = [self._summarize_submission(item) for item in page]
         next_offset = offset + len(page)
-        last_key = {"offset": next_offset, "group": group} if next_offset < len(items) else None
+        last_key = {"offset": next_offset, "group": group, "search": search} if next_offset < len(items) else None
         return {"items": page, "lastEvaluatedKey": last_key, "totalCount": total_count}
 
     def count_submissions(self, group=None):
@@ -132,6 +136,22 @@ class LocalSubmissionsRepository:
             )
             if value
         )
+
+    def _submission_search_text(self, submission):
+        raw_data = submission.get("rawData") or {}
+        raw_values = raw_data.values() if isinstance(raw_data, dict) else []
+        values = [
+            submission.get("submissionTitle"),
+            submission.get("name"),
+            submission.get("email"),
+            submission.get("phone"),
+            submission.get("status"),
+            submission.get("assignedTo"),
+            submission.get("notes"),
+            submission.get("source"),
+            *raw_values,
+        ]
+        return " ".join(str(value).lower() for value in values if value is not None)
 
     def _cursor_offset(self, cursor):
         if not isinstance(cursor, dict):

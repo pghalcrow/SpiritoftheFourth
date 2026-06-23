@@ -24,6 +24,7 @@ class FakeRepo:
         self.last_list_limit = None
         self.last_list_cursor = None
         self.last_list_summary_only = None
+        self.last_list_search = None
         self.password_setup_required = set()
 
     def get_runtime_settings(self):
@@ -51,11 +52,12 @@ class FakeRepo:
         self.last_list_limit = limit
         return {"items": [{"submissionId": "s1", "submissionTitle": "Volunteer", "status": "New"}]}
 
-    def list_submissions_page(self, limit=50, cursor=None, summary_only=True, group=None):
+    def list_submissions_page(self, limit=50, cursor=None, summary_only=True, group=None, search=None):
         self.last_list_limit = limit
         self.last_list_cursor = cursor
         self.last_list_summary_only = summary_only
         self.last_list_group = group
+        self.last_list_search = search
         result = {
             "items": [{
                 "submissionId": "s1",
@@ -67,6 +69,8 @@ class FakeRepo:
         }
         if group:
             result["totalCount"] = 12
+        if search:
+            result["totalCount"] = 7
         return result
 
     def count_submissions(self, group=None):
@@ -103,7 +107,7 @@ class DecimalRepo:
     def list_submissions(self, limit=None):
         return {"items": [{"submissionId": "s1", "amount": Decimal("125"), "rawData": {"rowNumber": Decimal("4")}}]}
 
-    def list_submissions_page(self, limit=50, cursor=None, summary_only=True, group=None):
+    def list_submissions_page(self, limit=50, cursor=None, summary_only=True, group=None, search=None):
         return {"items": [{"submissionId": "s1", "amount": Decimal("125"), "rawData": {"rowNumber": Decimal("4")}}]}
 
     def count_submissions(self, group=None):
@@ -304,6 +308,20 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         self.assertEqual(repo_factory.return_value.last_list_group, "vendor")
         self.assertFalse(hasattr(repo_factory.return_value, "last_count_group"))
         self.assertEqual(body["totalCount"], 12)
+        self.assertEqual(body["totalPages"], 3)
+
+    @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())
+    def test_list_submissions_passes_search_for_paged_results(self, repo_factory):
+        event = make_event("GET", "/admin/submissions")
+        event["queryStringParameters"] = {"limit": "3", "group": "vendor", "search": "alpha"}
+
+        response = events_service.lambda_handler(event, None)
+
+        self.assertEqual(response["statusCode"], 200)
+        body = json.loads(response["body"])
+        self.assertEqual(repo_factory.return_value.last_list_group, "vendor")
+        self.assertEqual(repo_factory.return_value.last_list_search, "alpha")
+        self.assertEqual(body["totalCount"], 7)
         self.assertEqual(body["totalPages"], 3)
 
     @patch.object(events_service, "get_submissions_repository", return_value=FakeRepo())

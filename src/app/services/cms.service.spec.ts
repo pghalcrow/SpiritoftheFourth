@@ -53,7 +53,7 @@ describe('CmsService', () => {
   it('lists admin submissions with pagination query params', () => {
     sessionStorage.setItem('adminToken', 'cms-admin-token');
 
-    service.getSubmissions({ limit: 50, cursor: 'next-page', summaryOnly: false, group: 'vendor' }).subscribe(res => {
+    service.getSubmissions({ limit: 50, cursor: 'next-page', summaryOnly: false, group: 'vendor', search: 'alpha' }).subscribe(res => {
       expect(res.items[0].submissionId).toBe('s1');
       expect(res.nextCursor).toBe('cursor-2');
       expect(res.totalCount).toBe(125);
@@ -65,7 +65,8 @@ describe('CmsService', () => {
       request.params.get('limit') === '50' &&
       request.params.get('cursor') === 'next-page' &&
       request.params.get('summary') === 'false' &&
-      request.params.get('group') === 'vendor'
+      request.params.get('group') === 'vendor' &&
+      request.params.get('search') === 'alpha'
     );
     expect(req.request.method).toBe('GET');
     expect(req.request.headers.get('Authorization')).toBe('Bearer cms-admin-token');

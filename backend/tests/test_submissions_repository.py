@@ -259,6 +259,77 @@ class RepositoryTests(unittest.TestCase):
         self.assertNotIn("SUBMISSION_GROUP#all", self.table.query_pks)
         self.assertEqual(self.repo.count_submissions("all"), 1)
 
+    def test_search_submissions_returns_matching_pages_and_totals(self):
+        for index in range(6):
+            self.repo.create_submission({
+                "pk": "SUBMISSION",
+                "sk": f"2026-06-05T10:0{index}:00-07:00#s{index}",
+                "recordType": "submission",
+                "submissionId": f"s{index}",
+                "submissionTitle": "Volunteer Request",
+                "submittedAt": f"2026-06-05T10:0{index}:00-07:00",
+                "name": f"Alpha Person {index}" if index < 5 else "Beta Person",
+                "email": f"person{index}@example.com",
+                "phone": "555",
+                "status": "New",
+                "assignedTo": "",
+                "notes": "",
+                "rawData": {"formType": "volunteerForm"},
+            })
+
+        first_page = self.repo.list_submissions_page(limit=2, search="Alpha")
+        second_page = self.repo.list_submissions_page(
+            limit=2,
+            cursor=first_page["lastEvaluatedKey"],
+            search="Alpha",
+        )
+
+        self.assertEqual(first_page["totalCount"], 5)
+        self.assertEqual([item["submissionId"] for item in first_page["items"]], ["s4", "s3"])
+        self.assertEqual(first_page["lastEvaluatedKey"]["offset"], 2)
+        self.assertEqual(first_page["lastEvaluatedKey"]["search"], "alpha")
+        self.assertEqual([item["submissionId"] for item in second_page["items"]], ["s2", "s1"])
+        self.assertEqual(second_page["totalCount"], 5)
+
+    def test_search_submissions_can_scope_to_group(self):
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:00:00-07:00#vendor",
+            "recordType": "submission",
+            "submissionId": "vendor",
+            "submissionTitle": "Vendor Application",
+            "submittedAt": "2026-06-05T10:00:00-07:00",
+            "name": "Alpha Vendor",
+            "email": "vendor@example.com",
+            "phone": "555",
+            "status": "New",
+            "assignedTo": "",
+            "notes": "",
+            "source": "vendorApplication",
+            "rawData": {"formType": "vendorApplicationForm"},
+        })
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:01:00-07:00#volunteer",
+            "recordType": "submission",
+            "submissionId": "volunteer",
+            "submissionTitle": "Volunteer Request",
+            "submittedAt": "2026-06-05T10:01:00-07:00",
+            "name": "Alpha Volunteer",
+            "email": "volunteer@example.com",
+            "phone": "555",
+            "status": "New",
+            "assignedTo": "",
+            "notes": "",
+            "source": "volunteerForm",
+            "rawData": {"formType": "volunteerForm"},
+        })
+
+        result = self.repo.list_submissions_page(limit=10, group="vendor", search="Alpha")
+
+        self.assertEqual(result["totalCount"], 1)
+        self.assertEqual([item["submissionId"] for item in result["items"]], ["vendor"])
+
     def test_get_submission_uses_submission_id_lookup_record(self):
         self.repo.create_submission({
             "pk": "SUBMISSION",

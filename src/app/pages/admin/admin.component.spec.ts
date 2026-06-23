@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { of, Subject, throwError } from 'rxjs';
@@ -1205,39 +1205,60 @@ describe('AdminComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Page 1 of 1');
   });
 
-  it('updates the displayed pagination count when search narrows the visible submissions', () => {
+  it('reloads paged search results and keeps next page behavior for matching submissions', fakeAsync(() => {
     cmsService.getSubmissions.calls.reset();
-    cmsService.getSubmissions.and.returnValue(of({
-      items: [
-        {
+    cmsService.getSubmissions.and.returnValues(
+      of({
+        items: [{
           submissionId: 's1',
           submissionTitle: 'Volunteer Request',
           submittedAt: '2026-06-05T10:00:00-07:00',
-          name: 'Alpha Person',
+          name: 'Initial Person',
+          email: 'initial@example.com',
+          phone: '555-0000',
+          status: 'New',
+          assignedTo: '',
+          notes: '',
+          rawData: { formType: 'volunteerForm' },
+        }],
+        nextCursor: 'initial-cursor',
+        totalCount: 75,
+        totalPages: 2,
+      }),
+      of({
+        items: [{
+          submissionId: 'search-1',
+          submissionTitle: 'Volunteer Request',
+          submittedAt: '2026-06-05T10:00:00-07:00',
+          name: 'Alpha Person 1',
           email: 'alpha@example.com',
           phone: '555-1111',
           status: 'New',
           assignedTo: '',
           notes: '',
           rawData: { formType: 'volunteerForm' },
-        },
-        {
-          submissionId: 's2',
-          submissionTitle: 'Parade Entry Request - Parade',
+        }],
+        nextCursor: 'search-cursor-2',
+        totalCount: 125,
+        totalPages: 3,
+      }),
+      of({
+        items: [{
+          submissionId: 'search-2',
+          submissionTitle: 'Volunteer Request',
           submittedAt: '2026-06-06T10:00:00-07:00',
-          name: 'Beta Person',
-          email: 'beta@example.com',
+          name: 'Alpha Person 2',
+          email: 'alpha2@example.com',
           phone: '555-2222',
           status: 'New',
           assignedTo: '',
           notes: '',
-          rawData: { formType: 'paradeEntryForm' },
-        },
-      ],
-      nextCursor: 'cursor-2',
-      totalCount: 75,
-      totalPages: 2,
-    }));
+          rawData: { formType: 'volunteerForm' },
+        }],
+        totalCount: 125,
+        totalPages: 3,
+      }),
+    );
 
     component.loadSubmissions();
     fixture.detectChanges();
@@ -1246,14 +1267,27 @@ describe('AdminComponent', () => {
     expect(component.displayedHasNextSubmissionPage).toBeTrue();
 
     component.submissionSearch = 'Alpha';
+    component.onSubmissionSearchChange();
+    tick(250);
     fixture.detectChanges();
 
-    expect(component.filteredSubmissions.length).toBe(1);
+    expect(cmsService.getSubmissions.calls.mostRecent().args[0]).toEqual({ limit: 50, search: 'Alpha' });
     expect(component.displayedSubmissionPageNumber).toBe(1);
-    expect(component.displayedSubmissionTotalPages).toBe(1);
-    expect(component.displayedHasNextSubmissionPage).toBeFalse();
-    expect(fixture.nativeElement.textContent).toContain('Page 1 of 1');
-  });
+    expect(component.displayedSubmissionTotalPages).toBe(3);
+    expect(component.displayedHasNextSubmissionPage).toBeTrue();
+    expect(fixture.nativeElement.textContent).toContain('Page 1 of 3');
+
+    component.loadNextSubmissionPage();
+    fixture.detectChanges();
+
+    expect(cmsService.getSubmissions.calls.mostRecent().args[0]).toEqual({
+      limit: 50,
+      cursor: 'search-cursor-2',
+      search: 'Alpha',
+    });
+    expect(component.displayedSubmissionPageNumber).toBe(2);
+    expect(fixture.nativeElement.textContent).toContain('Page 2 of 3');
+  }));
 
   it('syncs the export category dropdown when a submission group filter is selected', () => {
     cmsService.getSubmissions.calls.reset();
