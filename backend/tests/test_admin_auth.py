@@ -211,6 +211,18 @@ class AdminAuthServiceTests(unittest.TestCase):
         self.assertEqual(client.group_calls[0]["GroupName"], "Viewer")
         self.assertFalse(client.forgot_password_calls)
 
+    def test_resend_user_invite_uses_cognito_resend_action(self):
+        client = FakeCreateClient()
+        service = AdminAuthService(client=client, user_pool_id="pool-id", client_id="client-id")
+
+        response = service.resend_user_invite("viewer@example.com")
+
+        self.assertEqual(response, {"email": "viewer@example.com"})
+        self.assertEqual(client.create_user_calls[0]["UserPoolId"], "pool-id")
+        self.assertEqual(client.create_user_calls[0]["Username"], "viewer@example.com")
+        self.assertEqual(client.create_user_calls[0]["MessageAction"], "RESEND")
+        self.assertEqual(client.create_user_calls[0]["DesiredDeliveryMediums"], ["EMAIL"])
+
 
 if __name__ == "__main__":
     unittest.main()

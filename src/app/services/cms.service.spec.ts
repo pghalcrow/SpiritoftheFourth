@@ -227,6 +227,16 @@ describe('CmsService', () => {
     expect(update.request.headers.get('Authorization')).toBe('Bearer jwt-token');
     update.flush({ email: 'viewer2@example.com', role: 'admin', enabled: false });
 
+    service.resendAdminUserInvite('viewer2@example.com').subscribe(res => {
+      expect(res.email).toBe('viewer2@example.com');
+      expect(res.status).toBe('RESET_REQUIRED');
+    });
+    const resend = httpMock.expectOne(`${environment.cms.baseUrl}${environment.cms.routes.adminUsers}/viewer2%40example.com/invite`);
+    expect(resend.request.method).toBe('POST');
+    expect(resend.request.body).toEqual({});
+    expect(resend.request.headers.get('Authorization')).toBe('Bearer jwt-token');
+    resend.flush({ email: 'viewer2@example.com', role: 'viewer', status: 'RESET_REQUIRED' });
+
     service.deleteAdminUser('viewer2@example.com').subscribe(res => {
       expect(res.success).toBeTrue();
     });

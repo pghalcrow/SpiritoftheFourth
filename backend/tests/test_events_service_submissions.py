@@ -26,6 +26,7 @@ class FakeRepo:
         self.last_list_summary_only = None
         self.last_list_search = None
         self.password_setup_required = set()
+        self.password_setup_statuses = {}
 
     def get_runtime_settings(self):
         return {"testMode": self.test_mode, "updatedBy": "", "updatedAt": ""}
@@ -35,18 +36,30 @@ class FakeRepo:
         return {"testMode": enabled, "updatedBy": updated_by, "updatedAt": "2026-06-15T12:00:00-07:00"}
 
     def list_admin_user_setup_statuses(self):
+        if self.password_setup_statuses:
+            return self.password_setup_statuses
         return {
             email: {"passwordSetupRequired": True}
             for email in self.password_setup_required
         }
 
     def mark_admin_user_password_setup_required(self, email):
-        self.password_setup_required.add(email.strip().lower())
-        return {"email": email.strip().lower(), "passwordSetupRequired": True}
+        normalized_email = email.strip().lower()
+        self.password_setup_required.add(normalized_email)
+        self.password_setup_statuses[normalized_email] = {
+            "passwordSetupRequired": True,
+            "setupRequiredAt": "2026-06-23T12:00:00-07:00",
+        }
+        return {"email": normalized_email, "passwordSetupRequired": True}
 
     def mark_admin_user_password_setup_complete(self, email):
-        self.password_setup_required.discard(email.strip().lower())
-        return {"email": email.strip().lower(), "passwordSetupRequired": False}
+        normalized_email = email.strip().lower()
+        self.password_setup_required.discard(normalized_email)
+        self.password_setup_statuses[normalized_email] = {
+            "passwordSetupRequired": False,
+            "setupRequiredAt": "2026-06-23T12:00:00-07:00",
+        }
+        return {"email": normalized_email, "passwordSetupRequired": False}
 
     def list_submissions(self, limit=None):
         self.last_list_limit = limit
@@ -122,6 +135,7 @@ class FakeAuthService:
             {"email": "admin@example.com", "role": ROLE_ADMIN, "enabled": True, "status": "CONFIRMED"},
             {"email": "viewer@example.com", "role": ROLE_VIEWER, "enabled": True, "status": "CONFIRMED"},
         ]
+        self.resent_invites = []
 
     def login(self, email, password):
         if email == "super@example.com" and password == "secret7":
@@ -151,6 +165,10 @@ class FakeAuthService:
                     user["enabled"] = enabled
                 return user
         raise KeyError(email)
+
+    def resend_user_invite(self, email):
+        self.resent_invites.append(email)
+        return {"email": email}
 
     def request_password_reset(self, email):
         return {"success": True}
@@ -494,6 +512,48 @@ class EventsServiceSubmissionRoutesTests(unittest.TestCase):
         updated_users = json.loads(updated_list_response["body"])["items"]
         updated_admin_user = next(user for user in updated_users if user["email"] == "admin@example.com")
         self.assertEqual(updated_admin_user["status"], "CONFIRMED")
+
+    @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
+    def test_list_admin_users_marks_expired_password_setup_invites(self, _auth):
+        repo = FakeRepo()
+        repo.password_setup_statuses["admin@example.com"] = {
+            "passwordSetupRequired": True,
+            "setupRequiredAt": "2026-06-01T12:00:00-07:00",
+        }
+
+        with patch.object(events_service, "get_submissions_repository", return_value=repo):
+            with patch.object(events_service, "current_time_iso", return_value="2026-06-23T12:00:00-07:00"):
+                response = events_service.lambda_handler(
+                    make_event("GET", "/admin/users", token="role:superAdmin"),
+                    None,
+                )
+
+        self.assertEqual(response["statusCode"], 200)
+        users = json.loads(response["body"])["items"]
+        admin_user = next(user for user in users if user["email"] == "admin@example.com")
+        self.assertEqual(admin_user["status"], "INVITE_EXPIRED")
+
+    def test_super_admin_can_resend_expired_user_invite(self):
+        auth = FakeAuthService()
+        repo = FakeRepo()
+        repo.password_setup_statuses["admin@example.com"] = {
+            "passwordSetupRequired": True,
+            "setupRequiredAt": "2026-06-01T12:00:00-07:00",
+        }
+
+        with patch.object(events_service, "get_admin_auth_service", return_value=auth):
+            with patch.object(events_service, "get_submissions_repository", return_value=repo):
+                response = events_service.lambda_handler(
+                    make_event("POST", "/admin/users/admin@example.com/invite", token="role:superAdmin"),
+                    None,
+                )
+
+        self.assertEqual(response["statusCode"], 200)
+        body = json.loads(response["body"])
+        self.assertEqual(body["email"], "admin@example.com")
+        self.assertEqual(body["status"], "RESET_REQUIRED")
+        self.assertEqual(auth.resent_invites, ["admin@example.com"])
+        self.assertTrue(repo.password_setup_statuses["admin@example.com"]["passwordSetupRequired"])
 
     @patch.object(events_service, "get_admin_auth_service", return_value=FakeAuthService())
     def test_new_password_challenge_marks_password_setup_complete(self, _auth):

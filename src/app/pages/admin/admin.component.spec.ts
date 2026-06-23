@@ -31,6 +31,7 @@ describe('AdminComponent', () => {
       'createAdminUser',
       'deleteAdminUser',
       'updateAdminUser',
+      'resendAdminUserInvite',
     ]);
     cmsService.getEvents.and.returnValue(of({
       events: [{
@@ -73,6 +74,7 @@ describe('AdminComponent', () => {
     cmsService.createAdminUser.and.returnValue(of({ email: 'viewer@example.com', role: 'viewer' }));
     cmsService.deleteAdminUser.and.returnValue(of({ success: true, email: 'viewer@example.com' }));
     cmsService.updateAdminUser.and.returnValue(of({ email: 'viewer@example.com', role: 'viewer', enabled: true }));
+    cmsService.resendAdminUserInvite.and.returnValue(of({ email: 'viewer@example.com', role: 'viewer', status: 'RESET_REQUIRED' }));
 
     await TestBed.configureTestingModule({
       declarations: [AdminComponent],
@@ -438,6 +440,7 @@ describe('AdminComponent', () => {
       items: [
         { email: 'active@example.com', role: 'admin', enabled: true, status: 'CONFIRMED' },
         { email: 'setup@example.com', role: 'viewer', enabled: true, status: 'RESET_REQUIRED' },
+        { email: 'expired@example.com', role: 'viewer', enabled: true, status: 'INVITE_EXPIRED' },
         { email: 'change@example.com', role: 'viewer', enabled: true, status: 'FORCE_CHANGE_PASSWORD' },
         { email: 'pending@example.com', role: 'viewer', enabled: true, status: 'UNCONFIRMED' },
       ]
@@ -457,9 +460,11 @@ describe('AdminComponent', () => {
     expect(accountStatusHelp?.getAttribute('aria-describedby')).toBe('account-status-tooltip');
     expect(accountStatusTooltip?.textContent).toContain('Active users can sign in');
     expect(accountStatusTooltip?.textContent).toContain('Password setup needed');
+    expect(accountStatusTooltip?.textContent).toContain('Invite expired');
     expect(accountStatusTooltip?.textContent).toContain('Not confirmed');
     expect(nativeElement.textContent).toContain('Active');
     expect(nativeElement.textContent).toContain('Password setup needed');
+    expect(nativeElement.textContent).toContain('Invite expired');
     expect(nativeElement.textContent).toContain('Password change required');
     expect(nativeElement.textContent).toContain('Not confirmed');
   });
@@ -653,7 +658,7 @@ describe('AdminComponent', () => {
     expect(nativeElement.querySelector('[data-testid="user-enabled-toggle-viewer@example.com"]')).toBeTruthy();
   });
 
-  it('marks the signed-in user role and account status cells for centered alignment', () => {
+  it('vertically centers every account status and the signed-in user role cell', () => {
     sessionStorage.setItem('adminRole', 'admin');
     sessionStorage.setItem('adminEmail', 'admin@example.com');
     cmsService.getAdminUsers.and.returnValue(of({
@@ -669,9 +674,9 @@ describe('AdminComponent', () => {
 
     const nativeElement = fixture.nativeElement as HTMLElement;
     expect(nativeElement.querySelector('[data-testid="user-role-cell-admin@example.com"]')?.classList).toContain('current-admin-user-cell');
-    expect(nativeElement.querySelector('[data-testid="user-account-status-cell-admin@example.com"]')?.classList).toContain('current-admin-user-cell');
     expect(nativeElement.querySelector('[data-testid="user-role-cell-viewer@example.com"]')?.classList).not.toContain('current-admin-user-cell');
-    expect(nativeElement.querySelector('[data-testid="user-account-status-cell-viewer@example.com"]')?.classList).not.toContain('current-admin-user-cell');
+    expect(nativeElement.querySelector<HTMLElement>('[data-testid="user-account-status-cell-admin@example.com"]')?.style.verticalAlign).toBe('middle');
+    expect(nativeElement.querySelector<HTMLElement>('[data-testid="user-account-status-cell-viewer@example.com"]')?.style.verticalAlign).toBe('middle');
   });
 
   it('automatically saves enabled changes for scoped users', () => {
@@ -696,6 +701,34 @@ describe('AdminComponent', () => {
 
     expect(cmsService.updateAdminUser).toHaveBeenCalledWith('viewer@example.com', { enabled: false });
     expect(component.adminUsers[0].enabled).toBeFalse();
+  });
+
+  it('resends expired setup invites for scoped users', () => {
+    sessionStorage.setItem('adminRole', 'superAdmin');
+    sessionStorage.setItem('adminEmail', 'super@example.com');
+    cmsService.getAdminUsers.and.returnValue(of({
+      items: [
+        { email: 'viewer@example.com', role: 'viewer', enabled: true, status: 'INVITE_EXPIRED' },
+      ]
+    }));
+    cmsService.resendAdminUserInvite.and.returnValue(of({
+      email: 'viewer@example.com',
+      role: 'viewer',
+      enabled: true,
+      status: 'RESET_REQUIRED',
+    }));
+    fixture.detectChanges();
+
+    component.selectAdminSection('users');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="resend-admin-user-invite-viewer@example.com"]')!.click();
+    fixture.detectChanges();
+
+    expect(cmsService.resendAdminUserInvite).toHaveBeenCalledWith('viewer@example.com');
+    expect(component.adminUsers[0].status).toBe('RESET_REQUIRED');
+    expect(nativeElement.textContent).toContain('Password setup needed');
   });
 
   it('shows enabled as a checkbox with status text below it', () => {
@@ -1778,6 +1811,8 @@ describe('AdminComponent', () => {
     expect(row[header.indexOf('Additional Plaques')]).toBe(2);
     expect(row[header.indexOf('Additional Small')]).toBe(1);
     expect(row[header.indexOf('Phone')]).toBe('555-1212');
+    expect(row[header.indexOf('Payment Provider')]).toBe('Stripe');
+    expect(header.indexOf('Payment Provider')).toBe(header.indexOf('Phone') + 1);
     expect(row[header.indexOf('Zip Code')]).toBe(1234);
     expect(row[header.indexOf('Vehicle Year')]).toBe(1969);
   });
@@ -1918,7 +1953,6 @@ describe('AdminComponent', () => {
     const omittedHeaders = [
       'Payment Status',
       'Payment Method',
-      'Payment Provider',
       'Payment Received',
       'Payment Hold Created At',
       'Payment Hold Id',
@@ -1934,6 +1968,9 @@ describe('AdminComponent', () => {
       omittedHeaders.forEach(header => expect(sheet.data[0]).not.toContain(header));
     });
 
+    const vendorSheet = sheets.find(sheet => sheet.sheet === 'Vendors')!;
+    expect(vendorSheet.data[0]).toContain('Payment Provider');
+    expect(vendorSheet.data[1][vendorSheet.data[0].indexOf('Payment Provider')]).toBe('Stripe');
     sheets.forEach(sheet => expect(sheet.data[0]).not.toContain('Raw Data'));
   });
 

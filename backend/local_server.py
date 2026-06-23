@@ -108,6 +108,14 @@ class LocalAdminAuthService:
         self._save_users()
         return {"email": normalized_email, "role": normalized_role}
 
+    def resend_user_invite(self, email):
+        if email not in self.users:
+            raise KeyError(email)
+        self.users[email]["password"] = "reset7"
+        self.users[email]["status"] = "RESET_REQUIRED"
+        self._save_users()
+        return {"email": email}
+
     def delete_user(self, email):
         self.users.pop(email, None)
         self._save_users()

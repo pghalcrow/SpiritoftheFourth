@@ -267,10 +267,19 @@ class LocalSubmissionsRepository:
         statuses = settings.get("adminUserSetupStatuses", {})
         if not isinstance(statuses, dict):
             statuses = {}
-        statuses[normalized_email] = {"passwordSetupRequired": bool(required)}
+        updated_at = now_iso()
+        statuses[normalized_email] = {
+            "passwordSetupRequired": bool(required),
+            "setupRequiredAt": updated_at if required else "",
+            "updatedAt": updated_at,
+        }
         settings["adminUserSetupStatuses"] = statuses
         self._write_settings(settings)
-        return {"email": normalized_email, "passwordSetupRequired": bool(required)}
+        return {
+            "email": normalized_email,
+            "passwordSetupRequired": bool(required),
+            "setupRequiredAt": statuses[normalized_email]["setupRequiredAt"],
+        }
 
     def _read(self):
         if not self.path.exists():

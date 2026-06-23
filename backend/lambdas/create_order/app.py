@@ -361,7 +361,45 @@ def build_motor_show_items_html(form_data):
     return "".join(rows)
 
 
-def build_email_context(event_title, order_id, event_meta, buyer_info, items_html, form_fields_html, participants_table_rows, total_price, purchased_date, admin_details_heading='<h3 style="margin-top: 30px; color: #333">Records</h3>'):
+def build_payment_method_summary_row(payment_method):
+    if not payment_method:
+        return ""
+    return f"""
+              <tr>
+                <td
+                  style="
+                    padding: 4px;
+                    border: 1px solid #ddd;
+                    white-space: nowrap;
+                  "
+                >
+                  Payment Method
+                </td>
+                <td
+                  style="
+                    padding: 4px;
+                    border: 1px solid #ddd;
+                    white-space: nowrap;
+                  "
+                >
+                  {payment_method}
+                </td>
+              </tr>
+    """
+
+
+def build_vendor_payment_method_row(payment_method):
+    if not payment_method:
+        return ""
+    return f"""
+        <div class="form-row">
+          <label>Payment Method</label>
+          <span class="form-line"><span class="form-value">{payment_method}</span></span>
+        </div>
+    """
+
+
+def build_email_context(event_title, order_id, event_meta, buyer_info, items_html, form_fields_html, participants_table_rows, total_price, purchased_date, admin_details_heading='<h3 style="margin-top: 30px; color: #333">Records</h3>', payment_method=""):
     return {
         "event": event_title,
         "order_id": order_id,
@@ -375,6 +413,7 @@ def build_email_context(event_title, order_id, event_meta, buyer_info, items_htm
         "items_html": items_html,
         "total_price": total_price,
         "purchased_date": purchased_date,
+        "payment_method_row": build_payment_method_summary_row(payment_method),
         "form_fields_html": form_fields_html,
         "admin_details_heading": admin_details_heading,
         "participants_table_rows": participants_table_rows,
@@ -391,7 +430,7 @@ def format_vendor_receipt_price(total_price):
     amount = float(total_price or 0)
     return "No Fee" if amount == 0 else f"${amount:.2f}"
 
-def build_vendor_email_contexts(form_data, purchased_date, total_price, buyer_full_name):
+def build_vendor_email_contexts(form_data, purchased_date, total_price, buyer_full_name, payment_method=""):
     vendor_type = form_data.get("vendorType", "")
     check_map = {
         "Non-Profit": "NON_PROFIT_CHECK",
@@ -422,6 +461,7 @@ def build_vendor_email_contexts(form_data, purchased_date, total_price, buyer_fu
         "ZIP": form_data.get("zipcode", ""),
         "PHONE": form_data.get("phone", ""),
         "EMAIL": form_data.get("email", ""),
+        "PAYMENT_METHOD_ROW": build_vendor_payment_method_row(payment_method),
         "PRODUCT_DESCRIPTION": form_data.get("description", ""),
         "SPECIAL_REQUESTS": form_data.get("specialRequests", ""),
         "SIGNER_NAME": form_data.get("signatureName", ""),
@@ -823,12 +863,13 @@ def process_paypal_order_completion(resource, event_create_time=None):
         context = build_email_context(
             event_meta["event_title"], order_id, event_meta, buyer_info,
             items_html, form_fields_html, participants_table_rows, total_price, purchased_date,
-            admin_details_heading=admin_details_heading
+            admin_details_heading=admin_details_heading,
+            payment_method="PayPal",
         )
 
         if order_type == "vendorApplication":
             buyer_ctx, seller_ctx = build_vendor_email_contexts(
-                form_data, purchased_date, total_price, buyer_info["full_name"]
+                form_data, purchased_date, total_price, buyer_info["full_name"], payment_method="PayPal"
             )
             buyers_body = email_sender.format_email("emails/vender__application_receipt.html", buyer_ctx)
             sellers_body = email_sender.format_email("emails/vender__application_form.html", seller_ctx)
@@ -1437,12 +1478,13 @@ def lambda_handler(event, context):
                 context_data = build_email_context(
                     event_meta["event_title"], session_id, event_meta, buyer_info,
                     items_html, form_fields_html, participants_table_rows, total_price, purchased_date,
-                    admin_details_heading=admin_details_heading
+                    admin_details_heading=admin_details_heading,
+                    payment_method="Stripe",
                 )
 
                 if event_type == "vendorApplication":
                     buyer_ctx, seller_ctx = build_vendor_email_contexts(
-                        form_data, purchased_date, total_price, buyer_info["full_name"]
+                        form_data, purchased_date, total_price, buyer_info["full_name"], payment_method="Stripe"
                     )
                     buyers_body = email_sender.format_email("emails/vender__application_receipt.html", buyer_ctx)
                     sellers_body = email_sender.format_email("emails/vender__application_form.html", seller_ctx)

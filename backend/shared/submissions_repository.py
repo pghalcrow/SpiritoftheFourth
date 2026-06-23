@@ -210,6 +210,8 @@ class SubmissionsRepository:
         return {
             item.get("email", item.get("sk", "")).strip().lower(): {
                 "passwordSetupRequired": bool(item.get("passwordSetupRequired", False)),
+                "setupRequiredAt": item.get("setupRequiredAt") or item.get("updatedAt", ""),
+                "updatedAt": item.get("updatedAt", ""),
             }
             for item in result.get("Items", [])
             if item.get("email") or item.get("sk")
@@ -217,16 +219,18 @@ class SubmissionsRepository:
 
     def mark_admin_user_password_setup_required(self, email):
         normalized_email = str(email or "").strip().lower()
+        updated_at = _now_iso()
         record = {
             "pk": "ADMIN_USER_SETUP",
             "sk": normalized_email,
             "recordType": "admin_user_setup",
             "email": normalized_email,
             "passwordSetupRequired": True,
-            "updatedAt": _now_iso(),
+            "setupRequiredAt": updated_at,
+            "updatedAt": updated_at,
         }
         self.table.put_item(Item=record)
-        return {"email": normalized_email, "passwordSetupRequired": True}
+        return {"email": normalized_email, "passwordSetupRequired": True, "setupRequiredAt": updated_at}
 
     def mark_admin_user_password_setup_complete(self, email):
         normalized_email = str(email or "").strip().lower()
@@ -236,6 +240,7 @@ class SubmissionsRepository:
             "recordType": "admin_user_setup",
             "email": normalized_email,
             "passwordSetupRequired": False,
+            "setupRequiredAt": "",
             "updatedAt": _now_iso(),
         }
         self.table.put_item(Item=record)

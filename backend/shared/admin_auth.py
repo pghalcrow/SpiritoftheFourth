@@ -227,6 +227,15 @@ class AdminAuthService:
         )
         return {"email": email, "role": normalized_role}
 
+    def resend_user_invite(self, email):
+        self.client.admin_create_user(
+            UserPoolId=self.user_pool_id,
+            Username=email,
+            MessageAction="RESEND",
+            DesiredDeliveryMediums=["EMAIL"],
+        )
+        return {"email": email}
+
     def delete_user(self, email):
         self.client.admin_delete_user(UserPoolId=self.user_pool_id, Username=email)
         return {"email": email}

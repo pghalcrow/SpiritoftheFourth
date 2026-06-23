@@ -336,6 +336,7 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
             "150.00",
             "06/22/2026",
             admin_details_heading="",
+            payment_method="PayPal",
         )
 
         seller_body = sender.format_email("emails/seller__po.html", context)
@@ -349,6 +350,30 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
         self.assertIn("pat@example.com", seller_body)
         self.assertIn("Donation Amount", seller_body)
         self.assertIn("$150.00", seller_body)
+        self.assertIn("Payment Method", seller_body)
+        self.assertIn("PayPal", seller_body)
+
+    def test_paid_vendor_admin_form_includes_payment_method(self):
+        app = import_create_order_app()
+        sender = app.EmailSender.__new__(app.EmailSender)
+
+        _, seller_context = app.build_vendor_email_contexts(
+            {
+                "companyName": "Booth Co",
+                "contactName": "Vendor Contact",
+                "email": "vendor@example.com",
+                "vendorType": "Non-Food Sales",
+            },
+            "06/22/2026",
+            "65.00",
+            "Vendor Contact",
+            payment_method="Stripe",
+        )
+
+        seller_body = sender.format_email("emails/vender__application_form.html", seller_context)
+
+        self.assertIn("Payment Method", seller_body)
+        self.assertIn("Stripe", seller_body)
 
     def test_lookup_dynamic_submission_falls_back_to_google_sheet(self):
         app = import_create_order_app()

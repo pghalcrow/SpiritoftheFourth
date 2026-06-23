@@ -61,6 +61,7 @@ export interface AdminUser {
   role: AdminRole;
   enabled?: boolean;
   status?: string;
+  setupRequiredAt?: string;
 }
 
 export interface AdminUsersResponse {
@@ -307,6 +308,15 @@ export class CmsService {
     return this.http.patch<AdminUserMutationResponse>(
       `${this.baseUrl}${this.routes.adminUsers}/${encodeURIComponent(email)}`,
       update,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  }
+
+  resendAdminUserInvite(email: string): Observable<AdminUserMutationResponse> {
+    const token = sessionStorage.getItem('adminToken');
+    return this.http.post<AdminUserMutationResponse>(
+      `${this.baseUrl}${this.routes.adminUsers}/${encodeURIComponent(email)}/invite`,
+      {},
       { headers: { Authorization: `Bearer ${token}` } }
     );
   }

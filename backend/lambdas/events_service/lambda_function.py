@@ -2,6 +2,7 @@ import base64
 import json
 import os
 import re
+from datetime import datetime, timedelta, timezone
 from urllib.parse import unquote
 from decimal import Decimal
 
@@ -42,6 +43,7 @@ NO_CACHE_HEADERS = {
 }
 RESET_CODE_ERROR_MESSAGE = "Invalid or expired reset code. Request a new password reset code and use the newest email."
 PASSWORD_POLICY_ERROR_MESSAGE = "Password does not meet policy. Use at least 8 characters and include uppercase, lowercase, number, and symbol."
+ADMIN_INVITE_EXPIRATION_DAYS = int(os.environ.get("ADMIN_INVITE_EXPIRATION_DAYS", "7"))
 
 
 def lambda_handler(event, context):
@@ -111,6 +113,15 @@ def lambda_handler(event, context):
             body = json.loads(event.get("body", "{}"))
             return create_admin_user(body, user)
 
+    if http_method == "POST" and raw_path.startswith("/admin/users/") and raw_path.endswith("/invite"):
+        user = get_authorized_user(event)
+        if not user:
+            return json_response(401, {"error": "Unauthorized"})
+        if not can_manage_users(user["role"]):
+            return json_response(403, {"error": "User management access required"})
+        email = unquote(raw_path[len("/admin/users/"):-len("/invite")].strip("/"))
+        return resend_admin_user_invite(email, user)
+
     if raw_path.startswith("/admin/users/"):
         user = get_authorized_user(event)
         if not user:
@@ -167,6 +178,10 @@ def json_default(value):
     if isinstance(value, Decimal):
         return int(value) if value % 1 == 0 else float(value)
     raise TypeError(f"Object of type {value.__class__.__name__} is not JSON serializable")
+
+
+def current_time_iso():
+    return datetime.now(timezone.utc).isoformat()
 
 
 def get_submissions_repository():
@@ -327,15 +342,41 @@ def merge_admin_user_setup_statuses(users):
     return {
         **users,
         "items": [
-            {
-                **user,
-                "status": "RESET_REQUIRED"
-                if setup_statuses.get(str(user.get("email") or user.get("username") or "").strip().lower(), {}).get("passwordSetupRequired")
-                else user.get("status", ""),
-            }
+            merge_admin_user_setup_status(user, setup_statuses)
             for user in users.get("items", [])
         ],
     }
+
+
+def merge_admin_user_setup_status(user, setup_statuses):
+    email = str(user.get("email") or user.get("username") or "").strip().lower()
+    setup_status = setup_statuses.get(email, {})
+    if not setup_status.get("passwordSetupRequired"):
+        return {**user, "status": user.get("status", "")}
+    return {
+        **user,
+        "status": "INVITE_EXPIRED" if admin_user_invite_expired(setup_status) else "RESET_REQUIRED",
+    }
+
+
+def admin_user_invite_expired(setup_status):
+    setup_at = setup_status.get("setupRequiredAt") or setup_status.get("updatedAt")
+    setup_time = parse_iso_datetime(setup_at)
+    now_time = parse_iso_datetime(current_time_iso())
+    if not setup_time or not now_time:
+        return False
+    return now_time - setup_time >= timedelta(days=ADMIN_INVITE_EXPIRATION_DAYS)
+
+
+def parse_iso_datetime(value):
+    if not value:
+        return None
+    try:
+        normalized = str(value).replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(normalized)
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
 
 
 def create_admin_user(body, current_user):
@@ -353,6 +394,30 @@ def create_admin_user(body, current_user):
         return json_response(200, {**created_user, "status": "RESET_REQUIRED"})
     except ValueError as error:
         return json_response(400, {"error": str(error)})
+
+
+def resend_admin_user_invite(email, current_user):
+    current_email = str((current_user or {}).get("email", "")).strip().lower()
+    target_email = str(email or "").strip().lower()
+    if current_email and target_email and current_email == target_email:
+        return json_response(403, {"error": "Cannot resend your own invite"})
+
+    auth_service = get_admin_auth_service()
+    try:
+        users = auth_service.list_users().get("items", [])
+        match = next((item for item in users if item.get("email") == email or item.get("username") == email), None)
+        target_role = normalize_role((match or {}).get("role"))
+        if not target_role:
+            return json_response(404, {"error": "User not found"})
+        if not can_manage_role(current_user["role"], target_role):
+            return json_response(403, {"error": "Cannot manage requested role"})
+        resent_user = auth_service.resend_user_invite(email)
+        mark_admin_user_password_setup_required(email)
+        return json_response(200, {**resent_user, "role": target_role, "status": "RESET_REQUIRED"})
+    except ValueError as error:
+        return json_response(400, {"error": str(error)})
+    except KeyError:
+        return json_response(404, {"error": "User not found"})
 
 
 def mark_admin_user_password_setup_required(email):

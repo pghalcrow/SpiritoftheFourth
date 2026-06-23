@@ -244,6 +244,7 @@ export class AdminComponent implements OnInit {
     const labels: Record<string, string> = {
       CONFIRMED: 'Active',
       RESET_REQUIRED: 'Password setup needed',
+      INVITE_EXPIRED: 'Invite expired',
       FORCE_CHANGE_PASSWORD: 'Password change required',
       UNCONFIRMED: 'Not confirmed',
     };
@@ -324,6 +325,10 @@ export class AdminComponent implements OnInit {
 
   canToggleAdminUserEnabled(user: AdminUser): boolean {
     return this.canManageAdminUser(user);
+  }
+
+  canResendAdminUserInvite(user: AdminUser): boolean {
+    return this.canManageAdminUser(user) && user.status === 'INVITE_EXPIRED';
   }
 
   showRoleHelp() {
@@ -584,6 +589,31 @@ export class AdminComponent implements OnInit {
       });
   }
 
+  resendAdminUserInvite(user: AdminUser) {
+    if (!user.email || !this.canResendAdminUserInvite(user)) {
+      return;
+    }
+
+    this.userUpdateLoadingEmail = user.email;
+    this.cmsService.resendAdminUserInvite(user.email)
+      .pipe(finalize(() => this.userUpdateLoadingEmail = null))
+      .subscribe({
+        next: updatedUser => {
+          this.applyAdminUserUpdate(user.email, updatedUser);
+          this.showModal(
+            'Invite resent',
+            `${user.email} has been sent a new setup invite.`,
+            'success'
+          );
+        },
+        error: err => {
+          if (this.handleAuthFailure(err)) return;
+          console.error('Admin user invite resend failed', err);
+          this.showModal('Invite resend failed', 'Could not resend the admin user invite.', 'danger');
+        }
+      });
+  }
+
   private applyAdminUserUpdate(email: string, update: Partial<AdminUser>) {
     this.adminUsers = this.sortAdminUsers(this.adminUsers.map(user => {
       if (user.email !== email) return user;
@@ -810,6 +840,10 @@ export class AdminComponent implements OnInit {
         Email: submission.email || '',
         Phone: submission.phone || '',
       };
+      const paymentProvider = this.formatSubmissionPaymentProvider(submission);
+      if (paymentProvider) {
+        row['Payment Provider'] = paymentProvider;
+      }
       if (this.hasDisplayValue(submission.amount)) {
         row['Amount'] = this.formatSubmissionExportFieldValue(submission.amount, 'amount');
       }
@@ -978,6 +1012,7 @@ export class AdminComponent implements OnInit {
       'Name',
       'Email',
       'Phone',
+      'Payment Provider',
       'Submitted Date',
       'Total',
       'Vehicle Year',

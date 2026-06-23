@@ -556,7 +556,7 @@
                   class="status-help-tooltip"
                   data-testid="account-status-tooltip"
                   role="tooltip">
-                  Active users can sign in. Password setup needed means the user still needs to set or reset their password. Password change required means a temporary password must be changed at sign-in. Not confirmed means setup has not been completed.
+                  Active users can sign in. Password setup needed means the user still needs to set or reset their password. Invite expired means the setup window has passed and a new invite should be sent. Password change required means a temporary password must be changed at sign-in. Not confirmed means setup has not been completed.
                 </span>
               </span>
             </th>
@@ -593,7 +593,7 @@
             <td
               class="user-account-status-cell"
               [class.current-admin-user-cell]="isCurrentAdminUser(user)"
-              [style.vertical-align]="isCurrentAdminUser(user) ? 'middle' : null"
+              style="vertical-align: middle;"
               [attr.data-testid]="'user-account-status-cell-' + user.email"
             >{{ formatAccountStatus(user.status) }}</td>
             <td>
@@ -619,6 +619,17 @@
               </ng-template>
             </td>
             <td>
+              <button
+                *ngIf="canResendAdminUserInvite(user)"
+                type="button"
+                [attr.data-testid]="'resend-admin-user-invite-' + user.email"
+                class="action-button secondary details-button"
+                [disabled]="userActionLoading || userUpdateLoadingEmail === user.email"
+                (click)="resendAdminUserInvite(user)"
+              >
+                <span *ngIf="userUpdateLoadingEmail === user.email" class="button-spinner" aria-hidden="true"></span>
+                {{ userUpdateLoadingEmail === user.email ? 'Sending...' : 'Resend Invite' }}
+              </button>
               <button *ngIf="canRemoveAdminUser(user)" type="button" data-testid="remove-admin-user" class="action-button danger details-button" [disabled]="userActionLoading || userUpdateLoadingEmail === user.email" (click)="deleteAdminUser(user)">
                 Remove
               </button>
