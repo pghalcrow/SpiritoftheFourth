@@ -9,6 +9,7 @@ class FakeTable:
         self.page_size = None
         self.delete_before_update_keys = set()
         self.query_pks = []
+        self.deleted_keys = []
 
     def put_item(self, **kwargs):
         item = kwargs["Item"]
@@ -44,6 +45,7 @@ class FakeTable:
 
     def delete_item(self, **kwargs):
         key = (kwargs["Key"]["pk"], kwargs["Key"]["sk"])
+        self.deleted_keys.append(key)
         condition = kwargs.get("ConditionExpression")
         if condition and key not in self.items:
             raise Exception("ConditionalCheckFailedException")
@@ -222,6 +224,22 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(result["totalCount"], 1)
         self.assertNotIn("SUBMISSION", self.table.query_pks)
         self.assertIn("SUBMISSION_GROUP#sponsor", self.table.query_pks)
+
+    def test_create_submission_writes_indexes_without_delete_permission(self):
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:00:00-07:00#s1",
+            "recordType": "submission",
+            "submissionId": "s1",
+            "submissionTitle": "Volunteer Request",
+            "submittedAt": "2026-06-05T10:00:00-07:00",
+            "source": "volunteerForm",
+            "rawData": {"formType": "volunteerForm"},
+        })
+
+        self.assertEqual(self.table.deleted_keys, [])
+        self.assertIn(("SUBMISSION_ID", "s1"), self.table.items)
+        self.assertIn(("SUBMISSION_GROUP#volunteer", "2026-06-05T10:00:00-07:00#s1"), self.table.items)
 
     def test_group_all_uses_main_submission_partition(self):
         self.repo.create_submission({

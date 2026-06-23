@@ -46,7 +46,7 @@ class SubmissionsRepository:
     def create_submission(self, record):
         self._prepare_submission_record(record)
         self.table.put_item(Item=record)
-        self.reindex_submission(record)
+        self._write_submission_indexes(record)
         return record
 
     def create_submission_if_missing(self, record):
@@ -59,7 +59,7 @@ class SubmissionsRepository:
                 Item=record,
                 ConditionExpression="attribute_not_exists(pk)",
             )
-            self.reindex_submission(record)
+            self._write_submission_indexes(record)
             return True
         except Exception as error:
             if self._is_conditional_check_failed(error):

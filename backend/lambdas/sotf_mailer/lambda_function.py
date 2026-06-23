@@ -86,7 +86,7 @@ def storage_form_title(subject, form_type):
         "paradeEntryForm": "New Parade Entry Request - Parade",
         "carEntryForm": "New Parade Entry Request - Car",
         "vipEntryForm": "New Parade Entry Request - VIP",
-        "volunteerForm": "New Volunteer Request",
+        "volunteerForm": "Volunteer Request",
         "vendorApplicationForm": "New Vendor Application Submission",
         "artistSignUpForm": "New Artist Sign-Up",
         "sponsorshipForm": "New Sponsorship Submission",

@@ -722,11 +722,12 @@
       <table class="submissions-table">
         <thead>
           <tr>
-            <th>Submission</th>
+            <th *ngIf="showSubmissionColumn">Submission</th>
             <th>Date</th>
             <th>Name</th>
             <th>Email</th>
             <th>Phone</th>
+            <th *ngIf="showPaymentMethodColumn">Payment Method</th>
             <th>Details</th>
           </tr>
         </thead>
@@ -737,11 +738,12 @@
             [class.check-payment-unreceived]="isCheckPaymentUnreceived(submission)"
             (click)="selectSubmission(submission)"
           >
-            <td>{{ formatSubmissionTitle(submission) }}</td>
+            <td *ngIf="showSubmissionColumn">{{ formatSubmissionTitle(submission) }}</td>
             <td>{{ formatSubmissionDate(submission.submittedAt) }}</td>
             <td>{{ submission.name }}</td>
             <td>{{ submission.email }}</td>
             <td>{{ submission.phone }}</td>
+            <td *ngIf="showPaymentMethodColumn">{{ formatSubmissionPaymentMethod(submission) }}</td>
             <td>
               <button
                 type="button"

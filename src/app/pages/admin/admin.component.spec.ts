@@ -1901,6 +1901,51 @@ describe('AdminComponent', () => {
     expect(detailPanel.querySelector('.submission-close-button')?.textContent?.trim()).toBe('Close');
   });
 
+  it('hides the submission column for focused submission groups and shows motor show payment method after phone', () => {
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 'motor-check-1',
+        submissionTitle: 'New Motor Show Entry — Check Payment',
+        submittedAt: '2026-06-05T10:07:00-07:00',
+        name: 'Pat Halcrow',
+        email: 'pat@example.com',
+        phone: '555-1212',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { formType: 'motorShowOrder', paymentMethod: 'check' },
+      }],
+      totalCount: 1,
+      totalPages: 1,
+    }));
+
+    component.toggleSubmissionGroup('motorShow');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const headerText = Array.from(nativeElement.querySelectorAll('.submissions-table th'))
+      .map(header => header.textContent?.trim());
+    const rowCells = Array.from(nativeElement.querySelectorAll('[data-testid="submission-row-motor-check-1"] td'))
+      .map(cell => cell.textContent?.trim());
+
+    expect(headerText).toEqual(['Date', 'Name', 'Email', 'Phone', 'Payment Method', 'Details']);
+    expect(rowCells[0]).toBe('2026-06-05 10:07');
+    expect(rowCells[3]).toBe('555-1212');
+    expect(rowCells[4]).toBe('Check');
+    expect(nativeElement.querySelector('.submissions-table')?.textContent).not.toContain('New Motor Show Entry');
+  });
+
+  it('hides the submission column for vendor, freedom club, motor show, and volunteer filters', () => {
+    (['vendor', 'sponsor', 'motorShow', 'volunteer'] as const).forEach(group => {
+      component.selectedSubmissionGroup = group;
+      expect(component.showSubmissionColumn).toBeFalse();
+    });
+    component.selectedSubmissionGroup = 'all';
+    expect(component.showSubmissionColumn).toBeTrue();
+  });
+
   it('displays imported motor show order titles as readable labels in the table details and search', () => {
     cmsService.getSubmissions.and.returnValue(of({
       items: [{
@@ -2080,7 +2125,9 @@ describe('AdminComponent', () => {
     tableText = nativeElement.querySelector('.submissions-table')?.textContent || '';
     expect(component.selectedSubmissionGroup).toBe('vendor');
     expect(nativeElement.querySelector('[data-testid="submission-group-vendor"]')?.classList).toContain('active');
-    expect(tableText).toContain('New Vendor Application Submission');
+    expect(tableText).toContain('Vendor Person');
+    expect(tableText).toContain('vendor@example.com');
+    expect(tableText).not.toContain('New Vendor Application Submission');
     expect(tableText).not.toContain('Motor Show Event');
     expect(tableText).not.toContain('New Artist Sign-Up');
     expect(tableText).not.toContain('Sponsorship Submission');
@@ -2100,7 +2147,9 @@ describe('AdminComponent', () => {
 
     tableText = nativeElement.querySelector('.submissions-table')?.textContent || '';
     expect(component.selectedSubmissionGroup).toBe('sponsor');
-    expect(tableText).toContain('Community Picnic Signup');
+    expect(tableText).toContain('Special Person');
+    expect(tableText).toContain('special@example.com');
+    expect(tableText).not.toContain('Community Picnic Signup');
     expect(tableText).not.toContain('New Vendor Application Submission');
     expect(tableText).not.toContain('New Artist Sign-Up');
     expect(tableText).not.toContain('Sponsorship Submission');

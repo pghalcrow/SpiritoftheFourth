@@ -1069,6 +1069,14 @@ export class AdminComponent implements OnInit {
     );
   }
 
+  get showSubmissionColumn(): boolean {
+    return !['vendor', 'sponsor', 'motorShow', 'volunteer'].includes(this.selectedSubmissionGroup);
+  }
+
+  get showPaymentMethodColumn(): boolean {
+    return this.selectedSubmissionGroup === 'motorShow';
+  }
+
   toggleSubmissionGroup(group: SubmissionGroupKey) {
     this.selectedSubmissionGroup = this.selectedSubmissionGroup === group ? 'all' : group;
     this.submissionPageCursors = [undefined];
@@ -1552,6 +1560,16 @@ export class AdminComponent implements OnInit {
       return title.slice(0, -' Order'.length);
     }
     return title;
+  }
+
+  formatSubmissionPaymentMethod(submission?: AdminSubmission): string {
+    if (!submission) return '';
+    const rawData = submission.rawData || {};
+    const rawPaymentMethod = typeof rawData.paymentMethod === 'string' ? rawData.paymentMethod : '';
+    if (/check/i.test(rawPaymentMethod) || this.isCheckPaymentSubmission(submission)) {
+      return 'Check';
+    }
+    return 'Card';
   }
 
   private formatFormTypeValue(value: string): string {

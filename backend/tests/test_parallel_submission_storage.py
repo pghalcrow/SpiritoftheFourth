@@ -140,7 +140,7 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
 
         self.assertEqual(response["statusCode"], 200)
         create_submission_record.assert_called_once()
-        self.assertEqual(create_submission_record.call_args.kwargs["form"], "New Volunteer Request")
+        self.assertEqual(create_submission_record.call_args.kwargs["form"], "Volunteer Request")
 
     def test_no_payment_vendor_updates_google_sheet_and_dynamodb(self):
         app = import_create_order_app()
@@ -618,7 +618,7 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
         self.assertEqual(response["statusCode"], 200)
         record_submission.assert_called_once()
         call_kwargs = record_submission.call_args.kwargs
-        self.assertEqual(call_kwargs["form"], "New Volunteer Request")
+        self.assertEqual(call_kwargs["form"], "Volunteer Request")
         self.assertEqual(call_kwargs["name"], "Pat Halcrow")
         self.assertEqual(call_kwargs["email"], "pat@example.com")
         self.assertEqual(call_kwargs["phone"], "555-1212")

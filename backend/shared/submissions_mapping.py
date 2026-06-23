@@ -18,6 +18,7 @@ EXACT_SUBMISSION_TITLE_REPLACEMENTS = {
     "Freedom Club Donation Order": "Freedom Club Donation",
     "New Vendor Application Submission": "Vendor Application",
     "Vendor Application Submission": "Vendor Application",
+    "New Volunteer Request": "Volunteer Request",
 }
 
 
