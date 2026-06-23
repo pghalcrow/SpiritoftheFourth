@@ -1937,6 +1937,41 @@ describe('AdminComponent', () => {
     expect(nativeElement.querySelector('.submissions-table')?.textContent).not.toContain('New Motor Show Entry');
   });
 
+  it('shows donation amount after phone for the Freedom Club filter', () => {
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 'donation-1',
+        submissionTitle: 'Freedom Club Donation',
+        submittedAt: '2026-06-16T12:00:00-07:00',
+        name: 'Pat Donor',
+        email: 'donor@example.com',
+        phone: '555-1212',
+        paymentStatus: 'paid',
+        paymentProvider: 'stripe',
+        amount: 150,
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { formType: 'freedomClubDonation', donationAmount: 150, grandTotal: 150 },
+      }],
+      totalCount: 1,
+      totalPages: 1,
+    }));
+
+    component.toggleSubmissionGroup('sponsor');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const headerText = Array.from(nativeElement.querySelectorAll('.submissions-table th'))
+      .map(header => header.textContent?.trim());
+    const rowCells = Array.from(nativeElement.querySelectorAll('[data-testid="submission-row-donation-1"] td'))
+      .map(cell => cell.textContent?.trim());
+
+    expect(headerText).toEqual(['Date', 'Name', 'Email', 'Phone', 'Amount', 'Details']);
+    expect(rowCells[3]).toBe('555-1212');
+    expect(rowCells[4]).toBe('$150.00');
+  });
+
   it('hides the submission column for vendor, freedom club, motor show, and volunteer filters', () => {
     (['vendor', 'sponsor', 'motorShow', 'volunteer'] as const).forEach(group => {
       component.selectedSubmissionGroup = group;

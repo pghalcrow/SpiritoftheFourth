@@ -19,6 +19,9 @@ EXACT_SUBMISSION_TITLE_REPLACEMENTS = {
     "New Vendor Application Submission": "Vendor Application",
     "Vendor Application Submission": "Vendor Application",
     "New Volunteer Request": "Volunteer Request",
+    "New Parade Entry Request - Parade": "Parade Entry Request - Parade",
+    "New Parade Entry Request - Car": "Parade Entry Request - Car",
+    "New Parade Entry Request - VIP": "Parade Entry Request - VIP",
 }
 
 

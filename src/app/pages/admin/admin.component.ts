@@ -1077,6 +1077,10 @@ export class AdminComponent implements OnInit {
     return this.selectedSubmissionGroup === 'motorShow';
   }
 
+  get showDonationAmountColumn(): boolean {
+    return this.selectedSubmissionGroup === 'sponsor';
+  }
+
   toggleSubmissionGroup(group: SubmissionGroupKey) {
     this.selectedSubmissionGroup = this.selectedSubmissionGroup === group ? 'all' : group;
     this.submissionPageCursors = [undefined];
@@ -1570,6 +1574,19 @@ export class AdminComponent implements OnInit {
       return 'Check';
     }
     return 'Card';
+  }
+
+  formatSubmissionDonationAmount(submission?: AdminSubmission): string {
+    if (!submission) return '';
+    const rawData = submission.rawData || {};
+    const amount = [
+      submission.amount,
+      rawData.donationAmount,
+      rawData.grandTotal,
+      rawData.total,
+      rawData.amount,
+    ].find(value => this.hasDisplayValue(value));
+    return this.hasDisplayValue(amount) ? this.formatCurrencyValue(amount) : '';
   }
 
   private formatFormTypeValue(value: string): string {

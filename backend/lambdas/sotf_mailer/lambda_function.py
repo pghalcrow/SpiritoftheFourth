@@ -83,9 +83,9 @@ def record_submission_parallel(form, name, email, phone, source, raw_data):
 
 def storage_form_title(subject, form_type):
     form_titles = {
-        "paradeEntryForm": "New Parade Entry Request - Parade",
-        "carEntryForm": "New Parade Entry Request - Car",
-        "vipEntryForm": "New Parade Entry Request - VIP",
+        "paradeEntryForm": "Parade Entry Request - Parade",
+        "carEntryForm": "Parade Entry Request - Car",
+        "vipEntryForm": "Parade Entry Request - VIP",
         "volunteerForm": "Volunteer Request",
         "vendorApplicationForm": "New Vendor Application Submission",
         "artistSignUpForm": "New Artist Sign-Up",

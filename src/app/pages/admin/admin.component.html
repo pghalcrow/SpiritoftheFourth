@@ -727,6 +727,7 @@
             <th>Name</th>
             <th>Email</th>
             <th>Phone</th>
+            <th *ngIf="showDonationAmountColumn">Amount</th>
             <th *ngIf="showPaymentMethodColumn">Payment Method</th>
             <th>Details</th>
           </tr>
@@ -743,6 +744,7 @@
             <td>{{ submission.name }}</td>
             <td>{{ submission.email }}</td>
             <td>{{ submission.phone }}</td>
+            <td *ngIf="showDonationAmountColumn">{{ formatSubmissionDonationAmount(submission) }}</td>
             <td *ngIf="showPaymentMethodColumn">{{ formatSubmissionPaymentMethod(submission) }}</td>
             <td>
               <button

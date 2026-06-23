@@ -632,17 +632,17 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
             (
                 "paradeEntryForm",
                 "New Parade Entry Request - Name: Rancho Float | Contact: Pat Halcrow | Email: pat@example.com",
-                "New Parade Entry Request - Parade",
+                "Parade Entry Request - Parade",
             ),
             (
                 "carEntryForm",
                 "New Parade Car Entry Request - Name: Pat Driver | Email: driver@example.com",
-                "New Parade Entry Request - Car",
+                "Parade Entry Request - Car",
             ),
             (
                 "vipEntryForm",
                 "New Parade VIP Entry Request: Name: Council Member Smith | Contact: Pat VIP | Email: vip@example.com",
-                "New Parade Entry Request - VIP",
+                "Parade Entry Request - VIP",
             ),
         ]
 

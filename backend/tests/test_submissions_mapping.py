@@ -197,6 +197,9 @@ class SubmissionsMappingTest(unittest.TestCase):
         self.assertEqual(normalize_submission_title("Motor Show Event Order"), "Motor Show Event")
         self.assertEqual(normalize_submission_title("Vendor Application Submission"), "Vendor Application")
         self.assertEqual(normalize_submission_title("New Volunteer Request"), "Volunteer Request")
+        self.assertEqual(normalize_submission_title("New Parade Entry Request - Parade"), "Parade Entry Request - Parade")
+        self.assertEqual(normalize_submission_title("New Parade Entry Request - Car"), "Parade Entry Request - Car")
+        self.assertEqual(normalize_submission_title("New Parade Entry Request - VIP"), "Parade Entry Request - VIP")
         self.assertEqual(normalize_submission_title("Golf Fundraiser Order"), "Golf Fundraiser")
 
 
