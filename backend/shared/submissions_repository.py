@@ -261,7 +261,7 @@ class SubmissionsRepository:
 
     def list_submissions_page(self, limit=50, cursor=None, summary_only=True, group=None):
         group = group or (cursor.get("group") if isinstance(cursor, dict) else None)
-        if group:
+        if group and group != "all":
             return self.list_submissions_group_page(group, limit=limit, cursor=cursor, summary_only=summary_only)
 
         result = self._query_submissions(

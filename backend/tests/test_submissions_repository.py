@@ -223,6 +223,23 @@ class RepositoryTests(unittest.TestCase):
         self.assertNotIn("SUBMISSION", self.table.query_pks)
         self.assertIn("SUBMISSION_GROUP#sponsor", self.table.query_pks)
 
+    def test_group_all_uses_main_submission_partition(self):
+        self.repo.create_submission({
+            "pk": "SUBMISSION",
+            "sk": "2026-06-05T10:00:00-07:00#s1",
+            "recordType": "submission",
+            "submissionId": "s1",
+            "submissionTitle": "Volunteer",
+            "submittedAt": "2026-06-05T10:00:00-07:00",
+        })
+        self.table.query_pks.clear()
+
+        result = self.repo.list_submissions_page(group="all")
+
+        self.assertEqual([item["submissionId"] for item in result["items"]], ["s1"])
+        self.assertIn("SUBMISSION", self.table.query_pks)
+        self.assertNotIn("SUBMISSION_GROUP#all", self.table.query_pks)
+
     def test_get_submission_uses_submission_id_lookup_record(self):
         self.repo.create_submission({
             "pk": "SUBMISSION",
