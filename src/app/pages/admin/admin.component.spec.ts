@@ -1197,11 +1197,28 @@ describe('AdminComponent', () => {
 
     expect(cmsService.getSubmissions.calls.mostRecent().args[0]).toEqual({ limit: 50, group: 'vendor' });
     expect(component.selectedSubmissionGroup).toBe('vendor');
+    expect(component.submissionExportGroup).toBe('vendor');
     expect(component.submissionPageNumber).toBe(1);
     expect(component.submissionTotalCount).toBe(12);
     expect(component.submissionTotalPages).toBe(1);
     expect(component.hasPreviousSubmissionPage).toBeFalse();
     expect(fixture.nativeElement.textContent).toContain('Page 1 of 1');
+  });
+
+  it('syncs the export category dropdown when a submission group filter is selected', () => {
+    cmsService.getSubmissions.calls.reset();
+    cmsService.getSubmissions.and.returnValue(of({ items: [], totalCount: 0, totalPages: 1 }));
+
+    component.submissionExportGroup = 'all';
+    component.toggleSubmissionGroup('parade');
+
+    expect(component.selectedSubmissionGroup).toBe('parade');
+    expect(component.submissionExportGroup).toBe('parade');
+
+    component.toggleSubmissionGroup('parade');
+
+    expect(component.selectedSubmissionGroup).toBe('all');
+    expect(component.submissionExportGroup).toBe('all');
   });
 
   it('loads full submission details when a summary row is selected', () => {
@@ -1970,6 +1987,51 @@ describe('AdminComponent', () => {
     expect(headerText).toEqual(['Date', 'Name', 'Email', 'Phone', 'Amount', 'Details']);
     expect(rowCells[3]).toBe('555-1212');
     expect(rowCells[4]).toBe('$150.00');
+  });
+
+  it('shows a shortened Entry Type column only for the Parade filter', () => {
+    cmsService.getSubmissions.and.returnValue(of({
+      items: [{
+        submissionId: 'parade-1',
+        submissionTitle: 'Parade Entry Request - VIP',
+        submittedAt: '2026-06-05T10:07:00-07:00',
+        name: 'VIP Guest',
+        email: 'vip@example.com',
+        phone: '555-1212',
+        paymentStatus: 'none',
+        paymentProvider: 'none',
+        status: 'New',
+        assignedTo: '',
+        notes: '',
+        rawData: { formType: 'vipEntryForm' },
+      }],
+      totalCount: 1,
+      totalPages: 1,
+    }));
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-submissions"]')!.click();
+    fixture.detectChanges();
+
+    let headerText = Array.from(nativeElement.querySelectorAll('.submissions-table th'))
+      .map(header => header.textContent?.trim());
+    let rowCells = Array.from(nativeElement.querySelectorAll('[data-testid="submission-row-parade-1"] td'))
+      .map(cell => cell.textContent?.trim());
+
+    expect(headerText[0]).toBe('Submission');
+    expect(rowCells[0]).toBe('Parade Entry Request - VIP');
+
+    component.toggleSubmissionGroup('parade');
+    fixture.detectChanges();
+
+    headerText = Array.from(nativeElement.querySelectorAll('.submissions-table th'))
+      .map(header => header.textContent?.trim());
+    rowCells = Array.from(nativeElement.querySelectorAll('[data-testid="submission-row-parade-1"] td'))
+      .map(cell => cell.textContent?.trim());
+
+    expect(headerText[0]).toBe('Entry Type');
+    expect(rowCells[0]).toBe('VIP');
+    expect(nativeElement.querySelector('.submissions-table')?.textContent).not.toContain('Parade Entry Request - VIP');
   });
 
   it('hides the submission column for vendor, freedom club, motor show, and volunteer filters', () => {

@@ -1073,6 +1073,10 @@ export class AdminComponent implements OnInit {
     return !['vendor', 'sponsor', 'motorShow', 'volunteer'].includes(this.selectedSubmissionGroup);
   }
 
+  get submissionColumnLabel(): string {
+    return this.selectedSubmissionGroup === 'parade' ? 'Entry Type' : 'Submission';
+  }
+
   get showPaymentMethodColumn(): boolean {
     return this.selectedSubmissionGroup === 'motorShow';
   }
@@ -1083,6 +1087,7 @@ export class AdminComponent implements OnInit {
 
   toggleSubmissionGroup(group: SubmissionGroupKey) {
     this.selectedSubmissionGroup = this.selectedSubmissionGroup === group ? 'all' : group;
+    this.submissionExportGroup = this.selectedSubmissionGroup;
     this.submissionPageCursors = [undefined];
     this.clearSelectedSubmission();
     this.loadSubmissions('filter', undefined, 1);
@@ -1564,6 +1569,12 @@ export class AdminComponent implements OnInit {
       return title.slice(0, -' Order'.length);
     }
     return title;
+  }
+
+  formatSubmissionTableTitle(submission?: AdminSubmission): string {
+    const title = this.formatSubmissionTitle(submission);
+    if (this.selectedSubmissionGroup !== 'parade') return title;
+    return title.replace(/^Parade Entry Request -\s*/, '');
   }
 
   formatSubmissionPaymentMethod(submission?: AdminSubmission): string {
