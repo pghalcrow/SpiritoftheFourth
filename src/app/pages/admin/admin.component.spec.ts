@@ -1744,7 +1744,7 @@ describe('AdminComponent', () => {
 
     expect(component.submissionsLoading).toBeTrue();
     expect(component.submissionsRefreshing).toBeFalse();
-    expect(loadingState?.textContent).toContain('Loading submissions...');
+    expect(loadingState?.textContent).toContain('Loading...');
     expect(nativeElement.querySelector('.submissions-table')).toBeFalsy();
     expect(refreshButton.disabled).toBeTrue();
     expect(refreshButton.querySelector('.button-spinner')).toBeFalsy();
@@ -1759,6 +1759,46 @@ describe('AdminComponent', () => {
     expect(nativeElement.querySelector('.submissions-table')).toBeTruthy();
     expect(refreshButton.disabled).toBeFalse();
     expect(refreshButton.textContent).toContain('Refresh');
+  });
+
+  it('shows content loading without spinning refresh when a submission group is selected', () => {
+    component.submissions = [{
+      submissionId: 'existing-1',
+      submissionTitle: 'Existing Submission',
+      submittedAt: '2026-06-05T10:00:00-07:00',
+      name: 'Existing Person',
+      email: 'existing@example.com',
+      phone: '555-1212',
+      paymentStatus: 'none',
+      paymentProvider: 'none',
+      status: 'New',
+      assignedTo: '',
+      notes: '',
+      rawData: {},
+    }];
+    const loadingResponse = new Subject<any>();
+    cmsService.getSubmissions.and.returnValue(loadingResponse.asObservable());
+
+    component.toggleSubmissionGroup('sponsor');
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    const loadingState = nativeElement.querySelector('[data-testid="submissions-loading-state"]');
+    const refreshButton = nativeElement.querySelector<HTMLButtonElement>('[data-testid="refresh-submissions-button"]')!;
+
+    expect(component.submissionsLoading).toBeTrue();
+    expect(component.submissionsRefreshing).toBeFalse();
+    expect(loadingState?.textContent).toContain('Loading...');
+    expect(refreshButton.querySelector('.button-spinner')).toBeFalsy();
+    expect(refreshButton.textContent).toContain('Refresh');
+    expect(nativeElement.querySelector('.submissions-table')).toBeFalsy();
+
+    loadingResponse.next({ items: [], totalCount: 0, totalPages: 1 });
+    loadingResponse.complete();
+    fixture.detectChanges();
+
+    expect(component.submissionsLoading).toBeFalse();
+    expect(nativeElement.querySelector('[data-testid="submissions-loading-state"]')).toBeFalsy();
   });
 
   it('keeps current submission rows visible and spins only refresh during manual refresh', () => {

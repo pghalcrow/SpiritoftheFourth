@@ -671,11 +671,6 @@
       </button>
     </div>
 
-    <div *ngIf="submissionsLoading" class="admin-loading-state" data-testid="submissions-loading-state">
-      <span class="button-spinner" aria-hidden="true"></span>
-      <span>Loading submissions...</span>
-    </div>
-
     <div class="submissions-tools">
       <label class="control-group submissions-search">
         <span>Search</span>
@@ -691,6 +686,11 @@
         <span *ngIf="submissionsRefreshing" class="button-spinner" aria-hidden="true"></span>
         {{ submissionsRefreshing ? 'Refreshing...' : 'Refresh' }}
       </button>
+    </div>
+
+    <div *ngIf="submissionsLoading" class="admin-loading-state" data-testid="submissions-loading-state" role="status" aria-live="polite">
+      <span class="button-spinner" aria-hidden="true"></span>
+      <span>Loading...</span>
     </div>
 
     <ng-template #submissionPaginationControls>

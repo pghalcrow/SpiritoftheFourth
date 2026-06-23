@@ -606,7 +606,7 @@ export class AdminComponent implements OnInit {
     this.loadSubmissions('page', this.submissionPageCursors[previousPageNumber - 1], previousPageNumber);
   }
 
-  loadSubmissions(mode: 'initial' | 'refresh' | 'page' = 'initial', cursor?: string, pageNumber = 1) {
+  loadSubmissions(mode: 'initial' | 'refresh' | 'page' | 'filter' = 'initial', cursor?: string, pageNumber = 1) {
     const isRefresh = mode === 'refresh';
     if (isRefresh) {
       this.submissionsRefreshing = true;
@@ -1073,7 +1073,7 @@ export class AdminComponent implements OnInit {
     this.selectedSubmissionGroup = this.selectedSubmissionGroup === group ? 'all' : group;
     this.submissionPageCursors = [undefined];
     this.clearSelectedSubmission();
-    this.loadSubmissions('refresh', undefined, 1);
+    this.loadSubmissions('filter', undefined, 1);
   }
 
   private submissionMatchesGroup(submission: AdminSubmission, group: SubmissionGroupKey): boolean {
