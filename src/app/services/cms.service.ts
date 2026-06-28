@@ -29,6 +29,7 @@ export interface Event {
   flyerUrl: string;
   description: string;
   isVisible?: boolean;
+  registrationEnabled?: boolean;
   eventMeta: EventMeta;
   pricing: EventPricing;
   formFields: any[];

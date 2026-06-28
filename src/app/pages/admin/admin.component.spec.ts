@@ -1119,7 +1119,7 @@ describe('AdminComponent', () => {
     expect(nativeElement.querySelector('.file-picker')).toBeTruthy();
   });
 
-  it('requires event title date and location before saving events', () => {
+  it('requires only event title before saving events', () => {
     component.addEvent();
     component.activeEvent!.title = '';
     component.activeEvent!.eventMeta.dateOfEvent = '';
@@ -1130,6 +1130,67 @@ describe('AdminComponent', () => {
 
     expect(cmsService.updateEvents).not.toHaveBeenCalled();
     expect(fixture.nativeElement.querySelector('.admin-modal')?.textContent).toContain('Event details required');
+
+    component.closeModal();
+    component.activeEvent!.title = 'Display Only Event';
+    component.saveEvents();
+
+    expect(cmsService.updateEvents).toHaveBeenCalled();
+    const savedEvents = cmsService.updateEvents.calls.mostRecent().args[0];
+    expect(savedEvents[1].eventMeta.dateOfEvent).toBe('');
+    expect(savedEvents[1].eventMeta.location).toBe('');
+  });
+
+  it('shows registration toggle and saves disabled registration events', () => {
+    const nativeElement = fixture.nativeElement as HTMLElement;
+    nativeElement.querySelector<HTMLButtonElement>('[data-testid="admin-section-events"]')!.click();
+    fixture.detectChanges();
+
+    const toggle = nativeElement.querySelector<HTMLInputElement>('[data-testid="event-registration-toggle"]');
+
+    expect(toggle).toBeTruthy();
+    expect(toggle?.checked).toBeTrue();
+
+    toggle!.click();
+    fixture.detectChanges();
+    component.saveEvents();
+
+    const savedEvents = cmsService.updateEvents.calls.mostRecent().args[0];
+    expect(savedEvents[0].registrationEnabled).toBeFalse();
+  });
+
+  it('reorders events with drag and drop and saves the new order', () => {
+    component.events = [
+      component.normalizeEventForEditor({
+        title: 'First Event',
+        type: 'firstEvent',
+        flyerUrl: '',
+        description: '',
+        eventMeta: { dateOfEvent: '', location: '', endBlurb: '', contactEmail: '' },
+        pricing: { basePlayerField: 'N/A', includePrimaryPlayer: false, pricePerPlayer: 0, addOns: [] },
+        formFields: [],
+        sections: [],
+      } as any),
+      component.normalizeEventForEditor({
+        title: 'Second Event',
+        type: 'secondEvent',
+        flyerUrl: '',
+        description: '',
+        eventMeta: { dateOfEvent: '', location: '', endBlurb: '', contactEmail: '' },
+        pricing: { basePlayerField: 'N/A', includePrimaryPlayer: false, pricePerPlayer: 0, addOns: [] },
+        formFields: [],
+        sections: [],
+      } as any),
+    ];
+    component.activeEventIndex = 0;
+
+    component.dropEvent({ previousIndex: 1, currentIndex: 0 } as any);
+    component.saveEvents();
+
+    expect(component.events.map(event => event.title)).toEqual(['Second Event', 'First Event']);
+    expect(component.activeEventIndex).toBe(1);
+    const savedEvents = cmsService.updateEvents.calls.mostRecent().args[0];
+    expect(savedEvents.map((event: any) => event.title)).toEqual(['Second Event', 'First Event']);
   });
 
   it('saves the uploaded flyer url for a new event', () => {

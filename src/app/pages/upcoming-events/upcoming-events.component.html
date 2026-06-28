@@ -1,7 +1,7 @@
 <div class="upcoming-events-page">
   <div class="events-shell">
     <header class="events-heading">
-      <h1 class="oswald-font">Upcoming Event(s)</h1>
+      <h1 class="oswald-font">Events</h1>
     </header>
 
     <div class="events-list">
@@ -38,7 +38,7 @@
           class="flyer-img"
         />
 
-        <form *ngIf="event.formGroup as fg" class="event-form" [formGroup]="fg" (ngSubmit)="onSubmit(event)" [hidden]="stripeCheckoutEventIndex === i">
+        <form *ngIf="isRegistrationEnabled(event) && event.formGroup as fg" class="event-form" [formGroup]="fg" (ngSubmit)="onSubmit(event)" [hidden]="stripeCheckoutEventIndex === i">
           <div class="event-form-grid">
             <ng-container *ngFor="let section of event.sections">
               <ng-container *ngIf="section.type === 'fields'">
@@ -105,7 +105,7 @@
 
           <p *ngIf="event.eventMeta.endBlurb" class="event-end-blurb">{{ event.eventMeta.endBlurb }}</p>
 
-          <div class="event-total">Total: ${{ calculateTotal(event) }}</div>
+          <div *ngIf="calculateTotal(event) > 0" class="event-total">Total: ${{ calculateTotal(event) }}</div>
 
           <div *ngIf="isFreeEvent(event); else paidEventButtons" class="payment-row">
             <button
@@ -139,7 +139,7 @@
           </div>
         </form>
 
-        <div [hidden]="stripeCheckoutEventIndex !== i" class="mt-3">
+        <div *ngIf="isRegistrationEnabled(event)" [hidden]="stripeCheckoutEventIndex !== i" class="mt-3">
           <div [id]="'stripe-checkout-event-' + i"></div>
           <div class="text-center mt-3">
             <button type="button" class="btn btn-outline-secondary" (click)="cancelEventStripe()">Back to form</button>

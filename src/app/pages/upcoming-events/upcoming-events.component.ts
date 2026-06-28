@@ -132,6 +132,10 @@ export class UpcomingEventsComponent implements OnInit, AfterViewInit{
     return event.isVisible !== false;
   }
 
+  isRegistrationEnabled(event: CmsEvent): boolean {
+    return event.registrationEnabled !== false;
+  }
+
   formatEventDate(event: CmsEvent): string {
     const eventDate = this.parseEventDate(event.eventMeta?.dateOfEvent || '');
     if (!eventDate) return event.eventMeta?.dateOfEvent || '';

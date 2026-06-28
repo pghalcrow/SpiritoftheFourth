@@ -143,10 +143,61 @@ describe('UpcomingEventsComponent', () => {
     const eventBlocks = Array.from(nativeElement.querySelectorAll<HTMLElement>('[data-testid="upcoming-event"]'));
 
     expect(eventBlocks[0].textContent).toContain('Sign Up');
+    expect(eventBlocks[0].textContent).not.toContain('Total: $0');
     expect(eventBlocks[0].textContent).not.toContain('Pay by Credit Card');
     expect(eventBlocks[0].textContent).not.toContain('PayPal');
     expect(eventBlocks[2].textContent).toContain('Pay by Credit Card');
     expect(eventBlocks[2].textContent).toContain('PayPal');
+  });
+
+  it('uses Events as the page heading', () => {
+    const nativeElement = fixture.nativeElement as HTMLElement;
+
+    expect(nativeElement.querySelector('h1')?.textContent?.trim()).toBe('Events');
+    expect(nativeElement.textContent).not.toContain('Upcoming Event(s)');
+  });
+
+  it('shows disabled registration events without signup or payment controls', () => {
+    cmsService.getEvents.and.returnValue(of({
+      events: [{
+        title: 'Display Only Event',
+        type: 'displayOnlyEvent',
+        flyerUrl: '',
+        description: 'This event is informational.',
+        registrationEnabled: false,
+        eventMeta: {
+          dateOfEvent: '',
+          location: '',
+          endBlurb: '',
+          contactEmail: '',
+        },
+        pricing: {
+          pricingMode: 'fixed',
+          basePlayerField: 'N/A',
+          includePrimaryPlayer: false,
+          pricePerPlayer: 25,
+          addOns: [],
+        },
+        formFields: [{
+          name: 'fullName',
+          label: 'Full Name',
+          type: 'text',
+          required: true,
+        }],
+        sections: [{ type: 'fields', fields: ['fullName'] }],
+      }],
+    }));
+
+    const disabledFixture = TestBed.createComponent(UpcomingEventsComponent);
+    disabledFixture.detectChanges();
+
+    const eventBlock = (disabledFixture.nativeElement as HTMLElement).querySelector<HTMLElement>('[data-testid="upcoming-event"]')!;
+    expect(eventBlock.textContent).toContain('Display Only Event');
+    expect(eventBlock.querySelector('form')).toBeFalsy();
+    expect(eventBlock.textContent).not.toContain('Sign Up');
+    expect(eventBlock.textContent).not.toContain('Pay by Credit Card');
+    expect(eventBlock.textContent).not.toContain('PayPal');
+    expect(orderService.processFreeEventSignup).not.toHaveBeenCalled();
   });
 
   it('submits a free event signup without creating a payment session', () => {

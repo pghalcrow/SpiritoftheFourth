@@ -69,11 +69,19 @@
       <span>Loading events...</span>
     </div>
 
-    <nav *ngIf="events.length" class="event-tabs" aria-label="Events">
+    <nav
+      *ngIf="events.length"
+      class="event-tabs"
+      aria-label="Events"
+      cdkDropList
+      cdkDropListOrientation="horizontal"
+      (cdkDropListDropped)="dropEvent($event)"
+    >
       <button
         *ngFor="let cmsEvent of events; let i = index"
         type="button"
         class="event-tab"
+        cdkDrag
         [class.active]="i === activeEventIndex"
         (click)="selectEvent(i)"
       >
@@ -158,6 +166,16 @@
             />
             <span>Show this event on the Upcoming Events page</span>
           </label>
+
+          <label class="visibility-toggle span-full">
+            <input
+              type="checkbox"
+              data-testid="event-registration-toggle"
+              [checked]="cmsEvent.registrationEnabled !== false"
+              (change)="cmsEvent.registrationEnabled = $any($event.target).checked"
+            />
+            <span>Allow registration and payment for this event</span>
+          </label>
         </div>
       </section>
 
@@ -176,13 +194,12 @@
               [value]="cmsEvent.eventMeta.dateOfEvent"
               (input)="cmsEvent.eventMeta.dateOfEvent = getInputValue($event)"
               placeholder="Date"
-              required
             />
           </label>
 
           <label class="control-group">
             <span>Location</span>
-            <input class="admin-input" [(ngModel)]="cmsEvent.eventMeta.location" placeholder="Location" required />
+            <input class="admin-input" [(ngModel)]="cmsEvent.eventMeta.location" placeholder="Location" />
           </label>
 
           <div class="control-group span-full">

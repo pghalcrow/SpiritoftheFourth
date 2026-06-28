@@ -162,6 +162,7 @@ export class AdminComponent implements OnInit {
     return {
       ...event,
       isVisible: event.isVisible !== false,
+      registrationEnabled: event.registrationEnabled !== false,
       pricing: {
         ...event.pricing,
         pricingMode: this.derivePricingMode(event),
@@ -1919,9 +1920,7 @@ export class AdminComponent implements OnInit {
 
   validateEventsBeforeSave(): boolean {
     const invalidEvent = this.events.find(event =>
-      !event.title?.trim() ||
-      !event.eventMeta?.dateOfEvent?.trim() ||
-      !event.eventMeta?.location?.trim()
+      !event.title?.trim()
     );
 
     if (!invalidEvent) {
@@ -1930,7 +1929,7 @@ export class AdminComponent implements OnInit {
 
     this.showModal(
       'Event details required',
-      'Event title, date, and location are required before saving.',
+      'Event title is required before saving.',
       'warning'
     );
     this.adminSection = 'events';
@@ -2031,6 +2030,7 @@ export class AdminComponent implements OnInit {
     const updatedEvents = this.events.map(event => ({
       ...event,
       isVisible: event.isVisible !== false,
+      registrationEnabled: event.registrationEnabled !== false,
       pricing: this.normalizePricingForSave(event),
       eventMeta: {
         ...event.eventMeta,
@@ -2126,6 +2126,7 @@ export class AdminComponent implements OnInit {
       flyerUrl: '',
       description: '',
       isVisible: true,
+      registrationEnabled: true,
       eventMeta: {
         dateOfEvent: '',
         location: '',
@@ -2238,6 +2239,14 @@ export class AdminComponent implements OnInit {
 
   dropField(event: CdkDragDrop<any[]>, fields: any[]) {
     moveItemInArray(fields, event.previousIndex, event.currentIndex);
+  }
+
+  dropEvent(event: CdkDragDrop<CmsEvent[]>) {
+    const activeEvent = this.activeEvent;
+    moveItemInArray(this.events, event.previousIndex, event.currentIndex);
+    if (activeEvent) {
+      this.activeEventIndex = this.events.indexOf(activeEvent);
+    }
   }
 
   buildSections(event: CmsEvent) {

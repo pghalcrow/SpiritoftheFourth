@@ -618,6 +618,66 @@ class ParallelSubmissionStorageTests(unittest.TestCase):
         self.assertEqual(create_submission_record.call_args.kwargs["payment_provider"], "none")
         self.assertEqual(create_submission_record.call_args.kwargs["amount"], 0)
 
+    def test_free_dynamic_event_signup_rejects_disabled_registration(self):
+        app = import_create_order_app()
+        email_sender = FakeEmailSender()
+        form_data = {
+            "type": "freePicnic",
+            "eventTitle": "Community Picnic",
+            "fullName": "Pat Halcrow",
+            "email": "pat@example.com",
+            "phone": "555-1212",
+            "grandTotal": 0,
+            "pricing": {"pricePerPlayer": 0},
+            "teamMembers": [],
+        }
+
+        with patch.object(app, "EmailSender", return_value=email_sender), \
+            patch.object(app, "get_event_config", return_value={
+                "title": "Community Picnic",
+                "registrationEnabled": False,
+                "eventMeta": {
+                    "dateOfEvent": "July 4, 2026",
+                    "location": "Town Park",
+                    "contactEmail": "event@example.com",
+                },
+                "sections": [{"type": "fields", "fields": ["fullName", "email", "phone"]}],
+            }), \
+            patch.object(app, "update_google_sheet") as update_google_sheet, \
+            patch.object(app, "create_submission_record") as create_submission_record, \
+            patch.dict(app.os.environ, {"RESA_EMAIL": "resa@example.com"}):
+            response = app.process_free_event_signup(form_data, "free-1")
+
+        self.assertEqual(response["error"], "Registration is closed for this event")
+        self.assertEqual(email_sender.sent, [])
+        update_google_sheet.assert_not_called()
+        create_submission_record.assert_not_called()
+
+    def test_dynamic_event_payment_rejects_disabled_registration(self):
+        app = import_create_order_app()
+
+        with patch.object(app, "get_event_config", return_value={
+            "title": "Golf Fundraiser",
+            "registrationEnabled": False,
+        }), \
+            patch.object(app, "store_dynamic_submission") as store_dynamic_submission, \
+            patch.dict(app.os.environ, {
+                "ENVIRONMENT": "prod",
+                "RETURN_URL": "https://spiritofthefourth.org",
+                "STRIPE_API_KEY": "sk_live_real",
+            }, clear=True):
+            response = app.lambda_handler({
+                "action": "createStripeEmbeddedSession",
+                "type": "golfEvent",
+                "email": "buyer@example.com",
+                "pricing": {"pricingMode": "fixed", "pricePerPlayer": 25},
+                "grandTotal": 25,
+            }, None)
+
+        self.assertEqual(response["statusCode"], 400)
+        self.assertEqual(json.loads(response["body"])["error"], "Registration is closed for this event")
+        store_dynamic_submission.assert_not_called()
+
     def test_mailer_records_submission_in_google_sheet_and_dynamodb(self):
         mailer = import_sotf_mailer()
 

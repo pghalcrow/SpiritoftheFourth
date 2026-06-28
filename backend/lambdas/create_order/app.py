@@ -962,6 +962,8 @@ def stripe_items_to_email_html(email_sender, stripe_service, session_id):
 def process_free_event_signup(form_data, submission_id=None):
     submission_id = submission_id or uuid.uuid4().hex[:12]
     event_type = form_data.get("type", "dynamic_event")
+    if not event_registration_enabled(event_type):
+        return registration_closed_response()
     resa_email = os.environ.get("RESA_EMAIL")
     event_config = get_event_config(event_type)
     event_meta = get_event_meta(event_type, event_config, form_data, resa_email)
@@ -1107,6 +1109,15 @@ def get_event_config(event_type):
     return {}
 
 
+def event_registration_enabled(event_type):
+    event_config = get_event_config(event_type)
+    return event_config.get("registrationEnabled") is not False
+
+
+def registration_closed_response():
+    return {"error": "Registration is closed for this event"}
+
+
 def lambda_handler(event, context):
     print("in Now!")
     if 'body' in event:
@@ -1167,6 +1178,8 @@ def lambda_handler(event, context):
             elif event.get('pricing'):
 
                 print("🔥 dynamic event order received")
+                if not event_registration_enabled(event.get("type")):
+                    return {"statusCode": 400, "body": json.dumps(registration_closed_response())}
 
                 submission_id = uuid.uuid4().hex[:12]
 
@@ -1351,6 +1364,9 @@ def lambda_handler(event, context):
 
             event_type = event.get('type', 'general_order')
             submission_id = uuid.uuid4().hex[:12]
+
+            if event.get('pricing') and not event_registration_enabled(event_type):
+                return {"statusCode": 400, "body": json.dumps(registration_closed_response())}
 
             if event_type == 'vendorApplication' and float(event.get('grandTotal', 0)) == 0:
                 send_vendor_emails_direct(event, submission_id)
