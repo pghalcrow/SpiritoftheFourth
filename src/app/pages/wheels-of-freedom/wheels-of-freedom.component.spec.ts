@@ -1,14 +1,20 @@
-import { fakeAsync, tick } from '@angular/core/testing';
-import { FormBuilder } from '@angular/forms';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { RouterTestingModule } from '@angular/router/testing';
 import { of, Subject } from 'rxjs';
+import { EmailService } from 'src/app/services/email.service';
+import { OrderService } from 'src/app/services/order.service';
+import { PaypalDonationService } from 'src/app/services/paypal-donation.service';
 import { WheelsOfFreedomComponent } from './wheels-of-freedom.component';
 
 describe('WheelsOfFreedomComponent', () => {
   let component: WheelsOfFreedomComponent;
+  let fixture: ComponentFixture<WheelsOfFreedomComponent>;
   let orderService: any;
   let emailService: any;
+  let paypalDonationService: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     emailService = {
       sendEmail: jasmine.createSpy('sendEmail').and.returnValue(of({ status: true }))
     };
@@ -18,12 +24,26 @@ describe('WheelsOfFreedomComponent', () => {
       ),
       submitOrder: jasmine.createSpy('submitOrder')
     };
+    paypalDonationService = {
+      renderDonationButton: jasmine.createSpy('renderDonationButton')
+    };
+
+    await TestBed.configureTestingModule({
+      declarations: [WheelsOfFreedomComponent],
+      imports: [ReactiveFormsModule, RouterTestingModule],
+      providers: [
+        FormBuilder,
+        { provide: EmailService, useValue: emailService },
+        { provide: OrderService, useValue: orderService },
+        { provide: PaypalDonationService, useValue: paypalDonationService },
+      ],
+    }).compileComponents();
 
     component = new WheelsOfFreedomComponent(
       new FormBuilder(),
       emailService as any,
       orderService,
-      { renderDonationButton: jasmine.createSpy('renderDonationButton') } as any,
+      paypalDonationService as any,
       { queryParams: of({}) } as any
     );
 
@@ -39,6 +59,22 @@ describe('WheelsOfFreedomComponent', () => {
 
   afterEach(() => {
     delete (window as any).Stripe;
+  });
+
+  it('shows the motor show as closed without registration controls', () => {
+    fixture = TestBed.createComponent(WheelsOfFreedomComponent);
+    fixture.detectChanges();
+
+    const nativeElement = fixture.nativeElement as HTMLElement;
+
+    expect(nativeElement.textContent).toContain('Motor show registration is closed for the season.');
+    expect(nativeElement.textContent).not.toContain('Enter Motor Show');
+    expect(nativeElement.querySelector('[data-bs-target="#motorShowModal"]')).toBeFalsy();
+    expect(nativeElement.querySelector('#motorShowModal')).toBeFalsy();
+    expect(nativeElement.querySelector('form')).toBeFalsy();
+    expect(nativeElement.textContent).not.toContain('Pay by Credit Card');
+    expect(nativeElement.textContent).not.toContain('PayPal');
+    expect(nativeElement.textContent).not.toContain('Pay by Check');
   });
 
   it('preloads a Stripe session after the motor show form is valid and stable', fakeAsync(() => {
