@@ -79,8 +79,8 @@ export class SponsorsPlugComponent {
         url: 'https://koizencellars.com/'
       },
       {
-        image: "assets/sdbsd logo.png",
-        url: 'https://www.sbdsd.com/'
+        image: "assets/sponsor_logos/lucia.png",
+        url: 'https://www.luciacap.com/'
       },
       {
         image: "assets/sponsor_logos/psycho_oncology_care.png",
@@ -93,22 +93,6 @@ export class SponsorsPlugComponent {
       {
         image: "assets/sponsor_logos/TheHeights.png",
         url: 'https://www.invitedclubs.com/clubs/the-heights-golf-club'
-      },
-      {
-        image: "assets/sponsor_logos/BarrelRiot.jpg",
-        url: 'https://www.barrelriot.com/'
-      },
-      {
-        image: "assets/sponsor_logos/rivian.png",
-        url: 'https://rivian.com/demo-drive/book'
-      },
-      {
-        image: "assets/sponsor_logos/round_table.png",
-        url: 'https://www.roundtablepizza.com/location/93/'
-      },
-      {
-        image: "assets/sponsor_logos/chick_fil_a.png",
-        url: 'https://www.chick-fil-a.com/locations/ca/carmel-mountain'
       },
     )
   }
